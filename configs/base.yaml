@@ -6,7 +6,7 @@ defaults:
 data:
 
   # Available tasks: hallucination, inpainting
-  task: hallucination
+  task: inpainting
 
   # Available tasks: pdb, scope
   dataset: pdb
@@ -19,6 +19,11 @@ data:
     # Setting for 48GB GPUs
     max_batch_size: 80
     max_num_res_squared: 400_000
+
+  # Cropping 
+  ab_threshold: 40
+  general_threshold: 40
+  max_num_res: 650
 
 interpolant:
   min_t: 1e-2
@@ -51,9 +56,9 @@ interpolant:
   self_condition: ${model.edge_features.self_condition}
 
 experiment:
-  debug: False
+  debug: True
   seed: 123
-  num_devices: 2
+  num_devices: 1
   warm_start: null
   warm_start_cfg_override: True
   training:
@@ -63,12 +68,12 @@ experiment:
     translation_loss_weight: 2.0
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
-    aux_loss_weight: 0.0
+    aux_loss_weight: 0.2
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: True
     aux_loss_t_pass: 0.5
   wandb:
-    name: ${data.task}_${data.dataset}
+    name: default_frame_pred
     project: se3-fm
   optimizer:
     lr: 0.0001
@@ -86,7 +91,7 @@ experiment:
     dirpath: ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/non_coil_percent
+    monitor: valid/h3_trans_loss
     mode: max
   # Keep this null. Will be populated at runtime.
   inference_dir: null

@@ -199,31 +199,39 @@ class FlowModule(LightningModule):
         num_batch, num_res = res_mask.shape
         diffuse_mask = batch['diffuse_mask']
         csv_idx = batch['csv_idx']
-        atom37_traj, _, _ = self.interpolant.sample(
+        raw_path = batch['raw_path']
+        pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
+        atom37_traj, _, _, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
+            aatype=batch['aatype'],
             trans_1=batch['trans_1'],
             rotmats_1=batch['rotmats_1'],
             diffuse_mask=diffuse_mask,
             chain_idx=batch['chain_idx'],
             res_idx=batch['res_idx'],
+            pair_init=batch['pair_init'],
+            return_trans_rot=True
         )
+        
         samples = atom37_traj[-1].numpy()
         batch_metrics = []
         for i in range(num_batch):
             sample_dir = os.path.join(
                 self.checkpoint_dir,
-                f'sample_{csv_idx[i].item()}_idx_{batch_idx}_len_{num_res}'
+                f'{pdb_id}_len_{num_res}'
             )
             os.makedirs(sample_dir, exist_ok=True)
 
-            # Write out sample to PDB file
+            # Write out sample to PDB file (wo b-factors)
             final_pos = samples[i]
             saved_path = au.write_prot_to_pdb(
                 final_pos,
-                os.path.join(sample_dir, 'sample.pdb'),
-                no_indexing=True
+                file_path=os.path.join(sample_dir, pdb_id),
+                aatype=batch['aatype'].cpu(),
+                chain_index=batch['chain_idx'].cpu(),
+                no_indexing=False
             )
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
@@ -234,6 +242,49 @@ class FlowModule(LightningModule):
             ca_idx = residue_constants.atom_order['CA']
             ca_ca_metrics = metrics.calc_ca_ca_metrics(final_pos[:, ca_idx])
             batch_metrics.append((mdtraj_metrics | ca_ca_metrics))
+
+            # calculate trans loss (rmsd)
+            gt_trans_1 = batch['trans_1']
+            trans_error = (gt_trans_1 - pred_trans_1) 
+            trans_loss = torch.sum(
+                trans_error ** 2 * diffuse_mask[..., None],
+                dim=(-1, -2)
+            ) / torch.sum(diffuse_mask, dim=-1) * 3
+            trans_loss_dict = {'trans_loss': trans_loss**0.5}
+            batch_metrics.append(trans_loss_dict)
+
+            # calcuclate trans loss (h3 rmsd)
+            b, N = diffuse_mask.shape
+            h3_mask = torch.zeros_like(diffuse_mask)
+            count = 0
+            for i in range(b):
+                count = 0  
+                in_group = False  
+                group_start = None  
+                
+                # 연속된 1들의 그룹을 추적
+                for j in range(N):
+                    if diffuse_mask[i, j] == 1:
+                        if not in_group:  # 새로운 그룹 시작
+                            group_start = j
+                            in_group = True
+                    else:
+                        if in_group:  # 그룹이 끝나는 지점
+                            count += 1
+                            # 세 번째 그룹만 남기고 나머지 그룹은 0
+                            if count == 3:
+                                h3_mask[i, group_start:j] = 1
+                            in_group = False
+                
+            # calculate h3 trans loss (rmsd)
+
+            h3_trans_loss = torch.sum(
+                trans_error ** 2 * h3_mask[..., None],
+                dim=(-1, -2)
+            ) / torch.sum(h3_mask, dim=-1) * 3
+            h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
+
+            batch_metrics.append(h3_trans_loss_dict)
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
@@ -285,6 +336,7 @@ class FlowModule(LightningModule):
         step_start_time = time.time()
         self.interpolant.set_device(batch['res_mask'].device)
         noisy_batch = self.interpolant.corrupt_batch(batch)
+
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
                 model_sc = self.model(noisy_batch)
@@ -361,22 +413,26 @@ class FlowModule(LightningModule):
         sample_ids = [sample_ids] if isinstance(sample_ids, int) else sample_ids
         num_batch = len(sample_ids)
 
+
+        pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
+
         if 'diffuse_mask' in batch: # motif-scaffolding
             target = batch['target'][0]
             trans_1 = batch['trans_1']
             rotmats_1 = batch['rotmats_1']
             diffuse_mask = batch['diffuse_mask']
+
             true_bb_pos = all_atom.atom37_from_trans_rot(trans_1, rotmats_1, 1 - diffuse_mask)
             true_bb_pos = true_bb_pos[..., :3, :].reshape(-1, 3).cpu().numpy()
             _, sample_length, _ = trans_1.shape
             sample_dirs = [os.path.join(
-                self.inference_dir, target, f'sample_{str(sample_id)}')
+                self.inference_dir, target, f'{pdb_id}')
                 for sample_id in sample_ids]
         else: # unconditional
             sample_length = batch['num_res'].item()
             true_bb_pos = None
             sample_dirs = [os.path.join(
-                self.inference_dir, f'length_{sample_length}', f'sample_{str(sample_id)}')
+                self.inference_dir, f'length_{sample_length}', f'{pdb_id}')
                 for sample_id in sample_ids]
             trans_1 = rotmats_1 = diffuse_mask = None
             diffuse_mask = torch.ones(1, sample_length, device=device)
@@ -384,7 +440,9 @@ class FlowModule(LightningModule):
         # Sample batch
         atom37_traj, model_traj, _ = interpolant.sample(
             num_batch, sample_length, self.model,
-            trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask
+            aatype=aatype,
+            trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
+            pair_init=batch['pair_init']
         )
 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
@@ -396,6 +454,7 @@ class FlowModule(LightningModule):
                 aatype = du.to_numpy(batch['aatype'].long())[0]
             else:
                 aatype = np.zeros(sample_length, dtype=int)
+            print(f'aatype: {aatype}')
             _ = eu.save_traj(
                 bb_traj[-1],
                 bb_traj,

@@ -160,10 +160,12 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
   pdb_lines = []
 
   atom_mask = prot.atom_mask
-  aatype = prot.aatype
+  if len(prot.aatype.shape) > 1:
+    aatype = prot.aatype.squeeze().numpy().astype(int) # only available when batch consists of same protein
   atom_positions = prot.atom_positions
   residue_index = prot.residue_index.astype(int)
-  chain_index = prot.chain_index.astype(int)
+  if len(prot.chain_index.shape) > 1:
+    chain_index = prot.chain_index.squeeze().numpy().astype(int) # only available when batch consists of same protein
   b_factors = prot.b_factors
 
   if np.any(aatype > residue_constants.restype_num):

@@ -11,7 +11,7 @@ class NodeFeatureNet(nn.Module):
         self.c_s = self._cfg.c_s
         self.c_pos_emb = self._cfg.c_pos_emb
         self.c_timestep_emb = self._cfg.c_timestep_emb
-        embed_size = self._cfg.c_pos_emb + self._cfg.c_timestep_emb * 2 + 1
+        embed_size = self._cfg.c_pos_emb + self._cfg.c_timestep_emb * 2 + 1 + 1
         if self._cfg.embed_chain:
             embed_size += self._cfg.c_pos_emb
         self.linear = nn.Linear(embed_size, self.c_s)
@@ -24,7 +24,7 @@ class NodeFeatureNet(nn.Module):
         )[:, None, :].repeat(1, mask.shape[1], 1)
         return timestep_emb * mask.unsqueeze(-1)
 
-    def forward(self, so3_t, r3_t, res_mask, diffuse_mask, pos):
+    def forward(self, so3_t, r3_t, res_mask, diffuse_mask, pos, aatype):
         # s: [b]
 
         b, num_res, device = res_mask.shape[0], res_mask.shape[1], res_mask.device
@@ -36,6 +36,7 @@ class NodeFeatureNet(nn.Module):
 
         # [b, n_res, c_timestep_emb]
         input_feats = [
+            aatype[..., None],
             pos_emb,
             diffuse_mask[..., None],
             self.embed_t(so3_t, res_mask),

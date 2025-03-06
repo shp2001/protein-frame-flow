@@ -15,7 +15,6 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler, dist
 
-
 class PdbDataModule(LightningDataModule):
     def __init__(self, data_cfg):
         super().__init__()
@@ -33,11 +32,12 @@ class PdbDataModule(LightningDataModule):
             dataset_cfg=self.dataset_cfg,
             is_training=False,
         )
-
+    
     def train_dataloader(self, rank=None, num_replicas=None):
         num_workers = self.loader_cfg.num_workers
         return DataLoader(
             self._train_dataset,
+            collate_fn=self.collate_fn,
             batch_sampler=LengthBatcher(
                 sampler_cfg=self.sampler_cfg,
                 metadata_csv=self._train_dataset.csv,
@@ -53,6 +53,7 @@ class PdbDataModule(LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self._valid_dataset,
+            collate_fn=self.collate_fn,
             sampler=DistributedSampler(self._valid_dataset, shuffle=False),
             num_workers=2,
             prefetch_factor=2,
@@ -156,6 +157,7 @@ class PdbDataset(Dataset):
         processed_file_path = csv_row['processed_path']
         chain_feats = self._process_csv_row(processed_file_path)
         chain_feats['csv_idx'] = torch.ones(1, dtype=torch.long) * idx
+
         return chain_feats
 
 

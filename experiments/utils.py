@@ -200,6 +200,7 @@ def save_traj(
         diffuse_mask: np.ndarray,
         output_dir: str,
         aatype = None,
+        chain_index = None
     ):
     """Writes final sample and reverse diffusion trajectory.
 
@@ -236,22 +237,25 @@ def save_traj(
         sample,
         sample_path,
         b_factors=b_factors,
-        no_indexing=True,
+        no_indexing=False,
         aatype=aatype,
+        chain_index=chain_index
     )
     prot_traj_path = au.write_prot_to_pdb(
         bb_prot_traj,
         prot_traj_path,
         b_factors=b_factors,
-        no_indexing=True,
+        no_indexing=False,
         aatype=aatype,
+        chain_index=chain_index
     )
     x0_traj_path = au.write_prot_to_pdb(
         x0_traj,
         x0_traj_path,
         b_factors=b_factors,
-        no_indexing=True,
-        aatype=aatype
+        no_indexing=False,
+        aatype=aatype,
+        chain_index=chain_index
     )
     return {
         'sample_path': sample_path,

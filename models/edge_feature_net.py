@@ -12,9 +12,10 @@ class EdgeFeatureNet(nn.Module):
         self.c_s = self._cfg.c_s
         self.c_p = self._cfg.c_p
         self.feat_dim = self._cfg.feat_dim
+        self.relpos_dim = self._cfg.relpos_dim
 
         self.linear_s_p = nn.Linear(self.c_s, self.feat_dim)
-        self.linear_relpos = nn.Linear(self.feat_dim, self.feat_dim)
+        self.linear_relpos = nn.Linear(self.relpos_dim, self.feat_dim)
 
         total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
         if self._cfg.embed_chain:
@@ -30,14 +31,8 @@ class EdgeFeatureNet(nn.Module):
             nn.LayerNorm(self.c_p),
         )
 
-    def embed_relpos(self, r):
-        # AlphaFold 2 Algorithm 4 & 5
-        # Based on OpenFold utils/tensor_utils.py
-        # Input: [b, n_res]
-        # [b, n_res, n_res]
-        d = r[:, :, None] - r[:, None, :]
-        pos_emb = get_index_embedding(d, self._cfg.feat_dim, max_len=2056)
-        return self.linear_relpos(pos_emb)
+    def embed_relpos(self, pair_init):
+        return self.linear_relpos(pair_init)
 
     def _cross_concat(self, feats_1d, num_batch, num_res):
         return torch.cat([
@@ -45,18 +40,15 @@ class EdgeFeatureNet(nn.Module):
             torch.tile(feats_1d[:, None, :, :], (1, num_res, 1, 1)),
         ], dim=-1).float().reshape([num_batch, num_res, num_res, -1])
 
-    def forward(self, s, t, sc_t, p_mask, diffuse_mask):
+    def forward(self, s, t, sc_t, p_mask, diffuse_mask, pair_init):
         # Input: [b, n_res, c_s]
         num_batch, num_res, _ = s.shape
-
+    
         # [b, n_res, c_p]
         p_i = self.linear_s_p(s)
         cross_node_feats = self._cross_concat(p_i, num_batch, num_res)
 
-        # [b, n_res]
-        r = torch.arange(
-            num_res, device=s.device).unsqueeze(0).repeat(num_batch, 1)
-        relpos_feats = self.embed_relpos(r)
+        relpos_feats = self.embed_relpos(pair_init)
 
         dist_feats = calc_distogram(
             t, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)

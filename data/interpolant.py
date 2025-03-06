@@ -117,6 +117,7 @@ class Interpolant:
         if torch.any(torch.isnan(rotmats_t)):
             raise ValueError('NaN in rotmats_t during corruption')
         noisy_batch['rotmats_t'] = rotmats_t
+        noisy_batch['pair_init'] = batch['pair_init']
         return noisy_batch
     
     def rot_sample_kappa(self, t):
@@ -152,6 +153,7 @@ class Interpolant:
             num_batch,
             num_res,
             model,
+            aatype,
             num_timesteps=None,
             trans_potential=None,
             trans_0=None,
@@ -161,7 +163,9 @@ class Interpolant:
             diffuse_mask=None,
             chain_idx=None,
             res_idx=None,
+            pair_init=None,
             verbose=False,
+            return_trans_rot=False,
         ):
         res_mask = torch.ones(num_batch, num_res, device=self._device)
 
@@ -176,14 +180,18 @@ class Interpolant:
                 num_res,
                 device=self._device,
                 dtype=torch.float32)[None].repeat(num_batch, 1)
+        
         batch = {
+            'aatype': aatype,
             'res_mask': res_mask,
-            'diffuse_mask': res_mask,
-            'res_idx': res_idx 
+            'diffuse_mask': diffuse_mask,
+            'res_idx': res_idx,
+            'pair_init': pair_init
         }
 
         motif_scaffolding = False
         if diffuse_mask is not None and trans_1 is not None and rotmats_1 is not None:
+
             motif_scaffolding = True
             motif_mask = ~diffuse_mask.bool().squeeze(0)
         else:
@@ -322,7 +330,11 @@ class Interpolant:
         # Convert trajectories to atom37.
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
-        return atom37_traj, clean_atom37_traj, clean_traj
+
+        if return_trans_rot:
+            return atom37_traj, clean_atom37_traj, clean_traj, pred_trans_1, pred_rotmats_1
+        else:
+            return atom37_traj, clean_atom37_traj, clean_traj
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

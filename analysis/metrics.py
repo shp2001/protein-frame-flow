@@ -4,7 +4,6 @@ import numpy as np
 from openfold.np import residue_constants
 from tmtools import tm_align
 
-
 def calc_tm_score(pos_1, pos_2, seq_1, seq_2):
     tm_results = tm_align(pos_1, pos_2, seq_1, seq_2)
     return tm_results.tm_norm_chain1, tm_results.tm_norm_chain2 

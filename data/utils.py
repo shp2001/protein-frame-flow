@@ -1,4 +1,6 @@
+import sys
 from typing import List, Dict, Any
+
 from openfold.utils import rigid_utils as ru
 from data import residue_constants
 import numpy as np
@@ -212,10 +214,7 @@ def chain_str_to_int(chain_str: str):
 def parse_chain_feats(chain_feats, scale_factor=1.):
     ca_idx = residue_constants.atom_order['CA']
     chain_feats['bb_mask'] = chain_feats['atom_mask'][:, ca_idx]
-    bb_pos = chain_feats['atom_positions'][:, ca_idx]
-    bb_center = np.sum(bb_pos, axis=0) / (np.sum(chain_feats['bb_mask']) + 1e-5)
-    centered_pos = chain_feats['atom_positions'] - bb_center[None, None, :]
-    scaled_pos = centered_pos / scale_factor
+    scaled_pos = chain_feats['atom_positions']  / scale_factor
     chain_feats['atom_positions'] = scaled_pos * chain_feats['atom_mask'][..., None]
     chain_feats['bb_positions'] = chain_feats['atom_positions'][:, ca_idx]
     return chain_feats

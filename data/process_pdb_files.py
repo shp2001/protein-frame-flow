@@ -10,12 +10,12 @@ import time
 from Bio import PDB
 import numpy as np
 import mdtraj as md
-
+import yaml
 
 from data import utils as du
 from data import parsers
 from data import errors
-
+from data import motif_index as mi
 
 # Define the parser
 parser = argparse.ArgumentParser(
@@ -42,9 +42,14 @@ parser.add_argument(
     '--verbose',
     help='Whether to log everything.',
     action='store_true')
+parser.add_argument(
+    '--config',
+    help='config file path',
+    type=str,
+    default='/home/psh/protein-frame-flow/configs/datasets.yaml'
+)
 
-
-def process_file(file_path: str, write_dir: str):
+def process_file(file_path: str, write_dir: str, cfg: str):
     """Processes protein file into usable, smaller pickles.
 
     Args:
@@ -59,6 +64,26 @@ def process_file(file_path: str, write_dir: str):
         All other errors are unexpected and are propogated.
     """
     metadata = {}
+    with open(cfg, 'r') as f:
+        cfg = yaml.safe_load(f)
+    
+    mode = cfg['shared']['mode']
+    metadata['mode'] = mode
+
+    if mode == 'ab':
+        cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
+        for cdr_type in cdr_types:
+            start, end = mi.cdr_indices(file_path, cdr_type)
+            metadata[f'{cdr_type}_start'] = start
+            metadata[f'{cdr_type}_end'] = end
+    
+    if mode == 'general':
+        loop_json_dir = cfg['shared']['loop_dir']
+        json_filename = os.path.basename(file_path).replace('.pdb', '.json')
+        loop_info_file = os.path.join(loop_json_dir, json_filename)
+
+        metadata['loop_info_dir'] = loop_info_file
+
     pdb_name = os.path.basename(file_path).replace('.pdb', '')
     metadata['pdb_name'] = pdb_name
 
@@ -70,7 +95,7 @@ def process_file(file_path: str, write_dir: str):
 
     # Extract all chains
     struct_chains = {
-        chain.id.upper(): chain
+        chain.id: chain
         for chain in structure.get_chains()}
     metadata['num_chains'] = len(struct_chains)
 
@@ -109,9 +134,8 @@ def process_file(file_path: str, write_dir: str):
         pdb_ss = md.compute_dssp(traj, simplified=True)
         # DG calculation
         pdb_dg = md.compute_rg(traj)
-        os.remove(file_path)
+
     except Exception as e:
-        os.remove(file_path)
         raise errors.DataError(f'Mdtraj failed with error {e}')
 
     chain_dict['ss'] = pdb_ss[0]
@@ -129,14 +153,15 @@ def process_file(file_path: str, write_dir: str):
     return metadata
 
 
-def process_serially(all_paths, write_dir):
+def process_serially(all_paths, write_dir, cfg):
     all_metadata = []
     for i, file_path in enumerate(all_paths):
         try:
             start_time = time.time()
             metadata = process_file(
                 file_path,
-                write_dir)
+                write_dir,
+                cfg)
             elapsed_time = time.time() - start_time
             print(f'Finished {file_path} in {elapsed_time:2.2f}s')
             all_metadata.append(metadata)
@@ -148,12 +173,14 @@ def process_serially(all_paths, write_dir):
 def process_fn(
         file_path,
         verbose=None,
-        write_dir=None):
+        write_dir=None,
+        cfg=None):
     try:
         start_time = time.time()
         metadata = process_file(
             file_path,
-            write_dir)
+            write_dir,
+            cfg)
         elapsed_time = time.time() - start_time
         if verbose:
             print(f'Finished {file_path} in {elapsed_time:2.2f}s')
@@ -165,6 +192,7 @@ def process_fn(
 
 def main(args):
     pdb_dir = args.pdb_dir
+    cfg = args.config
     all_file_paths = [
         os.path.join(pdb_dir, x)
         for x in os.listdir(args.pdb_dir) if '.pdb' in x]
@@ -183,12 +211,14 @@ def main(args):
     if args.num_processes == 1 or args.debug:
         all_metadata = process_serially(
             all_file_paths,
-            write_dir)
+            write_dir,
+            cfg)
     else:
         _process_fn = fn.partial(
             process_fn,
             verbose=args.verbose,
-            write_dir=write_dir)
+            write_dir=write_dir,
+            cfg=cfg)
         with mp.Pool(processes=args.num_processes) as pool:
             all_metadata = pool.map(_process_fn, all_file_paths)
         all_metadata = [x for x in all_metadata if x is not None]
