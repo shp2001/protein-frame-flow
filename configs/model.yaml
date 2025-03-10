@@ -30,3 +30,8 @@ model:
     seq_tfmr_num_heads: 4
     seq_tfmr_num_layers: 2
     num_blocks: 6
+  angle:
+    c_resnet: 256
+    no_resnet_blocks: 2
+    epsilon: 1.0e-07
+    use_original_sm: true
