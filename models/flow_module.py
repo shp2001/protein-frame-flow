@@ -186,6 +186,7 @@ class FlowModule(LightningModule):
         se3_vf_loss += auxiliary_loss
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
+
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,
@@ -297,6 +298,7 @@ class FlowModule(LightningModule):
                 data=self.validation_epoch_samples)
             self.validation_epoch_samples.clear()
         val_epoch_metrics = pd.concat(self.validation_epoch_metrics)
+
         for metric_name,metric_val in val_epoch_metrics.mean().to_dict().items():
             self._log_scalar(
                 f'valid/{metric_name}',
@@ -417,7 +419,6 @@ class FlowModule(LightningModule):
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
 
         if 'diffuse_mask' in batch: # motif-scaffolding
-            target = batch['target'][0]
             trans_1 = batch['trans_1']
             rotmats_1 = batch['rotmats_1']
             diffuse_mask = batch['diffuse_mask']
@@ -426,7 +427,7 @@ class FlowModule(LightningModule):
             true_bb_pos = true_bb_pos[..., :3, :].reshape(-1, 3).cpu().numpy()
             _, sample_length, _ = trans_1.shape
             sample_dirs = [os.path.join(
-                self.inference_dir, target, f'{pdb_id}')
+                self.inference_dir, pdb_id, f'sample_{sample_id}')
                 for sample_id in sample_ids]
         else: # unconditional
             sample_length = batch['num_res'].item()
@@ -440,12 +441,13 @@ class FlowModule(LightningModule):
         # Sample batch
         atom37_traj, model_traj, _ = interpolant.sample(
             num_batch, sample_length, self.model,
-            aatype=aatype,
+            aatype=batch['aatype'],
             trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
             pair_init=batch['pair_init']
         )
 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
+        print(num_batch)
         for i in range(num_batch):
             sample_dir = sample_dirs[i]
             bb_traj = bb_trajs[i]
@@ -454,7 +456,11 @@ class FlowModule(LightningModule):
                 aatype = du.to_numpy(batch['aatype'].long())[0]
             else:
                 aatype = np.zeros(sample_length, dtype=int)
-            print(f'aatype: {aatype}')
+
+            if 'chain_idx' in batch:
+                chain_idx = du.to_numpy(batch['chain_idx'].long())[0]
+            else:
+                chain_idx = None
             _ = eu.save_traj(
                 bb_traj[-1],
                 bb_traj,
@@ -462,4 +468,5 @@ class FlowModule(LightningModule):
                 du.to_numpy(diffuse_mask)[0],
                 output_dir=sample_dir,
                 aatype=aatype,
+                chain_index=chain_idx
             )

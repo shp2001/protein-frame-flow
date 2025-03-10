@@ -20,6 +20,7 @@ from typing import Any, Mapping, Optional
 from data import residue_constants
 from Bio.PDB import PDBParser
 import numpy as np
+import torch 
 
 FeatureDict = Mapping[str, np.ndarray]
 ModelOutput = Mapping[str, Any]  # Is a nested dict.
@@ -160,12 +161,17 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
   pdb_lines = []
 
   atom_mask = prot.atom_mask
-  if len(prot.aatype.shape) > 1:
+  if len(prot.aatype.shape) > 1 and isinstance(prot.aatype, torch.Tensor):
     aatype = prot.aatype.squeeze().numpy().astype(int) # only available when batch consists of same protein
+  else:
+    aatype = prot.aatype.squeeze().astype(int)
   atom_positions = prot.atom_positions
   residue_index = prot.residue_index.astype(int)
-  if len(prot.chain_index.shape) > 1:
+  if len(prot.chain_index.shape) > 1 and isinstance(prot.aatype, torch.Tensor):
     chain_index = prot.chain_index.squeeze().numpy().astype(int) # only available when batch consists of same protein
+  else:
+    chain_index = prot.chain_index.squeeze().astype(int)
+
   b_factors = prot.b_factors
 
   if np.any(aatype > residue_constants.restype_num):

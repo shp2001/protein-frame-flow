@@ -1,0 +1,335 @@
+import abc
+import numpy as np
+import pandas as pd
+import logging
+import torch
+
+
+from torch.utils.data import Dataset
+from data import utils as du
+
+
+from openfold.data import data_transforms
+from openfold.utils import rigid_utils
+import json 
+
+from Bio.PDB import PDBParser
+from Bio.SeqUtils import seq1
+
+from data.motif_index import load_loop_file
+from data.motif_index import embed_relpos, crop_antigen
+
+from itertools import accumulate
+import bisect
+# def _rog_filter(df, quantile):
+#     y_quant = pd.pivot_table(
+#         df,
+#         values='radius_gyration', 
+#         index='modeled_seq_len',
+#         aggfunc=lambda x: np.quantile(x, quantile)
+#     )
+#     x_quant = y_quant.index.to_numpy()
+#     y_quant = y_quant.radius_gyration.to_numpy()
+
+#     # Fit polynomial regressor
+#     poly = PolynomialFeatures(degree=4, include_bias=True)
+#     poly_features = poly.fit_transform(x_quant[:, None])
+#     poly_reg_model = LinearRegression()
+#     poly_reg_model.fit(poly_features, y_quant)
+
+#     # Calculate cutoff for all sequence lengths
+#     max_len = df.modeled_seq_len.max()
+#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
+#     # Add a little more.
+#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
+
+#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
+#     return df[df.radius_gyration < row_rog_cutoffs]
+
+
+def _length_filter(data_csv, min_res, max_res):
+    return data_csv[
+        (data_csv.seq_len >= min_res)
+        & (data_csv.seq_len <= max_res)
+    ]
+
+
+def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
+    processed_feats = du.read_pkl(processed_file_path)
+    processed_feats = du.parse_chain_feats(processed_feats)
+
+    # make chain sequence list (for the multimer relpos embedding)
+    chain_seq_list = []
+    pdb_file = raw_path
+
+    p = PDBParser()
+    structure = p.get_structure(
+        'protein',
+        pdb_file,
+    )
+
+    for chain in structure.get_chains():
+        pdb_seq = "".join([seq1(r.get_resname()) for r in chain.get_residues()])
+        chain_seq_list.append(pdb_seq)
+
+    # Run through OpenFold data transforms.
+    chain_feats = {
+        'aatype': torch.tensor(processed_feats['aatype']).long(),
+        'all_atom_positions': torch.tensor(processed_feats['atom_positions']).double(),
+        'all_atom_mask': torch.tensor(processed_feats['atom_mask']).double()
+    }
+
+    chain_feats = data_transforms.atom37_to_frames(chain_feats)
+    rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
+    rotmats_1 = rigids_1.get_rots().get_rot_mats()
+    trans_1 = rigids_1.get_trans()
+    res_plddt = processed_feats['b_factors'][:, 1]
+    res_mask = torch.tensor(processed_feats['bb_mask']).int()
+    
+    chain_idx = torch.tensor(processed_feats['chain_index'])
+    res_idx = processed_feats['residue_index']
+
+
+    # # res_idx offset version으로
+    # offset = 0  # 각 체인의 residue index를 조정하는 offset
+    # start = 0
+    # for chain_seq in chain_seq_list:
+    #     chain_length = len(chain_seq)
+    #     for i in range(start, start + chain_length):
+    #         res_idx[i] += offset  # 현재 offset 적용
+    #     offset += chain_length  # offset 업데이트
+    #     start += chain_length  # 다음 체인의 시작 위치
+
+    return {
+        'res_plddt': torch.tensor(res_plddt),
+        'aatype': chain_feats['aatype'],
+        'rotmats_1': rotmats_1,
+        'trans_1': trans_1,
+        'res_mask': res_mask,
+        'chain_idx': chain_idx,
+        'res_idx': res_idx,
+        'scaffold_idx': scaffold_idx,
+        'chain_seq_list': chain_seq_list
+    }
+
+
+def _add_plddt_mask(feats, plddt_threshold):
+    feats['plddt_mask'] = torch.tensor(
+        feats['res_plddt'] > plddt_threshold).int()
+
+
+def _read_clusters(cluster_path):
+    with open(cluster_path, 'r') as f:
+        cluster_dict = json.load(f)
+    
+    pdb_to_cluster = {}
+    for cluster_id, pdb_ids in cluster_dict.items():
+        for pdb_id in pdb_ids:
+            pdb_to_cluster[pdb_id] = cluster_id
+    
+    return pdb_to_cluster
+
+
+class BaseDataset(Dataset):
+    def __init__(
+            self,
+            inf_cfg,
+            is_training,
+            task,
+        ):
+        self._log = logging.getLogger(__name__)
+        self._is_training = is_training
+        self._inf_cfg = inf_cfg
+        self._inference_cfg = inf_cfg.inference
+        self.task = task
+
+        num_batch = self._inference_cfg.samples.num_batch
+        self.n_samples = self._inference_cfg.samples.samples_per_target // num_batch
+
+        self.raw_csv = pd.read_csv(self._inference_cfg.samples.csv_path)
+        
+        metadata_csv = self.raw_csv
+        self._create_split(metadata_csv)
+        self._cache = {}
+        self._rng = np.random.default_rng(seed=123)
+
+        all_sample_ids = []
+        for row_id in range(self.csv.shape[0]):
+            target_row = self.csv.iloc[row_id]
+            for sample_id in range(self.n_samples):
+                sample_ids = torch.tensor([num_batch * sample_id + i for i in range(num_batch)])
+                all_sample_ids.append((target_row, sample_ids))
+
+        self._all_sample_ids = all_sample_ids
+
+    @property
+    def is_training(self):
+        return self._is_training
+
+    
+    def __len__(self):
+        return len(self._all_sample_ids)
+    
+    def _create_split(self, data_csv):
+        # Training or validation specific logic.
+        self.csv = data_csv
+        self._log.info(
+            f'Validation: {len(self.csv)} examples')
+        self.csv['index'] = list(range(len(self.csv)))
+
+    def process_csv_row(self, csv_row):
+        path = csv_row['processed_path']
+        raw_path = csv_row['raw_path']
+        seq_len = csv_row['seq_len']
+        
+        masked_chain = None
+        first_chain_len = None
+
+        scaffold_idx = {}
+
+        if csv_row['mode'] == 'ab':
+            cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
+            for cdr in cdr_types:
+                scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
+                scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+
+        if csv_row['mode'] == 'general':
+            loop_info_file = csv_row['loop_info_dir']
+
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+
+        # Large protein files are slow to read. Cache them.
+        use_cache = True
+        if use_cache and path in self._cache:
+            return self._cache[path]
+        
+        processed_row = _process_csv_row(path, raw_path, scaffold_idx)
+        processed_row['masked_chain'] = masked_chain
+        processed_row['first_chain_len'] = first_chain_len
+        processed_row['raw_path'] = raw_path
+        if use_cache:
+            self._cache[path] = processed_row
+        
+        return processed_row
+    
+    def _sample_scaffold_mask(self, batch, rng):
+        trans_1 = batch['trans_1']
+        num_res = trans_1.shape[0]
+        scaffold_idx = batch['scaffold_idx']
+        scaffold_mask = torch.zeros(num_res)
+
+        if len(scaffold_idx.keys()) == 2: # general loop PPI
+            loop_indices = []
+            for scf, idx in scaffold_idx.items():
+                loop_indices.append(idx)
+            loop_indices = sorted(loop_indices)
+
+            scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
+
+        elif len(scaffold_idx.keys()) == 12: # antibody-antigen
+            cdr_indices = []
+            for scf, idx in scaffold_idx.items():
+                cdr_indices.append(idx)
+            cdr_indices = sorted(cdr_indices)
+            for i in range(6):
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+
+        return scaffold_mask * batch['res_mask']
+    
+    def setup_inpainting(self, feats, rng):
+        diffuse_mask = self._sample_scaffold_mask(feats, rng)
+        if 'plddt_mask' in feats:
+            diffuse_mask = diffuse_mask * feats['plddt_mask']
+        if torch.sum(diffuse_mask) < 1:
+            # Should only happen rarely.
+            diffuse_mask = torch.ones_like(diffuse_mask)
+        feats['diffuse_mask'] = diffuse_mask
+    
+    def __getitem__(self, row_idx):
+        # Process data example.
+        csv_row, sample_id = self._all_sample_ids[row_idx]
+        feats = self.process_csv_row(csv_row)
+
+        feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
+
+        if self.task == 'hallucination':
+            feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
+
+        elif self.task == 'inpainting':
+
+            rng = self._rng if self.is_training else np.random.default_rng(seed=123)
+            self.setup_inpainting(feats, rng)
+        
+            # Center based on motif locations
+            motif_mask = 1 - feats['diffuse_mask']
+            trans_1 = feats['trans_1']
+            motif_1 = trans_1 * motif_mask[:, None]
+            motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
+            trans_1 -= motif_com[None, :]
+            feats['trans_1'] = trans_1
+        else:
+            raise ValueError(f'Unknown task {self.task}')
+        feats['diffuse_mask'] = feats['diffuse_mask'].int()
+        # Storing the csv index is helpful for debugging.
+        feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
+        feats['sample_id'] = sample_id
+        return feats
+
+
+def collate_fn(batch):
+    cropped_batch = []
+
+    for feat in batch:
+        # crop the feats
+        cropped_feat = {}
+
+        cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
+                                                    threshold=60,
+                                                    cdr_mask=feat['diffuse_mask'],
+                                                    nan_mask=feat['res_mask'],
+                                                    max_len=1000,
+                                                    seq_list=feat['chain_seq_list']
+                                                    )
+        # del feat['masked_chain']
+        # del feat['first_chain_len']
+
+        not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id']
+
+        for key in feat.keys():
+            if key not in not_crop_key:
+                cropped_feat[key] = feat[key][cropped_feat['res_idx']]
+
+            if key == 'chain_seq_list':
+                lengths = [len(s) for s in feat[key]]
+                start_positions = list(accumulate([0] + lengths))
+
+                merged = "".join(feat[key])
+                cropped_seq_list = [[] for _ in range(len(feat[key]))]
+
+                for idx in cropped_feat['res_idx']:
+                    chain_idx = bisect.bisect_right(start_positions, idx) - 1
+                    cropped_seq_list[chain_idx].append(merged[idx])
+
+                cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
+
+        # make pair_init (relpos)
+        relpos_emb = embed_relpos(cropped_feat['res_idx'],
+                                cropped_feat['chain_seq_list'])
+        
+        cropped_feat['pair_init'] = relpos_emb
+        cropped_feat['csv_idx'] = feat['csv_idx']
+        cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
+        cropped_feat['sample_id'] = feat['sample_id']
+        del cropped_feat['chain_seq_list']
+
+        cropped_batch.append(cropped_feat)
+
+    cropped_batch = {key: [d[key] for d in cropped_batch] for key in cropped_batch[0].keys()}   
+
+    for key in cropped_batch.keys():                
+        cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
+
+    cropped_batch['raw_path'] = feat['raw_path']
+    return cropped_batch

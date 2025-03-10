@@ -4,18 +4,18 @@ defaults:
   - _self_
 
 inference:
-
-  predict_dir: ./inference_outputs/
+  base_configs: /home/psh/protein-frame-flow/configs/base.yaml
+  predict_dir: /home/psh/protein-frame-flow/inference_outputs/
   inference_subdir: run_${now:%Y-%m-%d}_${now:%H-%M-%S}
 
   # Use this to write with date-time stamp.
   name: run_${now:%Y-%m-%d}_${now:%H-%M}
   seed: 123
-  task: null
-  output_dir: inference_outputs/
+  task: inpainting
+  output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: null
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/default_frame_pred/2025-03-06_23-24-22/last.ckpt
 
   use_gpu: True
   num_gpus: 2
@@ -63,7 +63,7 @@ inference:
     min_length: 60
 
     # Maximum sequence length to sample.
-    max_length: 128
+    max_length: 10000
 
     # gap between lengths to sample. i.e. this script will sample all lengths
     # in range(min_length, max_length, length_step)
@@ -75,10 +75,10 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: motif_scaffolding/benchmark.csv
+    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
-    samples_per_target: 100
+    samples_per_target: 50
 
     # Batch size when sampling from the model
     num_batch: 1

@@ -10,6 +10,8 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from omegaconf import DictConfig, OmegaConf
 from experiments import utils as eu
+from experiments.inference_loader import BaseDataset, collate_fn
+
 from models.flow_module import FlowModule
 
 
@@ -84,11 +86,12 @@ class EvalRunner:
         if self._infer_cfg.task == 'unconditional':
             eval_dataset = eu.LengthDataset(self._samples_cfg)
         elif self._infer_cfg.task == 'scaffolding':
-            eval_dataset = eu.ScaffoldingDataset(self._samples_cfg)
+            eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
         else:
             raise ValueError(f'Unknown task {self._infer_cfg.task}')
+            
         dataloader = torch.utils.data.DataLoader(
-            eval_dataset, batch_size=1, shuffle=False, drop_last=False)
+            eval_dataset, batch_size=1, shuffle=False, drop_last=False, collate_fn=collate_fn)
         trainer = Trainer(
             accelerator="gpu",
             strategy="ddp",
@@ -97,7 +100,7 @@ class EvalRunner:
         trainer.predict(self._flow_module, dataloaders=dataloader)
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="inference_unconditional")
+@hydra.main(version_base=None, config_path="../configs", config_name="inference_scaffolding")
 def run(cfg: DictConfig) -> None:
 
     # Read model checkpoint.

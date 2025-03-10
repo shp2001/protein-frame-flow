@@ -192,7 +192,7 @@ def crop_antigen(trans_1, threshold, cdr_mask, nan_mask, max_len, seq_list=None)
         
         distance_ag = distance_vector[ab_len:]
         values, indices = torch.topk(distance_ag, max_len-ab_len, largest=False)
-        indices = [i + ab_len for i in indices if nan_mask[i]==1]
+        indices = sorted([i + ab_len for i in indices if nan_mask[i]==1])
         residue_indices = [i for i in range(ab_len) if nan_mask[i]==1] + indices
 
     return residue_indices
