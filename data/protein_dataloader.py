@@ -12,6 +12,7 @@ from itertools import accumulate
 from collections import defaultdict
 import bisect
 
+from openfold.data.data_transforms import reencode_cdr_mask
 class ProteinData(LightningDataModule):
 
     def __init__(self, *, data_cfg, train_dataset, valid_dataset, predict_dataset=None):
@@ -30,7 +31,6 @@ class ProteinData(LightningDataModule):
             for feat in batch:
                 # crop the feats
                 cropped_feat = {}
-
                 if len(feat['scaffold_idx'].keys()) == 12:
                     cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     threshold=self.data_cfg.ab_threshold,
@@ -81,6 +81,9 @@ class ProteinData(LightningDataModule):
                 cropped_feat['csv_idx'] = feat['csv_idx']
                 cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
 
+                if len(feat['scaffold_idx'].keys()) == 12:
+                    cropped_feat['region_numeric'] = reencode_cdr_mask(cropped_feat['diffuse_mask'])
+
                 del cropped_feat['chain_seq_list']
 
                 cropped_batch.append(cropped_feat)
@@ -91,6 +94,7 @@ class ProteinData(LightningDataModule):
                 cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
             cropped_batch['raw_path'] = feat['raw_path']
+
             return cropped_batch
         return collate_fn
     
