@@ -168,11 +168,13 @@ def frames_to_atom14_pos(
     return pred_positions
 
 
-def compute_backbone(bb_rigids, psi_torsions):
-    torsion_angles = torch.tile(
-        psi_torsions[..., None, :], tuple([1 for _ in range(len(bb_rigids.shape))]) + (7, 1)
-    )
-    aatype = torch.zeros(bb_rigids.shape, device=bb_rigids.device).long()
+def compute_backbone(bb_rigids, psi_torsions=None, aatype=None, torsion_angles=None):
+    if torsion_angles == None:
+        torsion_angles = torch.tile(
+            psi_torsions[..., None, :], tuple([1 for _ in range(len(bb_rigids.shape))]) + (7, 1)
+        )
+    if aatype == None:
+        aatype = torch.zeros(bb_rigids.shape, device=bb_rigids.device).long()
     # aatype = torch.zeros(bb_rigids.shape).long().to(bb_rigids.device)
     all_frames = torsion_angles_to_frames(
         bb_rigids,

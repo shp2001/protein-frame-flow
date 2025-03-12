@@ -206,12 +206,12 @@ class FlowModule(LightningModule):
             rotmats_t, gt_rotmats_1.type(torch.float32))
         if torch.any(torch.isnan(gt_rot_vf)):
             raise ValueError('NaN encountered in gt_rot_vf')
-        gt_bb_atoms = all_atom.to_atom37(gt_trans_1, gt_rotmats_1)[:, :, :3] 
-        gt_all_frame = all_atom.torsion_angles_to_frames(du.create_rigid(gt_rotmats_1, gt_trans_1), gt_torsion_angles, noisy_batch['aatype'])
-        gt_all_atom14 = all_atom.frames_to_atom14_pos(gt_all_frame, noisy_batch['aatype'])
+        gt_atom37_bb_pos, gt_atom37_mask, gt_aatype, gt_atom14_pos = all_atom.compute_backbone(du.create_rigid(gt_rotmats_1, gt_trans_1),
+                                                                                               torsion_angles=gt_torsion_angles,
+                                                                                               aatype=noisy_batch['aatype'])
 
-        # gt_bb_atoms = gt_all_atom14[:, :, :3] 
-        gt_sc_atoms = gt_all_atom14[:, :, 3:]
+        gt_bb_atoms = gt_atom37_bb_pos[:, :, :3] 
+        gt_sc_atoms = gt_atom14_pos[:, :, 3:]
 
         # Timestep used for normalization.
         r3_t = noisy_batch['r3_t']
@@ -235,11 +235,29 @@ class FlowModule(LightningModule):
         pred_all_frame = all_atom.torsion_angles_to_frames(du.create_rigid(pred_rotmats_1, pred_trans_1), pred_angles, noisy_batch['aatype'])
         pred_all_atom14 = all_atom.frames_to_atom14_pos(pred_all_frame, noisy_batch['aatype'])
 
+        # Translation VF loss
+        loss_denom = torch.sum(loss_mask, dim=-1) * 3
+        trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
+        trans_loss = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * loss_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_denom
+        print(f'trans_loss: {trans_loss}')
+        trans_loss = torch.clamp(trans_loss, max=5)
+
+        
+        # Rotation VF loss
+        rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
+        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * loss_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_denom
+
         # Backbone atom loss
         pred_bb_atoms = all_atom.to_atom37(pred_trans_1, pred_rotmats_1)[:, :, :3]
         gt_bb_atoms *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         pred_bb_atoms *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        loss_denom = torch.sum(loss_mask, dim=-1) * 3
+        
         bb_atom_loss = torch.sum(
             (gt_bb_atoms - pred_bb_atoms) ** 2 * loss_mask[..., None, None],
             dim=(-1, -2, -3)
@@ -252,7 +270,7 @@ class FlowModule(LightningModule):
                                        noisy_batch['aatype'],
                                        noisy_batch['res_mask'],
                                        noisy_batch['chi_mask'],
-                                       noisy_batch['chi_angles_sin_cos'],
+                                       gt_chi_angle,
                                        chi_weight=0.5,
                                        angle_norm_weight=0.02,
                                        cdr_mask=noisy_batch['diffuse_mask']
@@ -270,21 +288,7 @@ class FlowModule(LightningModule):
         ) / loss_denom_sc
 
         print(f'sc_atom_loss: {sc_atom_loss}')
-        # Translation VF loss
-        trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
-        trans_loss = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_denom
-        trans_loss = torch.clamp(trans_loss, max=5)
 
-        print(f'trans_loss: {trans_loss}')
-        # Rotation VF loss
-        rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
-        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_denom
 
         # Pairwise distance loss
         gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
