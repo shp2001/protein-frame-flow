@@ -7,140 +7,13 @@ from models.edge_feature_net import EdgeFeatureNet
 from models import ipa_pytorch
 from data import utils as du
 
-class AngleResnetBlock(nn.Module):
-    def __init__(self, c_hidden, use_original_sm):
-        """
-        Args:
-            c_hidden:
-                Hidden channel dimension
-        """
-        super(AngleResnetBlock, self).__init__()
 
-        self.c_hidden = c_hidden
-        self.use_original_sm = use_original_sm
-
-        if not self.use_original_sm:
-            self.linear_1 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_2 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="final")
-
-        self.relu = nn.ReLU()
-
-    def forward(self, a: torch.Tensor) -> torch.Tensor:
-        s_initial = a
-
-        if not self.use_original_sm:
-            a = self.relu(a)
-            a = self.linear_1(a)
-        a = self.relu(a)
-        a = self.linear_2(a)
-        a = self.relu(a)
-        a = self.linear_3(a)
-
-        return a + s_initial
-
-
-class AngleResnet(nn.Module):
-    """
-    Implements Algorithm 20, lines 11-14
-    """
-
-    def __init__(self, c_in, c_hidden, no_blocks, no_angles, epsilon, use_original_sm):
-        """
-        Args:
-            c_in:
-                Input channel dimension
-            c_hidden:
-                Hidden channel dimension
-            no_blocks:
-                Number of resnet blocks
-            no_angles:
-                Number of torsion angles to generate
-            epsilon:
-                Small constant for normalization
-            use_original_sm:
-                If True implement line 11 of algorithm 20 correctly else use the ABB3 implementation.
-        """
-        super(AngleResnet, self).__init__()
-
-        self.c_in = c_in
-        self.c_hidden = c_hidden
-        self.no_blocks = no_blocks
-        self.no_angles = no_angles
-        self.eps = epsilon
-        self.use_original_sm = use_original_sm
-
-        if self.use_original_sm:
-            self.linear_in = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-            self.linear_initial = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-
-        self.layers = nn.ModuleList()
-        for _ in range(self.no_blocks):
-            layer = AngleResnetBlock(
-                c_hidden=self.c_hidden, use_original_sm=self.use_original_sm
-            )
-            self.layers.append(layer)
-
-        self.linear_out = ipa_pytorch.Linear(self.c_hidden, self.no_angles * 2)
-
-        self.relu = nn.ReLU()
-
-    def forward(
-        self, s: torch.Tensor, s_initial: torch.Tensor
-    ):
-        """
-        Args:
-            s:
-                [*, C_hidden] single embedding
-            s_initial:
-                [*, C_hidden] single embedding as of the start of the
-                StructureModule
-        Returns:
-            [*, no_angles, 2] predicted angles
-        """
-        # NOTE: The ReLU's applied to the inputs are absent from the supplement
-        # pseudocode but present in the source. For maximal compatibility with
-        # the pretrained weights, I'm going with the source.
-
-        # [*, C_hidden]
-        if self.use_original_sm:
-            s_initial = self.relu(s_initial)
-            s_initial = self.linear_initial(s_initial)
-            s = self.relu(s)
-            s = self.linear_in(s)
-            s = s + s_initial
-        else:
-            s = torch.cat((s, s_initial), dim=-1)
-
-        for l in self.layers:
-            s = l(s)
-
-        s = self.relu(s)
-
-        # [*, no_angles * 2]
-        s = self.linear_out(s)
-
-        # [*, no_angles, 2]
-        s = s.view(s.shape[:-1] + (-1, 2))
-
-        unnormalized_s = s
-        norm_denom = torch.sqrt(
-            torch.clamp(
-                torch.sum(s**2, dim=-1, keepdim=True),
-                min=self.eps,
-            )
-        )
-        s = s / norm_denom
-
-        return unnormalized_s, s
-    
 class FlowModel(nn.Module):
 
     def __init__(self, model_conf):
         super(FlowModel, self).__init__()
         self._model_conf = model_conf
         self._ipa_conf = model_conf.ipa
-        self._angle_conf = model_conf.angle
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
         self.node_feature_net = NodeFeatureNet(model_conf.node_features)
@@ -177,15 +50,6 @@ class FlowModel(nn.Module):
                     edge_embed_in=edge_in,
                     edge_embed_out=self._model_conf.edge_embed_size,
                 )
-
-        self.angle_resnet = AngleResnet(
-                self._ipa_conf.c_s,
-                self._angle_conf.c_resnet,
-                self._angle_conf.no_resnet_blocks,
-                self._angle_conf.no_angles,
-                self._angle_conf.epsilon,
-                self._angle_conf.use_original_sm
-            )
 
     def forward(self, input_feats):
 
@@ -256,11 +120,7 @@ class FlowModel(nn.Module):
         curr_rigids = self.rigids_nm_to_ang(curr_rigids)
         pred_trans = curr_rigids.get_trans()
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()
-
-        unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
-            "unnormalized_angles": unnormalized_angles,
-            "angles": angles,
         }

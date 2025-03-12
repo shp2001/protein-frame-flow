@@ -21,103 +21,6 @@ from data import residue_constants
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 
-def masked_mean(mask, value, dim, eps=1e-4):
-    mask = mask.expand(*value.shape)
-    return torch.sum(mask * value, dim=dim) / (eps + torch.sum(mask, dim=dim))
-
-def supervised_chi_loss(
-    angles_sin_cos: torch.Tensor,
-    unnormalized_angles_sin_cos: torch.Tensor,
-    aatype: torch.Tensor,
-    seq_mask: torch.Tensor,
-    chi_mask: torch.Tensor,
-    chi_angles_sin_cos: torch.Tensor,
-    chi_weight: float,
-    angle_norm_weight: float,
-    cdr_mask: torch.Tensor,
-    eps=1e-6,
-) -> torch.Tensor:
-    """
-    Implements Algorithm 27 (torsionAngleLoss)
-
-    Args:
-        angles_sin_cos:
-            [*, N, 7, 2] predicted angles
-        unnormalized_angles_sin_cos:
-            The same angles, but unnormalized
-        aatype:
-            [*, N] residue indices
-        seq_mask:
-            [*, N] sequence mask
-        chi_mask:
-            [*, N, 7] angle mask
-        chi_angles_sin_cos:
-            [*, N, 7, 2] ground truth angles
-        chi_weight:
-            Weight for the angle component of the loss
-        angle_norm_weight:
-            Weight for the normalization component of the loss
-        cdr_mask:
-            [*, N] cdr mask
-    Returns:
-        [*] loss tensor
-    """
-
-    pred_angles = angles_sin_cos[..., 3:, :]
-    residue_type_one_hot = torch.nn.functional.one_hot(
-        aatype,
-        residue_constants.restype_num + 1,
-    )
-    chi_pi_periodic = torch.einsum(
-        "...ij,jk->ik",
-        residue_type_one_hot.type(angles_sin_cos.dtype),
-        angles_sin_cos.new_tensor(residue_constants.chi_pi_periodic),
-    )
-
-    true_chi = chi_angles_sin_cos[None]
-
-    shifted_mask = (1 - 2 * chi_pi_periodic).unsqueeze(-1)
-    true_chi_shifted = shifted_mask * true_chi
-    sq_chi_error = torch.sum((true_chi - pred_angles) ** 2, dim=-1)
-    sq_chi_error_shifted = torch.sum((true_chi_shifted - pred_angles) ** 2, dim=-1)
-    sq_chi_error = torch.minimum(sq_chi_error, sq_chi_error_shifted)
-  
-    # The ol' switcheroo
-    sq_chi_error = sq_chi_error.permute(
-        *range(len(sq_chi_error.shape))[1:-2], 0, -2, -1
-    )
-    sq_chi_error = sq_chi_error.squeeze(1)
-    sq_chi_loss = masked_mean(chi_mask, sq_chi_error, dim=(-1, -2, -3))
-
-    loss = chi_weight * sq_chi_loss
-
-    ## cdr_mask for sq_chi_loss
-    # (B, n) -> (B, n, 7) or (B, n, 4)
-    chi_cdr_mask = cdr_mask[..., None]
-    chi_cdr_mask = chi_cdr_mask * chi_mask
-    sq_chi_loss += masked_mean(chi_cdr_mask, sq_chi_error, dim=(-1, -2, -3))
-
-    angle_norm = torch.sqrt(torch.sum(unnormalized_angles_sin_cos**2, dim=-1) + eps)
-    norm_error = torch.abs(angle_norm - 1.0)
-    norm_error = norm_error.permute(*range(len(norm_error.shape))[1:-2], 0, -2, -1)
-    angle_norm_loss = masked_mean(
-        seq_mask[..., None], norm_error, dim=(-1, -2, -3)
-    )
-
-    ## cdr_mask for angle_norm_loss
-    angle_cdr_mask = cdr_mask
-    angle_cdr_mask = angle_cdr_mask * seq_mask
-    angle_norm_loss += masked_mean(
-        angle_cdr_mask[..., None], norm_error, dim=(-1, -2, -3)
-    )
-
-    loss = loss + angle_norm_weight * angle_norm_loss
-
-    # Average over the batch dimension
-    loss = torch.mean(loss)
-
-    return loss
-
 
 class FlowModule(LightningModule):
 
@@ -199,19 +102,11 @@ class FlowModule(LightningModule):
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
         rotmats_t = noisy_batch['rotmats_t']
-        gt_torsion_angles = noisy_batch['torsion_angles_sin_cos']
-        gt_chi_angle = noisy_batch['chi_angles_sin_cos']
-        
         gt_rot_vf = so3_utils.calc_rot_vf(
             rotmats_t, gt_rotmats_1.type(torch.float32))
         if torch.any(torch.isnan(gt_rot_vf)):
             raise ValueError('NaN encountered in gt_rot_vf')
-        gt_atom37_bb_pos, gt_atom37_mask, gt_aatype, gt_atom14_pos = all_atom.compute_backbone(du.create_rigid(gt_rotmats_1, gt_trans_1),
-                                                                                               torsion_angles=gt_torsion_angles,
-                                                                                               aatype=noisy_batch['aatype'])
-
-        gt_bb_atoms = gt_atom37_bb_pos[:, :, :3] 
-        gt_sc_atoms = gt_atom14_pos[:, :, 3:]
+        gt_bb_atoms = all_atom.to_atom37(gt_trans_1, gt_rotmats_1)[:, :, :3] 
 
         # Timestep used for normalization.
         r3_t = noisy_batch['r3_t']
@@ -225,70 +120,35 @@ class FlowModule(LightningModule):
         model_output = self.model(noisy_batch)
         pred_trans_1 = model_output['pred_trans']
         pred_rotmats_1 = model_output['pred_rotmats']
-        pred_angles = model_output['angles']
-        pred_unnormalized_angles = model_output['unnormalized_angles']
-
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
         if torch.any(torch.isnan(pred_rots_vf)):
             raise ValueError('NaN encountered in pred_rots_vf')
-
-        pred_all_frame = all_atom.torsion_angles_to_frames(du.create_rigid(pred_rotmats_1, pred_trans_1), pred_angles, noisy_batch['aatype'])
-        pred_all_atom14 = all_atom.frames_to_atom14_pos(pred_all_frame, noisy_batch['aatype'])
-
-        # Translation VF loss
-        loss_denom = torch.sum(loss_mask, dim=-1) * 3
-        trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
-        trans_loss = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_denom
-        print(f'trans_loss: {trans_loss}')
-        trans_loss = torch.clamp(trans_loss, max=5)
-
-        
-        # Rotation VF loss
-        rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
-        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_denom
 
         # Backbone atom loss
         pred_bb_atoms = all_atom.to_atom37(pred_trans_1, pred_rotmats_1)[:, :, :3]
         gt_bb_atoms *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         pred_bb_atoms *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        
+        loss_denom = torch.sum(loss_mask, dim=-1) * 3
         bb_atom_loss = torch.sum(
             (gt_bb_atoms - pred_bb_atoms) ** 2 * loss_mask[..., None, None],
             dim=(-1, -2, -3)
         ) / loss_denom
 
         print(f'bb_atom_loss: {bb_atom_loss}')
-        # torsion angle loss 
-        chi_loss = supervised_chi_loss(pred_angles,
-                                       pred_unnormalized_angles,
-                                       noisy_batch['aatype'],
-                                       noisy_batch['res_mask'],
-                                       noisy_batch['chi_mask'],
-                                       gt_chi_angle,
-                                       chi_weight=0.5,
-                                       angle_norm_weight=0.02,
-                                       cdr_mask=noisy_batch['diffuse_mask']
-                                       )
-
-        # sc atom loss 
-        sc_loss_mask = loss_mask[...,None] * noisy_batch['atom14_gt_exists'][..., 3:]
-        pred_sc_atoms = pred_all_atom14[:, :, 3:]
-        gt_sc_atoms *= training_cfg.sc_atom_scale / r3_norm_scale[..., None]
-        pred_sc_atoms *= training_cfg.sc_atom_scale / r3_norm_scale[..., None]
-        loss_denom_sc = torch.sum(sc_loss_mask, dim=(-1,-2)) * 3
-        sc_atom_loss = torch.sum(
-            (gt_sc_atoms - pred_sc_atoms) ** 2 * sc_loss_mask[..., None],
-            dim=(-1, -2, -3)
-        ) / loss_denom_sc
-
-        print(f'sc_atom_loss: {sc_atom_loss}')
-
+        # Translation VF loss
+        trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
+        trans_loss = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * loss_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_denom
+        trans_loss = torch.clamp(trans_loss, max=5)
+        print(f'trans_loss: {trans_loss}')
+        # Rotation VF loss
+        rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
+        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * loss_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_denom
 
         # Pairwise distance loss
         gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
@@ -312,14 +172,10 @@ class FlowModule(LightningModule):
             dim=(1, 2))
         dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1, 2)) + 1)
 
-        print(f'dist_mat_loss: {dist_mat_loss}')
-        
         se3_vf_loss = trans_loss + rots_vf_loss
         auxiliary_loss = (
             bb_atom_loss * training_cfg.aux_loss_use_bb_loss
             + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
-            + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
-            + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight
         )
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -340,7 +196,6 @@ class FlowModule(LightningModule):
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
-        print(batch.keys())
         res_mask = batch['res_mask']
         self.interpolant.set_device(res_mask.device)
         num_batch, num_res = res_mask.shape
@@ -373,13 +228,12 @@ class FlowModule(LightningModule):
 
             # Write out sample to PDB file (wo b-factors)
             final_pos = samples[i]
-            saved_path = au.no_indexing(
+            saved_path = au.write_prot_to_pdb(
                 final_pos,
                 file_path=os.path.join(sample_dir, pdb_id),
                 aatype=batch['aatype'].cpu(),
                 chain_index=batch['chain_idx'].cpu(),
-                no_indexing=True,
-                overwrite=True
+                no_indexing=False
             )
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(

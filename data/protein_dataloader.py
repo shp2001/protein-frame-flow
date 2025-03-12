@@ -94,7 +94,7 @@ class ProteinData(LightningDataModule):
                 cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
             cropped_batch['raw_path'] = feat['raw_path']
-            print(f"batch에서 chi_angles_sin_cos: {cropped_batch['chi_angles_sin_cos'].shape}")
+
             return cropped_batch
         return collate_fn
     

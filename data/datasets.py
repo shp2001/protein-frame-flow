@@ -8,6 +8,8 @@ import torch
 from torch.utils.data import Dataset
 from data import utils as du
 
+
+from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
@@ -93,9 +95,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats['scaffold_idx'] = scaffold_idx
     chain_feats['chain_seq_list'] = chain_seq_list
 
-    # print(f'torsion_angles_sin_cos: {chain_feats['torsion_angles_sin_cos'].shape}')
-    # print(f'alt_torsion_angles_sin_cos: {chain_feats['alt_torsion_angles_sin_cos'].shape}')
-    # print(f'alt_torsion_angles_sin_cos: {chain_feats['alt_torsion_angles_sin_cos'].shape}')
     return chain_feats
 
 
@@ -271,7 +270,6 @@ class BaseDataset(Dataset):
                 feats[key] -= motif_com
             for key in all_atom_frames:
                 feats[key][..., :3, 3] -= motif_com
-                
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
