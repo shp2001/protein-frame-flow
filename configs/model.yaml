@@ -33,5 +33,6 @@ model:
   angle:
     c_resnet: 256
     no_resnet_blocks: 2
+    no_angles: 7
     epsilon: 1.0e-07
     use_original_sm: true

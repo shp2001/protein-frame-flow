@@ -11,7 +11,7 @@ class NodeFeatureNet(nn.Module):
         self.c_s = self._cfg.c_s
         self.c_pos_emb = self._cfg.c_pos_emb
         self.c_timestep_emb = self._cfg.c_timestep_emb
-        embed_size = self._cfg.c_pos_emb + self._cfg.c_timestep_emb * 2 + 1 + 1
+        embed_size = self._cfg.c_pos_emb + self._cfg.c_timestep_emb * 2 + 1 + 21
         if self._cfg.embed_chain:
             embed_size += self._cfg.c_pos_emb
         self.linear = nn.Linear(embed_size, self.c_s)
@@ -34,9 +34,10 @@ class NodeFeatureNet(nn.Module):
         pos_emb = get_index_embedding(pos, self.c_pos_emb, max_len=2056)
         pos_emb = pos_emb * res_mask.unsqueeze(-1)
 
+        single = torch.nn.functional.one_hot(aatype, 21).float()
         # [b, n_res, c_timestep_emb]
         input_feats = [
-            aatype[..., None],
+            single,
             pos_emb,
             diffuse_mask[..., None],
             self.embed_t(so3_t, res_mask),

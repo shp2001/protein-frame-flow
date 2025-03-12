@@ -1189,3 +1189,32 @@ def random_crop_to_size(
     protein["seq_length"] = protein["seq_length"].new_tensor(num_res_crop_size)
     
     return protein
+
+def reencode_cdr_mask(cdr_mask):
+    # cdr_mask를 이용해 region_numeric 생성
+    non_cdr_encoding = torch.tensor([6, 7, 8, 9, 10, 11, 12, 13], dtype=torch.long)
+    cdr_encoding = torch.tensor([0, 1, 2, 3, 4, 5], dtype=torch.long)
+    
+    reencoded = []
+    
+    prev_value = 0
+    non_cdr_index = 0
+    cdr_index = -1
+    
+    for current_value in cdr_mask:
+        if current_value == 0:
+            if prev_value == current_value:
+                reencoded.append(non_cdr_encoding[non_cdr_index].item())
+            else:
+                non_cdr_index += 1
+                reencoded.append(non_cdr_encoding[non_cdr_index].item())
+            prev_value = current_value
+        else:
+            if prev_value == current_value:
+                reencoded.append(cdr_encoding[cdr_index].item())
+            else:
+                cdr_index += 1
+                reencoded.append(cdr_encoding[cdr_index].item())
+            prev_value = current_value
+            
+    return torch.tensor(reencoded, dtype=torch.long)

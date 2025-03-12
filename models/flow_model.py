@@ -181,10 +181,10 @@ class FlowModel(nn.Module):
         self.angle_resnet = AngleResnet(
                 self._ipa_conf.c_s,
                 self._angle_conf.c_resnet,
-                self.no_resnet_blocks,
-                self.no_angles,
-                self.epsilon,
-                self.use_original_sm
+                self._angle_conf.no_resnet_blocks,
+                self._angle_conf.no_angles,
+                self._angle_conf.epsilon,
+                self._angle_conf.use_original_sm
             )
 
     def forward(self, input_feats):
@@ -258,7 +258,6 @@ class FlowModel(nn.Module):
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()
 
         unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
-        
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,

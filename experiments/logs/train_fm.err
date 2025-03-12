@@ -1,12 +1,3 @@
-wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.19.8 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250309_231503-bw6bxoeh
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run default_frame_pred_real
-wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/bw6bxoeh
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -21,10 +12,11 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
 ------------------------------------
-0 | model | FlowModel | 11.3 M
+0 | model | FlowModel | 11.7 M
 ------------------------------------
-11.3 M    Trainable params
+11.7 M    Trainable params
 0         Non-trainable params
-11.3 M    Total params
-45.036    Total estimated model params size (MB)
-wandb: Network error (ReadTimeout), entering retry loop.
+11.7 M    Total params
+46.650    Total estimated model params size (MB)
+SLURM auto-requeueing enabled. Setting signal handlers.
+`Trainer.fit` stopped: No training batches.

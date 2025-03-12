@@ -56,7 +56,7 @@ interpolant:
   self_condition: ${model.edge_features.self_condition}
 
 experiment:
-  debug: False
+  debug: True
   seed: 123
   num_devices: 1
   warm_start: null
@@ -64,6 +64,7 @@ experiment:
   training:
     mask_plddt: True
     bb_atom_scale: 0.1
+    sc_atom_scale: 0.1
     trans_scale: 0.1
     translation_loss_weight: 2.0
     t_normalize_clip: 0.9
@@ -71,6 +72,11 @@ experiment:
     aux_loss_weight: 0.2
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: True
+    aux_loss_use_chi_loss: True
+    aux_loss_use_sc_atom_loss: True
+
+    aux_loss_chi_loss_weight: 1.0
+    aux_loss_sc_atom_loss_weight: 0.5
     aux_loss_t_pass: 0.5
   wandb:
     name: default_frame_pred_real
@@ -85,7 +91,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     strategy: ddp
-    check_val_every_n_epoch: 1
+    check_val_every_n_epoch: 4
     accumulate_grad_batches: 2
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}

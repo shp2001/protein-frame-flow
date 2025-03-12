@@ -22,9 +22,58 @@ import numpy as np
 
 from data import residue_constants
 from data import protein
+from openfold.data import data_transforms
 
 Protein = protein.Protein
 
+
+def add_openfold_data_transforms(
+    chain_information
+):
+    # this is a hack because openfold will put an aatype as unknown even if the residue
+    # is known but the structural information is missing. Without this hack the
+    # atom14 mask and other various quantities will be incorrect
+    aatype = chain_information["aatype"].clone()
+
+    chain_information["aatype"][~chain_information["seq_mask"].bool()] = (
+        residue_constants.restype_order_with_x["X"]
+    )
+
+    atom14_transforms = [
+        data_transforms.make_atom14_masks,
+        data_transforms.make_atom14_positions,
+    ]
+
+    for transform in atom14_transforms:
+        chain_information = transform(chain_information)
+
+    rest_of_transforms = [
+        data_transforms.atom37_to_frames,
+        data_transforms.atom37_to_torsion_angles(""),
+        data_transforms.make_pseudo_beta(""),
+        data_transforms.get_backbone_frames,
+        data_transforms.get_chi_angles,
+    ]
+
+    chain_information["all_atom_positions"] = chain_information[
+        "all_atom_positions"
+    ].double()
+    for transform in rest_of_transforms:
+        chain_information = transform(chain_information)
+
+    to_cast_to_float = [
+        "all_atom_positions",
+        "atom14_gt_positions",
+        "torsion_angles_sin_cos",
+        "alt_torsion_angles_sin_cos",
+        "pseudo_beta",
+    ]
+    for tensor in to_cast_to_float:
+        chain_information[tensor] = chain_information[tensor].float()
+
+    # return aatype to be non-masked version
+    chain_information["aatype"] = aatype
+    return chain_information
 
 def process_chain(chain: Chain, chain_id: str) -> Protein:
     """Convert a PDB chain object into a AlphaFold Protein instance.
