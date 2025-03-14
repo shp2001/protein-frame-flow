@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH -J fm_default_framepred_aux0.2
+#SBATCH -J fm_all_atom_framepred_t_pass_0.0
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
-#SBATCH -c 12
+#SBATCH -c 8
 #SBATCH -w gpu01
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/train_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/fm_with_aux_0.2.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/train_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/all_atom_framepred_t_pass_0.2.log

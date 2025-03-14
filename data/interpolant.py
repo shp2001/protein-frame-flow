@@ -8,7 +8,7 @@ import copy
 from torch import autograd
 from motif_scaffolding import twisting
 
-
+# nm scale
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
     return noise - torch.mean(noise, dim=-2, keepdims=True)
@@ -322,19 +322,20 @@ class Interpolant:
             model_out = model(batch)
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
+        prsmd = model_out['all_atom_preds']['prmsd']
+        pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
         )
+        
         prot_traj.append((pred_trans_1, pred_rotmats_1))
 
         # Convert trajectories to atom37.
-        atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
-        clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
+        # atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
+        # clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
 
-        if return_trans_rot:
-            return atom37_traj, clean_atom37_traj, clean_traj, pred_trans_1, pred_rotmats_1
-        else:
-            return atom37_traj, clean_atom37_traj, clean_traj
+        return pred_positions_14, prsmd
+
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

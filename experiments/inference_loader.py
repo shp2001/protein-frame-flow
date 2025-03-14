@@ -75,30 +75,24 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     # Run through OpenFold data transforms.
     chain_feats = {
         'aatype': torch.tensor(processed_feats['aatype']).long(),
-        'all_atom_positions': torch.tensor(processed_feats['atom_positions']).double(),
-        'all_atom_mask': torch.tensor(processed_feats['atom_mask']).double()
+        'all_atom_positions': torch.tensor(processed_feats['atom_positions']).float(),
+        'all_atom_mask': torch.tensor(processed_feats['atom_mask']).float(),
+        'seq_mask': torch.tensor(processed_feats['bb_mask']).int()
     }
-
+    chain_feats = data_transforms.make_atom14_masks(chain_feats)
+    chain_feats = data_transforms.make_atom14_positions(chain_feats)
     chain_feats = data_transforms.atom37_to_frames(chain_feats)
+    chain_feats = data_transforms.atom37_to_torsion_angles(chain_feats)
+    chain_feats = data_transforms.get_chi_angles(chain_feats)
     rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
     rotmats_1 = rigids_1.get_rots().get_rot_mats()
     trans_1 = rigids_1.get_trans()
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
-    
+
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
-
-    # # res_idx offset version으로
-    # offset = 0  # 각 체인의 residue index를 조정하는 offset
-    # start = 0
-    # for chain_seq in chain_seq_list:
-    #     chain_length = len(chain_seq)
-    #     for i in range(start, start + chain_length):
-    #         res_idx[i] += offset  # 현재 offset 적용
-    #     offset += chain_length  # offset 업데이트
-    #     start += chain_length  # 다음 체인의 시작 위치
 
     return {
         'res_plddt': torch.tensor(res_plddt),
@@ -109,7 +103,16 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chain_idx': chain_idx,
         'res_idx': res_idx,
         'scaffold_idx': scaffold_idx,
-        'chain_seq_list': chain_seq_list
+        'chain_seq_list': chain_seq_list,
+        'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
+        'alt_torsion_angles_sin_cos': chain_feats['alt_torsion_angles_sin_cos'],
+        'torsion_angles_mask': chain_feats['torsion_angles_mask'],
+        'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
+        'chi_mask': chain_feats['chi_mask'],
+        'atom14_gt_exists': chain_feats['atom14_gt_exists'],
+        'atom14_gt_positions': chain_feats['atom14_gt_positions'],
+        'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
+        'atom37_atom_exists': chain_feats['atom37_atom_exists']
     }
 
 
@@ -201,7 +204,7 @@ class BaseDataset(Dataset):
             scaffold_idx[f'loop_end'] = loop_end
 
         # Large protein files are slow to read. Cache them.
-        use_cache = True
+        use_cache = seq_len > self._dataset_cfg.cache_num_res
         if use_cache and path in self._cache:
             return self._cache[path]
         
@@ -249,19 +252,21 @@ class BaseDataset(Dataset):
     
     def __getitem__(self, row_idx):
         # Process data example.
-        csv_row, sample_id = self._all_sample_ids[row_idx]
+        csv_row = self.csv.iloc[row_idx]
         feats = self.process_csv_row(csv_row)
 
-        feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
+        if self._dataset_cfg.add_plddt_mask:
+            _add_plddt_mask(feats, self._dataset_cfg.min_plddt_threshold)
+        else:
+            feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
 
         if self.task == 'hallucination':
             feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
-
         elif self.task == 'inpainting':
 
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
-        
+
             # Center based on motif locations
             motif_mask = 1 - feats['diffuse_mask']
             trans_1 = feats['trans_1']
@@ -269,12 +274,13 @@ class BaseDataset(Dataset):
             motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
             trans_1 -= motif_com[None, :]
             feats['trans_1'] = trans_1
+            feats['atom14_gt_positions'] -= motif_com[None, :]
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
+        
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
-        feats['sample_id'] = sample_id
         return feats
 
 

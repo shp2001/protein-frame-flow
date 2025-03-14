@@ -17,7 +17,6 @@ from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 
 from data.motif_index import load_loop_file
-from data.parsers import add_openfold_data_transforms
 
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
@@ -73,29 +72,43 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     # Run through OpenFold data transforms.
     chain_feats = {
         'aatype': torch.tensor(processed_feats['aatype']).long(),
-        'all_atom_positions': torch.tensor(processed_feats['atom_positions']).double(),
-        'all_atom_mask': torch.tensor(processed_feats['atom_mask']).double(),
+        'all_atom_positions': torch.tensor(processed_feats['atom_positions']).float(),
+        'all_atom_mask': torch.tensor(processed_feats['atom_mask']).float(),
         'seq_mask': torch.tensor(processed_feats['bb_mask']).int()
     }
-
-    chain_feats = add_openfold_data_transforms(chain_feats)
+    chain_feats = data_transforms.make_atom14_masks(chain_feats)
+    chain_feats = data_transforms.make_atom14_positions(chain_feats)
+    chain_feats = data_transforms.atom37_to_frames(chain_feats)
+    chain_feats = data_transforms.atom37_to_torsion_angles(chain_feats)
+    chain_feats = data_transforms.get_chi_angles(chain_feats)
     rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
     rotmats_1 = rigids_1.get_rots().get_rot_mats()
     trans_1 = rigids_1.get_trans()
     res_plddt = processed_feats['b_factors'][:, 1]
+    res_mask = torch.tensor(processed_feats['bb_mask']).int()
+
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
-    chain_feats['res_mask'] = chain_feats['seq_mask']
-    chain_feats['res_plddt'] = torch.tensor(res_plddt)
-    chain_feats['rotmats_1'] = rotmats_1
-    chain_feats['trans_1'] = trans_1
-    chain_feats['chain_idx'] = chain_idx
-    chain_feats['res_idx'] = res_idx
-    chain_feats['scaffold_idx'] = scaffold_idx
-    chain_feats['chain_seq_list'] = chain_seq_list
 
-    return chain_feats
+    return {
+        'res_plddt': torch.tensor(res_plddt),
+        'aatype': chain_feats['aatype'],
+        'rotmats_1': rotmats_1,
+        'trans_1': trans_1,
+        'res_mask': res_mask,
+        'chain_idx': chain_idx,
+        'res_idx': res_idx,
+        'scaffold_idx': scaffold_idx,
+        'chain_seq_list': chain_seq_list,
+        'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
+        'alt_torsion_angles_sin_cos': chain_feats['alt_torsion_angles_sin_cos'],
+        'torsion_angles_mask': chain_feats['torsion_angles_mask'],
+        'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
+        'chi_mask': chain_feats['chi_mask'],
+        'atom14_gt_exists': chain_feats['atom14_gt_exists'],
+        'atom14_gt_positions': chain_feats['atom14_gt_positions']
+    }
 
 
 def _add_plddt_mask(feats, plddt_threshold):
@@ -261,25 +274,13 @@ class BaseDataset(Dataset):
             motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
             trans_1 -= motif_com[None, :]
             feats['trans_1'] = trans_1
-
-            # Center all atom feature 
-            all_atom_xyz = ['all_atom_positions', 'atom14_gt_positions', 'atom14_alt_gt_positions', 'pseudo_beta']
-            all_atom_frames = ['rigidgroups_gt_frames', 'rigidgroups_alt_gt_frames', 'backbone_rigid_tensor']
-
-            for key in all_atom_xyz:
-                feats[key] -= motif_com
-            for key in all_atom_frames:
-                feats[key][..., :3, 3] -= motif_com
+            feats['atom14_gt_positions'] -= motif_com[None, :]
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
         
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
-
-        # print(f"trans_1: {feats['trans_1']}")
-        # print(f"from_quat: {feats['rigidgroups_gt_frames'].shape}")
-        # print(f"from_quat: {feats['rigidgroups_gt_frames'][:, 0, :3, 3]}")
         return feats
 
 

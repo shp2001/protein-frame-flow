@@ -918,7 +918,6 @@ def get_chi_atom_indices():
     return chi_atom_indices
 
 
-@curry1
 def atom37_to_torsion_angles(
     protein,
     prefix="",
@@ -1083,7 +1082,7 @@ def atom37_to_torsion_angles(
     protein[prefix + "torsion_angles_sin_cos"] = torsion_angles_sin_cos
     protein[prefix + "alt_torsion_angles_sin_cos"] = alt_torsion_angles_sin_cos
     protein[prefix + "torsion_angles_mask"] = torsion_angles_mask
-
+    
     return protein
 
 

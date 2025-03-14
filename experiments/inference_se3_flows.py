@@ -71,7 +71,6 @@ class EvalRunner:
         output_dir = os.path.join(
             self._infer_cfg.predict_dir,
             self._ckpt_name,
-            self._infer_cfg.task,
             self._infer_cfg.inference_subdir,
         )
         os.makedirs(output_dir, exist_ok=True)
