@@ -107,7 +107,9 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
         'chi_mask': chain_feats['chi_mask'],
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
-        'atom14_gt_positions': chain_feats['atom14_gt_positions']
+        'atom14_gt_positions': chain_feats['atom14_gt_positions'],
+        'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
+        'atom37_atom_exists': chain_feats['atom37_atom_exists']
     }
 
 

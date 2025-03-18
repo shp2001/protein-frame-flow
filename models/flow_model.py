@@ -9,6 +9,7 @@ from data import utils as du
 from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
 
+
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden, use_original_sm):
         """
@@ -203,15 +204,17 @@ class FlowModel(nn.Module):
                 nn.ReLU(),
                 nn.LayerNorm(self._prmsd_conf.c_z)
             )
-            self.prmsd_ipa_layers = nn.ModuleList([])
-            for _ in range(self._prmsd_conf.num_blocks):
-                self.prmsd_ipa_layers.append(
-                    ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
-                )
+            self.prmsd_ipa = ipa_pytorch.IPAEncoder(
+                dim=self._prmsd_conf.c_s,
+                pairwise_repr_dim=self._prmsd_conf.c_z,
+                depth=self._prmsd_conf.num_blocks,
+                heads=self._prmsd_conf.no_heads,
+                require_pairwise_repr=True
+            )
+
             self.prmsd_linear = ipa_pytorch.Linear(
                 self._prmsd_conf.c_s,
-                1,
-                init='final'
+                1
                 )
             
     def forward(self, input_feats):
@@ -235,9 +238,10 @@ class FlowModel(nn.Module):
             res_index,
             aatype
         )
+        ######################## 0으로 초기화하지 말고 cdr masked protein으로 초기화 ######################
 
         if 'trans_sc' not in input_feats:
-            trans_sc = torch.zeros_like(trans_t)
+            trans_sc = du.manage_missing_batch(trans_t, mask=~diffuse_mask.bool())
         else:
             trans_sc = input_feats['trans_sc']
         init_edge_embed = self.edge_feature_net(
@@ -303,18 +307,16 @@ class FlowModel(nn.Module):
 
             prmsd_node = self.prmsd_node_transform(init_node_embed) 
             prmsd_edge = self.prmsd_edge_transform(init_edge_embed)
+            rots = curr_rigids.get_rots().get_rot_mats().detach()
+            trans = curr_rigids.get_trans().detach()
 
-            for i in range(self._prmsd_conf.num_blocks):
-                rots = curr_rigids.get_rots().get_rot_mats().detach()
-                trans = curr_rigids.get_trans().detach()
-
-                input_rigids = du.create_rigid(rots, trans)
-                prmsd_node = self.prmsd_ipa_layers[i](
-                                                    prmsd_node,
-                                                    prmsd_edge,
-                                                    input_rigids,
-                                                    node_mask
-                                                    )
+            prmsd_node = self.prmsd_ipa(
+                                        prmsd_node,
+                                        translations=trans,
+                                        rotations=rots,
+                                        mask=node_mask.bool(),
+                                        pairwise_repr=prmsd_edge
+                                        )
 
             prmsd = torch.nn.functional.relu(self.prmsd_linear(prmsd_node)).squeeze(-1) # (*, 128) -> (*, 1)
             all_atom_outputs["prmsd"] = prmsd

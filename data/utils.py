@@ -443,3 +443,43 @@ def process_chain(chain: Chain, chain_id: str) -> Protein:
         residue_index=np.array(residue_index),
         chain_index=np.array(chain_ids),
         b_factors=np.array(b_factors))
+
+def manage_missing_batch(xyz, mask):
+    """for missing residues, get the closest residue coordinate (batch version)
+    
+    Args:
+        xyz (tensor): xyz coordinates [b, L, 3]
+        mask (tensor): mask information [b, L] (True = atom exists)
+
+    Returns:
+        xyz (tensor): modified xyz coordinate [b, L, 3]
+    """
+    b, L, _ = xyz.shape  # 배치 차원 고려
+
+    # 존재하는 원소의 인덱스 찾기 (배치별)
+    exist_in_xyz = [torch.where(mask[i])[0] for i in range(b)]  # 각 배치에서 존재하는 residue 인덱스 리스트
+
+    # 새로운 xyz를 저장할 tensor
+    new_xyz = xyz.clone()
+
+    for i in range(b):
+        if len(exist_in_xyz[i]) == 0:  # 모든 residue가 missing이면 건너뛰기
+            continue
+
+        # 존재하는 원소의 인덱스 리스트 (L_sub)
+        valid_idx = exist_in_xyz[i]
+
+        # 각 residue가 가장 가까운 존재하는 residue를 찾기 위한 거리 계산
+        seqmap = (torch.arange(L, device=xyz.device)[:, None] - valid_idx[None, :]).abs()  # (L, L_sub)
+        closest_idx = torch.argmin(seqmap, dim=-1)  # L -> 가장 가까운 residue의 valid_idx 내부 인덱스
+
+        # 실제 index 가져오기 (L 크기의 인덱스 배열)
+        nearest_residue_idx = valid_idx[closest_idx]
+
+        # 가장 가까운 residue의 좌표 가져오기
+        nearest_residue_coords = xyz[i, nearest_residue_idx]
+
+        # mask가 False인 부분을 최근접 residue 좌표로 대체
+        new_xyz[i] = torch.where(mask[i].unsqueeze(-1), xyz[i], nearest_residue_coords)
+
+    return new_xyz

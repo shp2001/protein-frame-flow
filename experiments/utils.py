@@ -195,7 +195,6 @@ def get_available_device(num_device):
 
 def save_traj(
         sample: np.ndarray,
-        diffuse_mask: np.ndarray,
         output_dir: str,
         b_factors: np.ndarray,
         aatype = None,
@@ -224,7 +223,6 @@ def save_traj(
     """
 
     # Write sample.
-    diffuse_mask = diffuse_mask.astype(bool)
     sample_path = os.path.join(output_dir, 'sample.pdb')
     # prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
     # x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')

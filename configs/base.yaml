@@ -81,7 +81,7 @@ experiment:
     aux_loss_sc_atom_loss_weight: 2.5
     aux_loss_t_pass: 0
   wandb:
-    name: all_atom_framePred_t_pass_0.0
+    name: all_atom_framePred_sample_anchor
     project: se3-fm
   optimizer:
     lr: 0.0001

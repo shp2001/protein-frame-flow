@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/default_frame_pred/2025-03-06_23-24-22/last.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/all_atom_framePred_t_pass_0.0/2025-03-13_14-32-00/last.ckpt
 
   use_gpu: True
   num_gpus: 2
@@ -78,7 +78,7 @@ inference:
     csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
-    samples_per_target: 50
+    samples_per_target: 100
 
     # Batch size when sampling from the model
     num_batch: 1

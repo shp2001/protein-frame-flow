@@ -276,7 +276,7 @@ class FlowModule(LightningModule):
         csv_idx = batch['csv_idx']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
-        atom37_traj, _, _, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
+        pred_positions, prmsd, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
@@ -290,7 +290,13 @@ class FlowModule(LightningModule):
             return_trans_rot=True
         )
         
-        samples = atom37_traj[-1].numpy()
+        pred_positions_37 = []
+        pred_positions = du.to_numpy(pred_positions)
+        for i in range(pred_positions.shape[0]):
+            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch)
+            pred_positions_37.append(pred_position_37)
+        
+        pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
         for i in range(num_batch):
             sample_dir = os.path.join(
@@ -300,7 +306,7 @@ class FlowModule(LightningModule):
             os.makedirs(sample_dir, exist_ok=True)
 
             # Write out sample to PDB file (wo b-factors)
-            final_pos = samples[i]
+            final_pos = pred_positions[i]
             saved_path = au.write_prot_to_pdb(
                 final_pos,
                 file_path=os.path.join(sample_dir, pdb_id+'.pbd'),
@@ -522,8 +528,13 @@ class FlowModule(LightningModule):
             pair_init=batch['pair_init'],
             return_trans_rot=True
         )
+        pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
-        pred_positions = all_atom.atom14_to_atom37(pred_positions, batch)
+        for i in range(pred_positions.shape[0]):
+            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch)
+            pred_positions_37.append(pred_position_37)
+        
+        pred_positions = np.stack(pred_positions_37)
         prmsds = du.to_numpy(prmsd)
 
         for i in range(num_batch):
@@ -541,7 +552,7 @@ class FlowModule(LightningModule):
             else:
                 chain_idx = None
             _ = eu.save_traj(
-                pred_position,
+                sample=pred_position,
                 b_factors=prmsd,
                 output_dir=sample_dir,
                 aatype=aatype,

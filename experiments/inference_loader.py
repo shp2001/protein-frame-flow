@@ -204,7 +204,7 @@ class BaseDataset(Dataset):
             scaffold_idx[f'loop_end'] = loop_end
 
         # Large protein files are slow to read. Cache them.
-        use_cache = seq_len > self._dataset_cfg.cache_num_res
+        use_cache = True
         if use_cache and path in self._cache:
             return self._cache[path]
         
@@ -252,13 +252,10 @@ class BaseDataset(Dataset):
     
     def __getitem__(self, row_idx):
         # Process data example.
-        csv_row = self.csv.iloc[row_idx]
+        csv_row, sample_id = self._all_sample_ids[row_idx]
         feats = self.process_csv_row(csv_row)
 
-        if self._dataset_cfg.add_plddt_mask:
-            _add_plddt_mask(feats, self._dataset_cfg.min_plddt_threshold)
-        else:
-            feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
+        feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
 
         if self.task == 'hallucination':
             feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
@@ -281,6 +278,7 @@ class BaseDataset(Dataset):
         
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
+        feats['sample_id'] = sample_id
         return feats
 
 

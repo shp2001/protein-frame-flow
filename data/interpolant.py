@@ -54,9 +54,51 @@ class Interpolant:
         t = torch.rand(num_batch, device=self._device)
         return t * (1 - 2*self._cfg.min_t) + self._cfg.min_t
 
+    def manage_missing_batch(self, xyz, mask):
+        """for missing residues, get the closest residue coordinate (batch version)
+        
+        Args:
+            xyz (tensor): xyz coordinates [b, L, 3]
+            mask (tensor): mask information [b, L] (True = atom exists)
+
+        Returns:
+            xyz (tensor): modified xyz coordinate [b, L, 3]
+        """
+        b, L, _ = xyz.shape  # 배치 차원 고려
+
+        # 존재하는 원소의 인덱스 찾기 (배치별)
+        exist_in_xyz = [torch.where(mask[i])[0] for i in range(b)]  # 각 배치에서 존재하는 residue 인덱스 리스트
+
+        # 새로운 xyz를 저장할 tensor
+        new_xyz = xyz.clone()
+
+        for i in range(b):
+            if len(exist_in_xyz[i]) == 0:  # 모든 residue가 missing이면 건너뛰기
+                continue
+
+            # 존재하는 원소의 인덱스 리스트 (L_sub)
+            valid_idx = exist_in_xyz[i]
+
+            # 각 residue가 가장 가까운 존재하는 residue를 찾기 위한 거리 계산
+            seqmap = (torch.arange(L, device=xyz.device)[:, None] - valid_idx[None, :]).abs()  # (L, L_sub)
+            closest_idx = torch.argmin(seqmap, dim=-1)  # L -> 가장 가까운 residue의 valid_idx 내부 인덱스
+
+            # 실제 index 가져오기 (L 크기의 인덱스 배열)
+            nearest_residue_idx = valid_idx[closest_idx]
+
+            # 가장 가까운 residue의 좌표 가져오기
+            nearest_residue_coords = xyz[i, nearest_residue_idx]
+
+            # mask가 False인 부분을 최근접 residue 좌표로 대체
+            new_xyz[i] = torch.where(mask[i].unsqueeze(-1), xyz[i], nearest_residue_coords)
+
+        return new_xyz
+        
     def _corrupt_trans(self, trans_1, t, res_mask, diffuse_mask):
         trans_nm_0 = _centered_gaussian(*res_mask.shape, self._device)
+        masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
         trans_0 = trans_nm_0 * du.NM_TO_ANG_SCALE
+        trans_0 = trans_0 + masked_trans
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1
         trans_t = _trans_diffuse_mask(trans_t, trans_1, diffuse_mask)
         return trans_t * res_mask[..., None]
@@ -173,6 +215,10 @@ class Interpolant:
         if trans_0 is None:
             trans_0 = _centered_gaussian(
                 num_batch, num_res, self._device) * du.NM_TO_ANG_SCALE
+            masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
+            trans_0 = trans_0 + masked_trans
+            trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
+
         if rotmats_0 is None:
             rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
         if res_idx is None:
@@ -322,7 +368,7 @@ class Interpolant:
             model_out = model(batch)
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
-        prsmd = model_out['all_atom_preds']['prmsd']
+        prmsd = model_out['all_atom_preds']['prmsd']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
@@ -334,8 +380,10 @@ class Interpolant:
         # atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
         # clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
 
-        return pred_positions_14, prsmd
-
+        if not return_trans_rot:
+            return pred_positions_14, prmsd
+        else:
+            return pred_positions_14, prmsd, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

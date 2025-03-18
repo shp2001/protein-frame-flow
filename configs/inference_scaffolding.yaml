@@ -5,4 +5,4 @@ defaults:
 
 inference:
   task: scaffolding
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/default_frame_pred/2025-03-06_23-24-22/last.ckpt
+
