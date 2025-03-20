@@ -526,7 +526,7 @@ class FlowModule(LightningModule):
             aatype=batch['aatype'],
             trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
             pair_init=batch['pair_init'],
-            return_trans_rot=True
+            return_trans_rot=False
         )
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)

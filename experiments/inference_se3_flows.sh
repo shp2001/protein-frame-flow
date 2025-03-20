@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -J fm_default_framepred_inf
+#SBATCH -J fm_all_atom_anchor_sam
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=60g
+#SBATCH --mem=40g
 #SBATCH -c 12
 #SBATCH -w gpu02
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
