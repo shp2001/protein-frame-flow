@@ -1,6 +1,8 @@
 from typing import Any
 import torch
 import time
+import math 
+
 import os
 import random
 import wandb
@@ -481,12 +483,40 @@ class FlowModule(LightningModule):
             "train/loss", train_loss, batch_size=num_batch)
         return train_loss
 
-    def configure_optimizers(self):
-        return torch.optim.AdamW(
-            params=self.model.parameters(),
-            **self._exp_cfg.optimizer
-        )
+    def get_cosine_scheduler_w_warmup(
+        self,
+        optimizer: torch.optim.Optimizer,
+        warmup_steps: int = 5e3,
+        total_steps: int = 5e6,
+        min_lr: float = 1e-5,
+        max_lr: float = 1e-4,
+    ) -> torch.optim.lr_scheduler.LambdaLR:
+        """Get cosine annealing scheduler with warmup."""
 
+        def steplr_with_warmup(step):
+            if step < warmup_steps:
+                return step / warmup_steps
+            else:
+                theta = (step - warmup_steps) / (total_steps - warmup_steps) * math.pi
+                cosine_decay = 0.5 * (1 + math.cos(theta))
+                return (min_lr / max_lr) + cosine_decay * (1 - (min_lr / max_lr))
+
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, steplr_with_warmup)
+    
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(), self._exp_cfg.optimizer.max_lr
+        )
+        scheduler = self.get_cosine_scheduler_w_warmup(
+            optimizer,
+            self._exp_cfg.optimizer.warmup_steps,
+            self._exp_cfg.optimizer.decay_steps,
+            self._exp_cfg.optimizer.min_lr,
+            self._exp_cfg.optimizer.max_lr,
+        )
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
+    
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
         device = f'cuda:{torch.cuda.current_device()}'

@@ -81,14 +81,17 @@ experiment:
     aux_loss_sc_atom_loss_weight: 2.5
     aux_loss_t_pass: 0
   wandb:
-    name: all_atom_framePred_sample_anchor
+    name: fm_anchor_sample_w/_lrs
     project: se3-fm
   optimizer:
-    lr: 0.0001
+    warmup_steps: 0
+    decay_steps: 3e5
+    min_lr: 1e-5
+    max_lr: 5e-5
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
-    max_epochs: 1000
+    max_epochs: 120
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False

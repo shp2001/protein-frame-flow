@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_all_atom_framepred_t_pass_0.0
+#SBATCH -J fm_anchor_sample_w/_lrs
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
