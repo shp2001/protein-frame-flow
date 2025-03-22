@@ -223,7 +223,7 @@ def crop_general_protein(trans_1, threshold, loop_mask, nan_mask, max_len, maske
         distance_vector, _ = torch.min(distance_vectors, dim=0)
         values, indices = torch.topk(distance_vector, max_len, largest=False)
 
-        residue_indices = sorted(indices.tolist() + loop_indices)
+        residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
 
     return residue_indices
 

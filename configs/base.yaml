@@ -81,13 +81,13 @@ experiment:
     aux_loss_sc_atom_loss_weight: 2.5
     aux_loss_t_pass: 0
   wandb:
-    name: fm_anchor_sample_w/_lrs
+    name: fm_anchor_sample_wt_lrs
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 3e5
     min_lr: 1e-5
-    max_lr: 5e-5
+    max_lr: 8e-5
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
