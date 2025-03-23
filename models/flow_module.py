@@ -224,20 +224,31 @@ class FlowModule(LightningModule):
         dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1, 2)) + 1)
         
         # calculate prmsd 
-        prmsd_loss = compute_prmsd_loss(pdev=pred_rmsd,
-                                pred_position=pred_atom_14, # predicted structure (b, l, 14, 3)
-                                atom14_gt_positions=gt_atom14_pos, # gt stucture  (b, l, 14, 3)
-                                cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
+        if self._model_cfg.prmsd.use_prmsd:
+            prmsd_loss = compute_prmsd_loss(pdev=pred_rmsd,
+                                    pred_position=pred_atom_14, # predicted structure (b, l, 14, 3)
+                                    atom14_gt_positions=gt_atom14_pos, # gt stucture  (b, l, 14, 3)
+                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
 
-        se3_vf_loss = trans_loss + rots_vf_loss
-        auxiliary_loss = (
-            bb_atom_loss * training_cfg.aux_loss_use_bb_loss
-            + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
-            + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
-            + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
-            + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd
-            + prmsd_loss * training_cfg.aux_loss_use_prsmd_loss * 0.5
-        )
+            se3_vf_loss = trans_loss + rots_vf_loss
+            auxiliary_loss = (
+                bb_atom_loss * training_cfg.aux_loss_use_bb_loss
+                + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
+                + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
+                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
+                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd
+                + prmsd_loss * training_cfg.aux_loss_use_prsmd_loss * 0.5
+            )
+
+        else:
+            se3_vf_loss = trans_loss + rots_vf_loss
+            auxiliary_loss = (
+                bb_atom_loss * training_cfg.aux_loss_use_bb_loss
+                + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
+                + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
+                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
+                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd
+            )
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -257,7 +268,6 @@ class FlowModule(LightningModule):
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
-            'prmsd_loss': prmsd_loss
         })
         return {
             "trans_loss": trans_loss,
@@ -267,7 +277,6 @@ class FlowModule(LightningModule):
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
-            'prmsd_loss': prmsd_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):

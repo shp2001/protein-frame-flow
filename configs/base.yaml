@@ -18,7 +18,7 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
-    max_num_res_squared: 360_000
+    max_num_res_squared: 400_000
 
   # Cropping 
   ab_threshold: 40
@@ -81,17 +81,17 @@ experiment:
     aux_loss_sc_atom_loss_weight: 2.5
     aux_loss_t_pass: 0
   wandb:
-    name: fm_anchor_sample_wt_lrs
+    name: fm_anchor_sample_wt_lrs_2e-4
     project: se3-fm
   optimizer:
     warmup_steps: 0
-    decay_steps: 3e5
-    min_lr: 1e-5
-    max_lr: 8e-5
+    decay_steps: 4e5
+    min_lr: 2e-5
+    max_lr: 2e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
-    max_epochs: 120
+    max_epochs: 170
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False

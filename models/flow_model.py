@@ -320,7 +320,8 @@ class FlowModel(nn.Module):
 
             prmsd = torch.nn.functional.relu(self.prmsd_linear(prmsd_node)).squeeze(-1) # (*, 128) -> (*, 1)
             all_atom_outputs["prmsd"] = prmsd
-
+        else:
+            all_atom_outputs['prmsd'] = torch.zeros(node_embed.shape[0], node_embed.shape[1])
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
