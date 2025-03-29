@@ -987,7 +987,7 @@ def between_residue_clash_loss(
 
     # Compute the mean loss.
     # shape ()
-    mean_loss = torch.sum(dists_to_low_error) / (1e-6 + torch.sum(dists_mask))
+    mean_loss = torch.sum(dists_to_low_error, dim=(1,2,3,4)) / (1e-6 + torch.sum(dists_mask, dim=(1,2,3,4)))
 
     # Compute the per atom loss sum.
     # shape (N, 14)

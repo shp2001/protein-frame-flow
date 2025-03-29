@@ -81,6 +81,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats = data_transforms.atom37_to_frames(chain_feats)
     chain_feats = data_transforms.atom37_to_torsion_angles(chain_feats)
     chain_feats = data_transforms.get_chi_angles(chain_feats)
+
     rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
     rotmats_1 = rigids_1.get_rots().get_rot_mats()
     trans_1 = rigids_1.get_trans()
@@ -109,7 +110,8 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
         'atom14_gt_positions': chain_feats['atom14_gt_positions'],
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
-        'atom37_atom_exists': chain_feats['atom37_atom_exists']
+        'residx_atom14_to_atom37': chain_feats['residx_atom14_to_atom37'],
+        'atom37_atom_exists': chain_feats['atom37_atom_exists'],
     }
 
 

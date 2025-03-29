@@ -324,8 +324,13 @@ class Interpolant:
                         pred_trans_1 * diffuse_mask[..., None]
                         + trans_1 * (1 - diffuse_mask[..., None])
                     )
+                    batch['rotmats_sc'] = (
+                        pred_rotmats_1 * diffuse_mask[..., None, None]
+                        + rotmats_1 * (1 - diffuse_mask[..., None, None])
+                    )
                 else:
                     batch['trans_sc'] = pred_trans_1
+                    batch['rotmats_sc'] = pred_rotmats_1
 
             # Take reverse step
             

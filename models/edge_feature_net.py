@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 
-from models.utils import get_index_embedding, calc_distogram
+from models.utils import calc_distogram, calc_unit_vector
+from data.utils import create_rigid
 
 class EdgeFeatureNet(nn.Module):
 
@@ -10,55 +11,70 @@ class EdgeFeatureNet(nn.Module):
         self._cfg = module_cfg
 
         self.c_s = self._cfg.c_s
-        self.c_p = self._cfg.c_p
+        self.c_z = self._cfg.c_p
         self.feat_dim = self._cfg.feat_dim
         self.relpos_dim = self._cfg.relpos_dim
 
-        self.linear_s_p = nn.Linear(self.c_s, self.feat_dim)
         self.linear_relpos = nn.Linear(self.relpos_dim, self.feat_dim)
 
-        total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
+        # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
+        total_edge_feats = self.feat_dim 
         if self._cfg.embed_chain:
             total_edge_feats += 1
         if self._cfg.embed_diffuse_mask:
-            total_edge_feats += 2
+            total_edge_feats += 1
+        if self._cfg.embed_distogram:
+            total_edge_feats += self._cfg.num_bins * 2
+        if self._cfg.embed_unit_vector:
+            total_edge_feats += 3 * 2
+
         self.edge_embedder = nn.Sequential(
-            nn.Linear(total_edge_feats, self.c_p),
+            nn.Linear(total_edge_feats, self.c_z),
             nn.ReLU(),
-            nn.Linear(self.c_p, self.c_p),
+            nn.Linear(self.c_z, self.c_z),
             nn.ReLU(),
-            nn.Linear(self.c_p, self.c_p),
-            nn.LayerNorm(self.c_p),
+            nn.Linear(self.c_z, self.c_z),
+            nn.LayerNorm(self.c_z),
         )
 
     def embed_relpos(self, pair_init):
         return self.linear_relpos(pair_init)
 
-    def _cross_concat(self, feats_1d, num_batch, num_res):
-        return torch.cat([
-            torch.tile(feats_1d[:, :, None, :], (1, 1, num_res, 1)),
-            torch.tile(feats_1d[:, None, :, :], (1, num_res, 1, 1)),
-        ], dim=-1).float().reshape([num_batch, num_res, num_res, -1])
-
-    def forward(self, s, t, sc_t, p_mask, diffuse_mask, pair_init):
-        # Input: [b, n_res, c_s]
-        num_batch, num_res, _ = s.shape
-    
-        # [b, n_res, c_p]
-        p_i = self.linear_s_p(s)
-        cross_node_feats = self._cross_concat(p_i, num_batch, num_res)
-
+    def forward(self, 
+                trans_t, trans_sc, 
+                rotmats_t, rotmats_sc, 
+                p_mask, diffuse_mask, pair_init):
+        """
+        trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
+                                If not, it is cdr_masked (cdr masked to the closeast residues) value 
+        """
+        # [b, n_res, c_z]
         relpos_feats = self.embed_relpos(pair_init)
+        all_edge_feats = [relpos_feats]
 
-        dist_feats = calc_distogram(
-            t, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
-        sc_feats = calc_distogram(
-            sc_t, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
+        # cdr을 가까운 residue로 보냈을 때 distogram
+        if self._cfg.embed_distogram:
+            distogram_t = calc_distogram(
+                trans_t, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
+            all_edge_feats.append(distogram_t)
+            distogram_sc = calc_distogram(
+                trans_sc, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
+            all_edge_feats.append(distogram_sc)
 
-        all_edge_feats = [cross_node_feats, relpos_feats, dist_feats, sc_feats]
+        # cdr을 가까운 residue로 보냈을 때 unit_vector
+        if self._cfg.embed_unit_vector:
+            rigid_t = create_rigid(rotmats_t, trans_t)
+            unit_vec_t = calc_unit_vector(rigid_t)
+            all_edge_feats.append(unit_vec_t)
+
+            rigid_sc = create_rigid(rotmats_sc, trans_sc)
+            unit_vec_sc = calc_unit_vector(rigid_sc)
+            all_edge_feats.append(unit_vec_sc)
+
         if self._cfg.embed_diffuse_mask:
-            diff_feat = self._cross_concat(diffuse_mask[..., None], num_batch, num_res)
-            all_edge_feats.append(diff_feat)
+            diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
+            all_edge_feats.append(diff_feat[..., None])
+
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)
         return edge_feats

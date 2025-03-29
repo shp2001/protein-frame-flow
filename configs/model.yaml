@@ -2,6 +2,7 @@ model:
   node_embed_size: 256
   edge_embed_size: 128
   symmetric: False
+
   node_features:
     c_s: ${model.node_embed_size}
     c_pos_emb: 128
@@ -9,6 +10,7 @@ model:
     max_num_res: 2000
     timestep_int: 1000
     embed_chain: False
+
   edge_features:
     single_bias_transition_n: 2
     c_s: ${model.node_embed_size}
@@ -20,6 +22,8 @@ model:
     self_condition: True
     embed_chain: False
     embed_diffuse_mask: True
+    embed_unit_vector: True
+    embed_distogram: True
   ipa:
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
@@ -30,6 +34,22 @@ model:
     seq_tfmr_num_heads: 4
     seq_tfmr_num_layers: 2
     num_blocks: 6
+
+  local_triangle_attention_new:
+    enable: True # true
+    c_s: ${model.node_embed_size}
+    c_z: ${model.edge_embed_size}
+    c_rbf: 64
+    c_gate_s: 16
+    c_hidden: 128
+    c_hidden_mul: 128
+    no_heads: 4
+    transition_n: 2
+    k_neighbour: 32
+    k_linear: 0 # residue index 상에서 앞뒤로 존재하는 얘들을 강제로 포함
+    inf: 1e9
+    pair_dropout: 0.25
+
   angle:
     c_resnet: 256
     no_resnet_blocks: 2

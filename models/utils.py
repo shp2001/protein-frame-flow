@@ -4,10 +4,28 @@ from torch.nn import functional as F
 import numpy as np
 from data import utils as du
 
+def calc_unit_vector(rigids, eps=1e-20):
+    points = rigids.get_trans()[..., None, :, :]
+    rigid_vec = rigids[..., None].invert_apply(points)
 
+    inv_distance_scalar = torch.rsqrt(eps + torch.sum(rigid_vec**2, dim=-1))
+    unit_vector = rigid_vec * inv_distance_scalar[..., None]
+    unit_vector = torch.unbind(unit_vector[..., None, :], dim=-1)
+    unit_vector = torch.cat(unit_vector, dim=-1)
+    return unit_vector
+
+def compute_distance_map(coords):
+
+    coords_exp1 = coords.unsqueeze(2)  # (b, L, 1, 3)
+    coords_exp2 = coords.unsqueeze(1)  # (b, 1, L, 3)
+
+    dist_map = torch.norm(coords_exp1 - coords_exp2, dim=-1, keepdim=True)  # (b, L, L, 1)
+
+    return dist_map
 def calc_distogram(pos, min_bin, max_bin, num_bins):
+    # pos: (b, L, 3)
     dists_2d = torch.linalg.norm(
-        pos[:, :, None, :] - pos[:, None, :, :], axis=-1)[..., None]
+        pos[:, :, None, :] - pos[:, None, :, :], axis=-1)[..., None] # (b, L, L, 1)
     lower = torch.linspace(
         min_bin,
         max_bin,
@@ -17,6 +35,20 @@ def calc_distogram(pos, min_bin, max_bin, num_bins):
     dgram = ((dists_2d > lower) * (dists_2d < upper)).type(pos.dtype)
     return dgram
 
+def calc_all_atom_distogram(pos, min_bin, max_bin, num_bins):
+    # pos: (b, L, 14, 3)
+    dists_2d = torch.linalg.norm(
+        pos[:, :, None, :, :] - pos[:, None, :, :, :], axis=-1)[..., None] # (b, L, L, 14, 1)
+    
+    dists_2d = dists_2d.permute(0, 3, 1, 2, 4) # (b, 14, L, L, 1)
+    lower = torch.linspace(
+        min_bin,
+        max_bin,
+        num_bins,
+        device=pos.device)
+    upper = torch.cat([lower[1:], lower.new_tensor([1e8])], dim=-1)
+    dgram = ((dists_2d > lower) * (dists_2d < upper)).type(pos.dtype)
+    return dgram
 
 def get_index_embedding(indices, embed_size, max_len=2056):
     """Creates sine / cosine positional embeddings from a prespecified indices.

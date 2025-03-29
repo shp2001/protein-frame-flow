@@ -8,7 +8,7 @@ from models import ipa_pytorch
 from data import utils as du
 from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
-
+from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden, use_original_sm):
@@ -143,6 +143,7 @@ class FlowModel(nn.Module):
         super(FlowModel, self).__init__()
         self._model_conf = model_conf
         self._ipa_conf = model_conf.ipa
+        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._angle_conf = model_conf.angle
         self._prmsd_conf = model_conf.prmsd
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
@@ -174,13 +175,16 @@ class FlowModel(nn.Module):
                 self._ipa_conf.c_s, use_rot_updates=True)
 
             if b < self._ipa_conf.num_blocks-1:
-                # No edge update on the last block.
-                edge_in = self._model_conf.edge_embed_size
-                self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
-                    node_embed_size=self._ipa_conf.c_s,
-                    edge_embed_in=edge_in,
-                    edge_embed_out=self._model_conf.edge_embed_size,
-                )
+                if self._local_triangle_attention_new_conf.enable:
+                    self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
+                
+                else:
+                    edge_in = self._model_conf.edge_embed_size
+                    self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
+                        node_embed_size=self._ipa_conf.c_s,
+                        edge_embed_in=edge_in,
+                        edge_embed_out=self._model_conf.edge_embed_size,
+                    )
 
         self.angle_resnet = AngleResnet(
                 self._ipa_conf.c_s,
@@ -221,8 +225,6 @@ class FlowModel(nn.Module):
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
         diffuse_mask = input_feats['diffuse_mask']
-        res_index = input_feats['res_idx']
-        so3_t = input_feats['so3_t']
         r3_t = input_feats['r3_t']
         trans_t = input_feats['trans_t']
         rotmats_t = input_feats['rotmats_t']
@@ -231,38 +233,42 @@ class FlowModel(nn.Module):
         
         # Initialize node and edge embeddings
         init_node_embed = self.node_feature_net(
-            so3_t,
             r3_t,
             node_mask,
             diffuse_mask,
-            res_index,
             aatype
         )
-        ######################## 0으로 초기화하지 말고 cdr masked protein으로 초기화 ######################
 
         if 'trans_sc' not in input_feats:
             trans_sc = du.manage_missing_batch(trans_t, mask=~diffuse_mask.bool())
         else:
             trans_sc = input_feats['trans_sc']
+
+        if 'rotmats_sc' not in input_feats:
+            rotmats_sc = du.manage_missing_batch(rotmats_t, mask=~diffuse_mask.bool())
+        else:
+            rotmats_sc = input_feats['rotmats_sc']
+
         init_edge_embed = self.edge_feature_net(
-        init_node_embed,
             trans_t,
             trans_sc,
+            rotmats_t,
+            rotmats_sc,
             edge_mask,
             diffuse_mask,
             pair_init
         )
 
-        # Initial rigids
+        # Initialize rigids
         curr_rigids = du.create_rigid(rotmats_t, trans_t)
 
         # Main trunk
         all_atom_outputs = []
 
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
-        init_node_embed = init_node_embed * node_mask[..., None]
         node_embed = init_node_embed * node_mask[..., None]
         edge_embed = init_edge_embed * edge_mask[..., None]
+
         for b in range(self._ipa_conf.num_blocks):
             ipa_embed = self.trunk[f'ipa_{b}'](
                 node_embed,
@@ -281,9 +287,16 @@ class FlowModel(nn.Module):
             curr_rigids = curr_rigids.compose_q_update_vec(
                 rigid_update, (node_mask * diffuse_mask)[..., None])
             if b < self._ipa_conf.num_blocks-1:
-                edge_embed = self.trunk[f'edge_transition_{b}'](
-                    node_embed, edge_embed)
-                edge_embed *= edge_mask[..., None]
+                if self._local_triangle_attention_new_conf.enable:
+                    edge_embed = self.trunk[f'edge_transition_{b}'](
+                        node_embed, edge_embed, curr_rigids, edge_mask
+                    )
+                    edge_embed *= edge_mask[..., None]
+               
+                else:
+                    edge_embed = self.trunk[f'edge_transition_{b}'](
+                        node_embed, edge_embed)
+                    edge_embed *= edge_mask[..., None]
 
             unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
 
@@ -322,6 +335,7 @@ class FlowModel(nn.Module):
             all_atom_outputs["prmsd"] = prmsd
         else:
             all_atom_outputs['prmsd'] = torch.zeros(node_embed.shape[0], node_embed.shape[1])
+
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,

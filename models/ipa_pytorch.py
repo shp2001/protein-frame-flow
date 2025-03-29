@@ -29,6 +29,10 @@ from einops.layers.torch import Rearrange
 
 from torch.cuda.amp import autocast
 from contextlib import contextmanager
+from openfold.model.triangular_multiplicative_update import (
+    TriangleMultiplicationOutgoing,
+    TriangleMultiplicationIncoming
+)
 
 def exists(val):
     return val is not None
@@ -965,3 +969,4 @@ class IpaScore(nn.Module):
             'final_rigids': curr_rigids,
         }
         return model_out
+

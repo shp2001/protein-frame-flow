@@ -122,7 +122,7 @@ class ProteinData(LightningDataModule):
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
-            collate_fn=self.create_collate_fn(max_len=10000)
+            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res)
         )
 
     def predict_dataloader(self):

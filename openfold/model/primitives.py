@@ -22,7 +22,7 @@ import deepspeed
 import torch
 import torch.nn as nn
 from scipy.stats import truncnorm
-
+from einops import einsum
 from openfold.utils.checkpointing import get_checkpoint_fn
 from openfold.utils.tensor_utils import (
     permute_final_dims,
@@ -585,3 +585,16 @@ def _lma(
         o[..., q_s: q_s + q_chunk_size, :, :] = q_chunk_out
 
     return o
+
+def _tied_attention(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, biases: List[torch.Tensor]) -> torch.Tensor:
+    B,L,H = query.shape[0],query.shape[1],query.shape[3]
+    query = query
+    key = key / L # normalize for tied attention
+    attn = einsum('bnihk,bnjhk->bijh', query, key) # tied attention
+    for b in biases:
+        attn += b
+    attn = softmax(attn, dim=-1) # (B, L, L, h)
+    
+    out = einsum('bijh,bnjhd->bnihd', attn, value).reshape(B, L, L, H,-1)
+    
+    return out

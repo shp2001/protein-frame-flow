@@ -18,12 +18,12 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
-    max_num_res_squared: 400_000
+    max_num_res_squared: 160_000
 
   # Cropping 
   ab_threshold: 40
   general_threshold: 40
-  max_num_res: 600
+  max_num_res: 450
 
 interpolant:
   min_t: 1e-2
@@ -38,6 +38,7 @@ interpolant:
 
   trans:
     corrupt: True
+    scale: 0.25
     batch_ot: True
     sample_schedule: linear
     sample_temp: 1.0
@@ -70,28 +71,37 @@ experiment:
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
     aux_loss_weight: 0.2
+
     aux_loss_use_bb_loss: True
-    aux_loss_use_pair_loss: True
+    aux_loss_use_pair_loss: False
     aux_loss_use_chi_loss: True
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_prsmd_loss: True
+    aux_loss_use_prsmd_loss: False
+    aux_loss_use_all_atom_clash_loss: True
+    aux_loss_use_local_dist_mat_loss: True 
+    
     aux_loss_chi_loss_weight: 1.0
     aux_loss_bb_atom_loss_weight: 5.0
     aux_loss_sc_atom_loss_weight: 2.5
-    aux_loss_t_pass: 0
+    aux_loss_pair_loss_weight: 1.0
+    aux_loss_final_layer_rmsd_weight: 2.5
+    aux_loss_all_atom_clash_loss_weight: 0.2
+    aux_loss_local_dist_mat_loss_weight: 5.0
+    aux_loss_t_pass: 0.2
+
   wandb:
-    name: fm_anchor_sample_wt_lrs_2e-4
+    name: fm_tri_crop_450_loc_pair_loss
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 4e5
-    min_lr: 2e-5
-    max_lr: 2e-4
+    min_lr: 1e-5
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
-    max_epochs: 170
+    max_epochs: 150
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False

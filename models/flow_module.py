@@ -24,8 +24,6 @@ from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
 
-
-
 class FlowModule(LightningModule):
 
     def __init__(self, cfg):
@@ -83,7 +81,32 @@ class FlowModule(LightningModule):
 
     def on_train_start(self):
         self._epoch_start_time = time.time()
+
+    # def on_train_batch_start(self, batch, batch_idx):
+    #     # 모든 학습 가능한 파라미터 초기화
+    #     for p in self.parameters():
+    #         if p.requires_grad:
+    #             p.grad = None
         
+    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
+    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+
+    # def on_train_batch_end(self, outputs, batch, batch_idx):
+    #     # Backward 이후 gradient가 계산된 파라미터 추적
+    #     grads = {}
+    #     for n, p in self.named_parameters():
+    #         if p.requires_grad and p.grad is not None:
+    #             grads[id(p)] = n
+        
+    #     # 사용되지 않은 파라미터 찾기
+    #     unused = [self._params_before[id_p] for id_p in self._params_before 
+    #             if id_p not in grads]
+        
+    #     if unused:
+    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+    #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+    #     else:
+    #         print("✅ 모든 파라미터가 사용되었습니다.")
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
         self.log(
@@ -122,7 +145,7 @@ class FlowModule(LightningModule):
             so3_t[..., None], torch.tensor(training_cfg.t_normalize_clip))
         
         gt_atom14_pos *= training_cfg.bb_atom_scale / r3_norm_scale[..., None] # scaling 
-        gt_bb_atoms = gt_atom14_pos[:, :, :3] 
+        gt_bb_atoms = gt_atom14_pos[:, :, :3] # scaling 
 
         # Model output predictions.
         model_output = self.model(noisy_batch)
@@ -170,6 +193,7 @@ class FlowModule(LightningModule):
                                 cdr_mask=noisy_batch['diffuse_mask'],
                                 atom14_gt_exists=noisy_batch['atom14_gt_exists'],
                                 mode='sc',
+                                compute_non_cdr=True
                                 )        
 
         # torsion angle loss 
@@ -197,31 +221,54 @@ class FlowModule(LightningModule):
                                 atom14_gt_exists=noisy_batch['atom14_gt_exists'],
                                 mode='sc'
                                 )
-        final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2) + final_sc_rmsd *  (training_cfg.aux_loss_sc_atom_loss_weight/2)
-        
+        final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2) + final_sc_rmsd * (training_cfg.aux_loss_sc_atom_loss_weight/2)
+
         # Pairwise distance loss
-        pred_atom_14 = pred_atom_14_list[-1]
-        pred_bb_atoms = pred_atom_14[:, :, :3]
-        gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
-        gt_pair_dists = torch.linalg.norm(
-            gt_flat_atoms[:, :, None, :] - gt_flat_atoms[:, None, :, :], dim=-1)
-        pred_flat_atoms = pred_bb_atoms.reshape([num_batch, num_res*3, 3])
-        pred_pair_dists = torch.linalg.norm(
-            pred_flat_atoms[:, :, None, :] - pred_flat_atoms[:, None, :, :], dim=-1)
+        dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_pair_loss:
+            pred_atom_14 = pred_atom_14_list[-1]
+            pred_bb_atoms = pred_atom_14[:, :, :3]
+            gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
+            gt_pair_dists = torch.linalg.norm(
+                gt_flat_atoms[:, :, None, :] - gt_flat_atoms[:, None, :, :], dim=-1)
+            pred_flat_atoms = pred_bb_atoms.reshape([num_batch, num_res*3, 3])
+            pred_pair_dists = torch.linalg.norm(
+                pred_flat_atoms[:, :, None, :] - pred_flat_atoms[:, None, :, :], dim=-1)
 
-        flat_loss_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
-        flat_loss_mask = flat_loss_mask.reshape([num_batch, num_res*3])
-        flat_res_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
-        flat_res_mask = flat_res_mask.reshape([num_batch, num_res*3])
+            flat_loss_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
+            flat_loss_mask = flat_loss_mask.reshape([num_batch, num_res*3])
+            flat_res_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
+            flat_res_mask = flat_res_mask.reshape([num_batch, num_res*3])
 
-        gt_pair_dists = gt_pair_dists * flat_loss_mask[..., None]
-        pred_pair_dists = pred_pair_dists * flat_loss_mask[..., None]
-        pair_dist_mask = flat_loss_mask[..., None] * flat_res_mask[:, None, :]
+            gt_pair_dists = gt_pair_dists * flat_loss_mask[..., None]
+            pred_pair_dists = pred_pair_dists * flat_loss_mask[..., None]
+            pair_dist_mask = flat_loss_mask[..., None] * flat_res_mask[:, None, :]
 
-        dist_mat_loss = torch.sum(
-            (gt_pair_dists - pred_pair_dists)**2 * pair_dist_mask,
-            dim=(1, 2))
-        dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1, 2)) + 1)
+            dist_mat_loss = torch.sum(
+                (gt_pair_dists - pred_pair_dists)**2 * pair_dist_mask,
+                dim=(1, 2))
+            dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1, 2)) + 1)
+
+        # local Pairwise distance loss
+        local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_local_dist_mat_loss:
+            pred_atom_14 = pred_atom_14_list[-1]
+            local_dist_mat_loss = local_distance_loss(
+                noisy_batch['aatype'],
+                pred_atom_14,
+                noisy_batch['atom14_gt_exists'],
+                gt_atom14_pos,
+                noisy_batch['diffuse_mask'][0],
+            )
+        
+        # all atom clash loss 
+        all_atom_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_all_atom_clash_loss:
+            all_atom_clash_loss = compute_all_atom_clash_loss(
+                                                            model_output['all_atom_preds']['positions'][-1],
+                                                            noisy_batch['atom14_gt_exists'],
+                                                            noisy_batch['res_idx'],
+                                                            noisy_batch['residx_atom14_to_atom37'])
         
         # calculate prmsd 
         if self._model_cfg.prmsd.use_prmsd:
@@ -232,22 +279,26 @@ class FlowModule(LightningModule):
 
             se3_vf_loss = trans_loss + rots_vf_loss
             auxiliary_loss = (
-                bb_atom_loss * training_cfg.aux_loss_use_bb_loss
+                bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
                 + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
                 + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
-                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
-                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd
+                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss * training_cfg.aux_loss_pair_loss_weight
+                + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
+                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
+                + all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight * 10000
                 + prmsd_loss * training_cfg.aux_loss_use_prsmd_loss * 0.5
             )
 
         else:
             se3_vf_loss = trans_loss + rots_vf_loss
             auxiliary_loss = (
-                bb_atom_loss * training_cfg.aux_loss_use_bb_loss
+                bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
                 + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
                 + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
-                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss
-                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd
+                + dist_mat_loss * training_cfg.aux_loss_use_pair_loss * training_cfg.aux_loss_pair_loss_weight
+                + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
+                + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
+                + all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight * 10000
             )
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -268,6 +319,9 @@ class FlowModule(LightningModule):
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
+            'dist_mat_loss': dist_mat_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss
         })
         return {
             "trans_loss": trans_loss,
@@ -277,6 +331,9 @@ class FlowModule(LightningModule):
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
+            'dist_mat_loss': dist_mat_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
@@ -428,15 +485,20 @@ class FlowModule(LightningModule):
 
     def training_step(self, batch: Any, stage: int):
         step_start_time = time.time()
+        params_before = {n: p.requires_grad for n, p in self.named_parameters() if p.requires_grad}
         self.interpolant.set_device(batch['res_mask'].device)
         noisy_batch = self.interpolant.corrupt_batch(batch)
-
+        
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
                 model_sc = self.model(noisy_batch)
                 noisy_batch['trans_sc'] = (
                     model_sc['pred_trans'] * noisy_batch['diffuse_mask'][..., None]
                     + noisy_batch['trans_1'] * (1 - noisy_batch['diffuse_mask'][..., None])
+                )
+                noisy_batch['rotmats_sc'] = (
+                    model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
+                    + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
                 )
         batch_losses = self.model_step(noisy_batch)
         num_batch = batch_losses['trans_loss'].shape[0]
@@ -447,7 +509,12 @@ class FlowModule(LightningModule):
             self._log_scalar(
                 f"train/{k}", v, prog_bar=False, batch_size=num_batch)
         
-
+        # 사용되지 않은 파라미터 찾기
+        params_after = {n: p.requires_grad for n, p in self.named_parameters() if p.requires_grad}
+        unused_params = [n for n in params_before if not params_after[n]]
+        
+        if unused_params:
+            print(f"⚠️ Unused parameters: {unused_params}")
         # Losses to track. Stratified across t.
         so3_t = torch.squeeze(noisy_batch['so3_t'])
         self._log_scalar(

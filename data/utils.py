@@ -448,13 +448,14 @@ def manage_missing_batch(xyz, mask):
     """for missing residues, get the closest residue coordinate (batch version)
     
     Args:
-        xyz (tensor): xyz coordinates [b, L, 3]
+        xyz (tensor): xyz coordinates [b, L, 3] or [b, L, 3, 3]
         mask (tensor): mask information [b, L] (True = atom exists)
 
     Returns:
-        xyz (tensor): modified xyz coordinate [b, L, 3]
+        xyz (tensor): modified xyz coordinate with the same shape as input
     """
-    b, L, _ = xyz.shape  # 배치 차원 고려
+    b, L = mask.shape  
+    extra_dims = xyz.shape[2:]  # (3) or (3, 3)
 
     # 존재하는 원소의 인덱스 찾기 (배치별)
     exist_in_xyz = [torch.where(mask[i])[0] for i in range(b)]  # 각 배치에서 존재하는 residue 인덱스 리스트
@@ -476,10 +477,15 @@ def manage_missing_batch(xyz, mask):
         # 실제 index 가져오기 (L 크기의 인덱스 배열)
         nearest_residue_idx = valid_idx[closest_idx]
 
-        # 가장 가까운 residue의 좌표 가져오기
-        nearest_residue_coords = xyz[i, nearest_residue_idx]
+        # 가장 가까운 residue의 좌표 가져오기 (추가 차원 유지)
+        nearest_residue_coords = xyz[i, nearest_residue_idx]  # [L, *extra_dims]
+
+        # 차원 확장
+        mask_expanded = mask[i].unsqueeze(-1)  # (L) -> (L, 1)
+        for _ in range(len(extra_dims) - 1):  # extra_dims가 (3, 3)이면 한 번 더 확장
+            mask_expanded = mask_expanded.unsqueeze(-1)
 
         # mask가 False인 부분을 최근접 residue 좌표로 대체
-        new_xyz[i] = torch.where(mask[i].unsqueeze(-1), xyz[i], nearest_residue_coords)
+        new_xyz[i] = torch.where(mask_expanded, xyz[i], nearest_residue_coords)
 
     return new_xyz
