@@ -4,7 +4,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 # Pytorch lightning imports
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer
+from pytorch_lightning import LightningDataModule, LightningModule, Trainer, Callback
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -14,9 +14,21 @@ from models.flow_module import FlowModule
 from experiments import utils as eu
 import wandb
 
+
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
+class MaskingRatioCallback(Callback):
+    # @rank_zero_only
+    def on_train_epoch_start(self, trainer, pl_module):
+        datamodule = trainer.datamodule
+        datamodule.current_epoch = trainer.current_epoch
+        datamodule.masking_ratio = min(
+            1.0, 
+            datamodule.data_cfg.masking_scheduler.init_rate + 
+            datamodule.data_cfg.masking_scheduler.masking_increase_ratio * trainer.current_epoch
+        )
+        log.info(f"Epoch {trainer.current_epoch}: masking_ratio = {datamodule.masking_ratio}")
 
 class Experiment:
 
@@ -53,6 +65,7 @@ class Experiment:
             logger = None
             self._train_device_ids = [self._train_device_ids[0]]
             self._data_cfg.loader.num_workers = 0
+            callbacks.append(MaskingRatioCallback())
         else:
             logger = WandbLogger(
                 **self._exp_cfg.wandb,
@@ -65,7 +78,7 @@ class Experiment:
             
             # Model checkpoints
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
-            
+            callbacks.append(MaskingRatioCallback())
             # Save config only for main process.
             local_rank = os.environ.get('LOCAL_RANK', 0)
             if local_rank == 0:

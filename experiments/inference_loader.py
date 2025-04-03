@@ -293,7 +293,7 @@ def collate_fn(batch):
                                                     threshold=60,
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=1000,
+                                                    max_len=550,
                                                     seq_list=feat['chain_seq_list']
                                                     )
         # del feat['masked_chain']

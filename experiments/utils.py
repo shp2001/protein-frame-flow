@@ -195,8 +195,11 @@ def get_available_device(num_device):
 
 def save_traj(
         sample: np.ndarray,
+        bb_prot_traj: np.ndarray,
+        x0_traj: np.ndarray,
         output_dir: str,
         b_factors: np.ndarray,
+        save_traj_bool,
         aatype = None,
         chain_index = None
     ):
@@ -224,8 +227,8 @@ def save_traj(
 
     # Write sample.
     sample_path = os.path.join(output_dir, 'sample.pdb')
-    # prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
-    # x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
+    prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
+    x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
 
     # Use b-factors to specify which residues are diffused.
     b_factors = np.tile((b_factors)[:, None], (1, 37))
@@ -238,30 +241,33 @@ def save_traj(
         aatype=aatype,
         chain_index=chain_index
     )
-    return {
-        'sample_path': sample_path,
-    }
-    # prot_traj_path = au.write_prot_to_pdb(
-    #     bb_prot_traj,
-    #     prot_traj_path,
-    #     b_factors=b_factors,
-    #     no_indexing=False,
-    #     aatype=aatype,
-    #     chain_index=chain_index
-    # )
-    # x0_traj_path = au.write_prot_to_pdb(
-    #     x0_traj,
-    #     x0_traj_path,
-    #     b_factors=b_factors,
-    #     no_indexing=False,
-    #     aatype=aatype,
-    #     chain_index=chain_index
-    # )
-    # return {
-    #     'sample_path': sample_path,
-    #     'traj_path': prot_traj_path,
-    #     'x0_traj_path': x0_traj_path,
-    # }
+    if not save_traj_bool:
+        return {
+            'sample_path': sample_path,
+        }
+    
+    else:
+        prot_traj_path = au.write_prot_to_pdb(
+            bb_prot_traj,
+            prot_traj_path,
+            b_factors=b_factors,
+            no_indexing=False,
+            aatype=aatype,
+            chain_index=chain_index
+        )
+        x0_traj_path = au.write_prot_to_pdb(
+            x0_traj,
+            x0_traj_path,
+            b_factors=b_factors,
+            no_indexing=False,
+            aatype=aatype,
+            chain_index=chain_index
+        )
+        return {
+            'sample_path': sample_path,
+            'traj_path': prot_traj_path,
+            'x0_traj_path': x0_traj_path,
+        }
 
 
 def get_pylogger(name=__name__) -> logging.Logger:

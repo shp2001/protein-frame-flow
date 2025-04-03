@@ -13,6 +13,7 @@ from collections import defaultdict
 import bisect
 
 from openfold.data.data_transforms import reencode_cdr_mask
+
 class ProteinData(LightningDataModule):
 
     def __init__(self, *, data_cfg, train_dataset, valid_dataset, predict_dataset=None):
@@ -23,11 +24,37 @@ class ProteinData(LightningDataModule):
         self._train_dataset = train_dataset
         self._valid_dataset = valid_dataset
         self._predict_dataset = predict_dataset
+    
+    def apply_probabilistic_mask(self, mask: torch.Tensor, masking_ratio: float) -> torch.Tensor:
+        """
+        Args:
+            mask: (B, L) 크기의 이진 텐서 (1=유지, 0=마스킹)
+            masking_ratio: 1을 유지할 확률 (0.0 ~ 1.0)
+        Returns:
+            (B, L) 크기의 새 마스크 텐서
+        """
+        device = mask.device
+        B, L = mask.shape
+        print(f'ratio: {masking_ratio}')
+        # 1. [1, L] 크기의 확률 텐서 생성 → 배치 전체에 동일 적용
+        prob_matrix = torch.rand((1, L), device=device)  # 차원 확장
+        
+        # 2. masking_ratio 기준으로 0/1 결정
+        new_mask = torch.where(
+            (mask == 1) & (prob_matrix < masking_ratio),  # 조건
+            torch.ones_like(mask),                       # True면 1 유지
+            torch.zeros_like(mask)                       # False면 0으로 마스킹
+        )
+        
+        if torch.all(new_mask == 0):
+            new_mask = mask
 
-    def create_collate_fn(self, max_len):
+        return new_mask
+
+    def create_collate_fn(self, max_len, mask_schedule):
         def collate_fn(batch):
             cropped_batch = []
-
+            # masking_ratio = self.trainer.datamodule.masking_ratio if hasattr(self, 'trainer') else self.masking_ratio
             for feat in batch:
                 # crop the feats
                 cropped_feat = {}
@@ -95,6 +122,10 @@ class ProteinData(LightningDataModule):
 
             cropped_batch['raw_path'] = feat['raw_path']
 
+            # masking scheduling 
+            if mask_schedule:
+                cropped_batch['diffuse_mask'] = self.apply_probabilistic_mask(cropped_batch['diffuse_mask'], self.masking_ratio) 
+                print(f'masking_ratio: {self.masking_ratio}')
             return cropped_batch
         return collate_fn
     
@@ -110,9 +141,9 @@ class ProteinData(LightningDataModule):
             ),
             num_workers=num_workers,
             prefetch_factor=None if num_workers == 0 else self.loader_cfg.prefetch_factor,
-            pin_memory=False,
+            pin_memory=True,
             persistent_workers=True if num_workers > 0 else False,
-            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res)
+            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=self.data_cfg.masking_schedule)
         )
 
     def val_dataloader(self):
@@ -122,7 +153,7 @@ class ProteinData(LightningDataModule):
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
-            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res)
+            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=False)
         )
 
     def predict_dataloader(self):

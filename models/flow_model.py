@@ -306,7 +306,9 @@ class FlowModel(nn.Module):
             all_atom_preds = {
                 "unnormalized_angles": unnormalized_angles,
                 "angles": angles,
-                "positions": pred_xyz
+                "positions": pred_xyz,
+                "rigids": curr_rigids.to_tensor_7(),
+                "sidechain_frames": all_frames_to_global.to_tensor_4x4()
             }
             all_atom_outputs.append(all_atom_preds)
 

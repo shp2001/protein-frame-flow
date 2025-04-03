@@ -9,4 +9,4 @@ All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-/var/spool/slurmd/job778816/slurm_script: line 13: 2046573 Bus error               (core dumped) python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/inf_default.log
+slurmstepd: error: *** JOB 781395 ON gpu02 CANCELLED AT 2025-04-03T18:00:44 ***

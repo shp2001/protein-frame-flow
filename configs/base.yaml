@@ -15,6 +15,11 @@ data:
     num_workers: 4
     prefetch_factor: 10
 
+  masking_scheduler: 
+    mask_schedule: False
+    init_rate: 0.3
+    masking_increase_ratio: 0.02
+
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
@@ -38,7 +43,7 @@ interpolant:
 
   trans:
     corrupt: True
-    scale: 0.25
+    scale: 1.0
     batch_ot: True
     sample_schedule: linear
     sample_temp: 1.0
@@ -55,7 +60,8 @@ interpolant:
     do_sde: False
 
   self_condition: ${model.edge_features.self_condition}
-
+  save_traj: True 
+  
 experiment:
   debug: False
   seed: 123
@@ -74,13 +80,16 @@ experiment:
 
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False
-    aux_loss_use_chi_loss: True
+    aux_loss_use_chi_loss: False
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
     aux_loss_use_prsmd_loss: False
     aux_loss_use_all_atom_clash_loss: True
     aux_loss_use_local_dist_mat_loss: True 
-    
+    # fape loss
+    aux_loss_use_fape_bb_loss: True
+    aux_loss_use_fape_sc_loss: True 
+
     aux_loss_chi_loss_weight: 1.0
     aux_loss_bb_atom_loss_weight: 5.0
     aux_loss_sc_atom_loss_weight: 2.5
@@ -88,10 +97,13 @@ experiment:
     aux_loss_final_layer_rmsd_weight: 2.5
     aux_loss_all_atom_clash_loss_weight: 0.2
     aux_loss_local_dist_mat_loss_weight: 5.0
+    # fape loss
+    aux_loss_fape_bb_loss_weight: 10.0
+    aux_loss_fape_sc_loss_weight: 5.0
     aux_loss_t_pass: 0.2
 
   wandb:
-    name: fm_tri_crop_450_loc_pair_loss
+    name: fm_tri_partial_mask
     project: se3-fm
   optimizer:
     warmup_steps: 0

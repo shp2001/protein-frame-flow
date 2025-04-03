@@ -207,7 +207,6 @@ class Interpolant:
             res_idx=None,
             pair_init=None,
             verbose=False,
-            return_trans_rot=False,
         ):
         res_mask = torch.ones(num_batch, num_res, device=self._device)
 
@@ -382,13 +381,10 @@ class Interpolant:
         prot_traj.append((pred_trans_1, pred_rotmats_1))
 
         # Convert trajectories to atom37.
-        # atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
-        # clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
+        atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
+        clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
 
-        if not return_trans_rot:
-            return pred_positions_14, prmsd
-        else:
-            return pred_positions_14, prmsd, pred_trans_1, pred_rotmats_1
+        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

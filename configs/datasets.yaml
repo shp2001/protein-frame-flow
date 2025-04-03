@@ -13,6 +13,9 @@ shared:
   mode: ab
   loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
   
+  # masking scheduling 
+  init_masking_prob: 0.3 
+  masking_increase_ratio: 0.02
 scope_dataset:
   seed: ${shared.seed}
   csv_path: ./metadata/scope_metadata.csv
