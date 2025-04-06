@@ -48,7 +48,7 @@ pdb_dataset:
   valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
 
   max_cache_size: ${shared.max_cache_size}
-  cache_num_res: 0
+  cache_num_res: 10000000
   inpainting_percent: 1.0
 
   add_plddt_mask: False
