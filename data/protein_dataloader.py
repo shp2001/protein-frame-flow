@@ -143,7 +143,7 @@ class ProteinData(LightningDataModule):
             prefetch_factor=None if num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=True,
             persistent_workers=True if num_workers > 0 else False,
-            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=self.data_cfg.masking_schedule)
+            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=self.data_cfg.masking_scheduler.mask_schedule)
         )
 
     def val_dataloader(self):

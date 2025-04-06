@@ -1,10 +1,117 @@
 import torch 
-from typing import Optional
+from typing import Optional, Dict
 
 from data import residue_constants
 from openfold.utils.loss import between_residue_clash_loss
 from openfold.data.data_transforms import pseudo_beta_fn
 from openfold.utils.rigid_utils import Rigid, Rotation
+
+def compute_renamed_ground_truth(
+    batch: Dict[str, torch.Tensor],
+    atom14_pred_positions: torch.Tensor,
+    eps=1e-10,
+) -> Dict[str, torch.Tensor]:
+    """
+    Find optimal renaming of ground truth based on the predicted positions.
+
+    Alg. 26 "renameSymmetricGroundTruthAtoms"
+
+    This renamed ground truth is then used for all losses,
+    such that each loss moves the atoms in the same direction.
+
+    Args:
+      batch: Dictionary containing:
+        * atom14_gt_positions: Ground truth positions.
+        * atom14_alt_gt_positions: Ground truth positions with renaming swaps.
+        * atom14_atom_is_ambiguous: 1.0 for atoms that are affected by
+            renaming swaps.
+        * atom14_gt_exists: Mask for which atoms exist in ground truth.
+        * atom14_alt_gt_exists: Mask for which atoms exist in ground truth
+            after renaming.
+        * atom14_atom_exists: Mask for whether each atom is part of the given
+            amino acid type.
+      atom14_pred_positions: Array of atom positions in global frame with shape
+    Returns:
+      Dictionary containing:
+        alt_naming_is_better: Array with 1.0 where alternative swap is better.
+        renamed_atom14_gt_positions: Array of optimal ground truth positions
+          after renaming swaps are performed.
+        renamed_atom14_gt_exists: Mask after renaming swap is performed.
+    """
+
+    pred_dists = torch.sqrt(
+        eps
+        + torch.sum(
+            (
+                atom14_pred_positions[..., None, :, None, :]
+                - atom14_pred_positions[..., None, :, None, :, :]
+            )
+            ** 2,
+            dim=-1,
+        )
+    )
+
+    atom14_gt_positions = batch["atom14_gt_positions"]
+    gt_dists = torch.sqrt(
+        eps
+        + torch.sum(
+            (
+                atom14_gt_positions[..., None, :, None, :]
+                - atom14_gt_positions[..., None, :, None, :, :]
+            )
+            ** 2,
+            dim=-1,
+        )
+    )
+
+    atom14_alt_gt_positions = batch["atom14_alt_gt_positions"]
+    alt_gt_dists = torch.sqrt(
+        eps
+        + torch.sum(
+            (
+                atom14_alt_gt_positions[..., None, :, None, :]
+                - atom14_alt_gt_positions[..., None, :, None, :, :]
+            )
+            ** 2,
+            dim=-1,
+        )
+    )
+
+    lddt = torch.sqrt(eps + (pred_dists - gt_dists) ** 2)
+    alt_lddt = torch.sqrt(eps + (pred_dists - alt_gt_dists) ** 2)
+
+    atom14_gt_exists = batch["atom14_gt_exists"]
+    atom14_atom_is_ambiguous = batch["atom14_atom_is_ambiguous"]
+    mask = (
+        atom14_gt_exists[..., None, :, None]
+        * atom14_atom_is_ambiguous[..., None, :, None]
+        * atom14_gt_exists[..., None, :, None, :]
+        * (1.0 - atom14_atom_is_ambiguous[..., None, :, None, :])
+    )
+
+    per_res_lddt = torch.sum(mask * lddt, dim=(-1, -2, -3))
+    alt_per_res_lddt = torch.sum(mask * alt_lddt, dim=(-1, -2, -3))
+
+    fp_type = atom14_pred_positions.dtype
+    alt_naming_is_better = (alt_per_res_lddt < per_res_lddt).type(fp_type)
+
+    renamed_atom14_gt_positions = (
+        1.0 - alt_naming_is_better[..., None, None]
+    ) * atom14_gt_positions + alt_naming_is_better[
+        ..., None, None
+    ] * atom14_alt_gt_positions
+
+    renamed_atom14_gt_mask = (
+        1.0 - alt_naming_is_better[..., None]
+    ) * atom14_gt_exists + alt_naming_is_better[..., None] * batch[
+        "atom14_alt_gt_exists"
+    ]
+
+    return {
+        "alt_naming_is_better": alt_naming_is_better,
+        "renamed_atom14_gt_positions": renamed_atom14_gt_positions,
+        "renamed_atom14_gt_exists": renamed_atom14_gt_mask,
+    }
 
 def masked_mean(mask, value, dim, eps=1e-4):
     mask = mask.expand(*value.shape)
@@ -168,20 +275,20 @@ def compute_rmsd(
 def cdr_clamp(error_dist, l1_clamp_distance, l1_clamp_distance_large, cdr_mask):
     intra_clamped = torch.clamp(error_dist, min=0, max=l1_clamp_distance_large)
     inter_clamped = torch.clamp(error_dist, min=0, max=l1_clamp_distance)
-    error_dist = torch.where(cdr_mask, intra_clamped, inter_clamped)
+    error_dist = torch.where(cdr_mask.bool(), intra_clamped, inter_clamped)
     return error_dist
 
 def compute_fape(
-    pred_frames: Rigid,
+    pred_frames: Rigid,  
     target_frames: Rigid,
-    frames_mask: torch.Tensor,
-    pred_positions: torch.Tensor,
+    frames_mask: torch.Tensor, # (1, B, L, 8)
+    pred_positions: torch.Tensor, # (O, B, L, 14, 3)
     target_positions: torch.Tensor,
-    positions_mask: torch.Tensor,
+    positions_mask: torch.Tensor, # (1, B, L, 14)
     length_scale: float,
     l1_clamp_distance: Optional[float] = None,
     l1_clamp_distance_large: Optional[float] = None,
-    cdr_mask: Optional[float] = None,
+    cdr_mask: Optional[torch.Tensor] = None,
     eps=1e-8,
 ) -> torch.Tensor:
     """
@@ -210,17 +317,16 @@ def compute_fape(
         [*] loss tensor
     """
 
-    # [*, N_frames, N_pts, 3]
+    # [*, N_frames, N_pts, 3] -> [O, B, L, L, 3]
     local_pred_pos = pred_frames.invert()[..., None].apply(
         pred_positions[..., None, :, :],
     )
     local_target_pos = target_frames.invert()[..., None].apply(
         target_positions[..., None, :, :],
     )
-
     error_dist = torch.sqrt(
         torch.sum((local_pred_pos - local_target_pos) ** 2, dim=-1) + eps
-    )
+    ) # [O, B, L, L]
 
     if l1_clamp_distance is not None:
         if cdr_mask is not None and l1_clamp_distance_large is not None:
@@ -231,12 +337,9 @@ def compute_fape(
         else:
             error_dist = torch.clamp(error_dist, max=l1_clamp_distance)
 
-    normed_error = error_dist / length_scale
-
-    normed_error = normed_error * frames_mask[..., None]
-
-    
-    normed_error = normed_error * positions_mask[..., None, :]
+    normed_error = error_dist / length_scale # [*, N_frames, N_pts, 3] -> [O, B, L, L]
+    normed_error = normed_error * frames_mask[..., None] # [O, B, L, L] * (1, B, L, 1)
+    normed_error = normed_error * positions_mask[..., None, :] # [O, B, L, L] * (1, B, 1, L)
 
     # FP16-friendly averaging. Roughly equivalent to:
     #
@@ -248,25 +351,20 @@ def compute_fape(
     #
     # ("roughly" because eps is necessarily duplicated in the latter)
 
-    normed_error = torch.sum(normed_error, dim=-1)
-    normed_error = normed_error / (eps + torch.sum(frames_mask, dim=-1))[..., None]
-    normed_error = torch.sum(normed_error, dim=-1)
-    normed_error = normed_error / (eps + torch.sum(positions_mask, dim=-1))
-
+    normed_error = torch.sum(normed_error, dim=-1) # [O, B, L]
+    normed_error = normed_error / (eps + torch.sum(frames_mask, dim=-1))[..., None] # [O, B, L]
+    normed_error = torch.sum(normed_error, dim=-1) # (O, B)
+    normed_error = normed_error / (eps + torch.sum(positions_mask, dim=-1)) # (O, B)
+    
+    print(f'normed_error: {normed_error.shape}')
     return normed_error
-
-def cdr_clamp(error_dist, l1_clamp_distance, l1_clamp_distance_large, cdr_mask):
-    intra_clamped = torch.clamp(error_dist, min=0, max=l1_clamp_distance_large)
-    inter_clamped = torch.clamp(error_dist, min=0, max=l1_clamp_distance)
-    error_dist = torch.where(cdr_mask, intra_clamped, inter_clamped)
-    return error_dist
 
 # calculate only cdr-backbone loss 
 def backbone_fape_loss(
-    backbone_rigid_tensor: torch.Tensor,
-    backbone_rigid_mask: torch.Tensor,
-    traj: torch.Tensor,
-    cdr_mask: torch.Tensor,
+    backbone_rigid_tensor: torch.Tensor, # (B, L, 4, 4)
+    backbone_rigid_mask: torch.Tensor, # (B, L)
+    traj: torch.Tensor, # (O, B, L, 8, 7), pred frames 
+    cdr_mask: torch.Tensor, # (B, L)
     use_clamped_fape: Optional[torch.Tensor] = None,
     clamp_distance: float = 10.0,
     loss_unit_distance: float = 10.0,
@@ -279,7 +377,6 @@ def backbone_fape_loss(
         Rotation(rot_mats=pred_aff.get_rots().get_rot_mats(), quats=None),
         pred_aff.get_trans(),
     )
-
     # DISCREPANCY: DeepMind somehow gets a hold of a tensor_7 version of
     # backbone tensor, normalizes it, and then turns it back to a rotation
     # matrix. To avoid a potentially numerically unstable rotation matrix
@@ -294,41 +391,40 @@ def backbone_fape_loss(
     else:
         l1_clamp_distance = None
 
-    fape_loss = compute_fape(
-        pred_aff,
-        gt_aff[None],
-        backbone_rigid_mask[None],
-        pred_aff.get_trans(),
-        gt_aff[None].get_trans(),
-        backbone_rigid_mask[None],
-        l1_clamp_distance=l1_clamp_distance,
-        length_scale=loss_unit_distance,
-        eps=eps,
-    )
+    # fape_loss = compute_fape(
+    #     pred_aff,
+    #     gt_aff[None],
+    #     backbone_rigid_mask[None],
+    #     pred_aff.get_trans(),
+    #     gt_aff[None].get_trans(),
+    #     backbone_rigid_mask[None],
+    #     l1_clamp_distance=l1_clamp_distance,
+    #     length_scale=loss_unit_distance,
+    #     eps=eps,
+    # )
 
     cdr_fape_loss = compute_fape(
-        pred_aff,
-        gt_aff[None],
-        cdr_mask[None], # backbone_rigid_mask[None]
-        pred_aff.get_trans(),
-        gt_aff[None].get_trans(),
-        cdr_mask[None], # backbone_rigid_mask[None]
+        pred_frames=pred_aff,
+        target_frames=gt_aff[None],
+        frames_mask=cdr_mask[None] * backbone_rigid_mask[None],
+        pred_positions=pred_aff.get_trans(),
+        target_positions=gt_aff[None].get_trans(),
+        positions_mask=cdr_mask[None] * backbone_rigid_mask[None],
         l1_clamp_distance=l1_clamp_distance,
         l1_clamp_distance_large=intercdr_distance,
         cdr_mask=cdr_mask,
         length_scale=loss_unit_distance,
         eps=eps,
-    )
+    ) # (O, B, L, 8)
 
     # fape_loss = fape_loss * use_clamped_fape + unclamped_fape_loss * (
     #     1 - use_clamped_fape
     # )
 
-    # Average over the batch dimension
-    fape_loss = torch.mean(fape_loss)
-    cdr_fape_loss = torch.mean(cdr_fape_loss)
+    # Average over the dimensions except for batch dimension 
+    cdr_fape_loss = torch.mean(cdr_fape_loss, axis=0) 
 
-    return fape_loss + cdr_fape_loss
+    return cdr_fape_loss
 
 
 def sidechain_fape_loss(
@@ -394,18 +490,23 @@ def sidechain_fape_loss(
 
     ## cdr_mask
     # (B, n) -> (B, n, 8)
-    side_chain_frames_cdr_mask = cdr_mask.unsqueeze(-1).repeat(1, 1, 8)
-    # (B, n, 8) -> (B, n * 8)
-    side_chain_frames_cdr_mask = side_chain_frames_cdr_mask.view(*batch_dims, -1)
-    # (B, n) -> (B, n, 14)
-    sidechain_atom_pos_cdr_mask = cdr_mask.unsqueeze(-1).repeat(1, 1, 14)
-    # (B, n, 14) -> (B, n * 14)
-    sidechain_atom_pos_cdr_mask = sidechain_atom_pos_cdr_mask.view(*batch_dims, -1)
-    # (B, n) -> (B, n * 8, n * 14)
-    cdr_mask = side_chain_frames_cdr_mask.unsqueeze(-1) != (
-        sidechain_atom_pos_cdr_mask.unsqueeze(-2)
-    )
+    cdr_mask_frame_dim = cdr_mask.unsqueeze(-1).repeat(1, 1, 8)
 
+    # (B, n, 8) -> (B, n * 8)
+    cdr_mask_frame_dim = cdr_mask_frame_dim.view(*batch_dims, -1)
+    sidechain_cdr_frames_mask = rigidgroups_gt_exists * cdr_mask_frame_dim
+
+    # (B, n) -> (B, n, 14)
+    cdr_mask_pos_dim = cdr_mask.unsqueeze(-1).repeat(1, 1, 14)
+
+    # (B, n, 14) -> (B, n * 14)
+    cdr_mask_pos_dim = cdr_mask_pos_dim.view(*batch_dims, -1)
+    sidechain_cdr_points_mask = renamed_atom14_gt_exists * cdr_mask_pos_dim
+
+    # (B, n) -> (B, n * 8, n * 14)
+    cdr_mask = cdr_mask_frame_dim.unsqueeze(-1) != (
+        cdr_mask_pos_dim.unsqueeze(-2)
+    )
     fape = compute_fape(
         sidechain_frames,
         renamed_gt_frames,
@@ -420,14 +521,13 @@ def sidechain_fape_loss(
         eps=eps,
     )
 
-
     cdr_fape = compute_fape(
         sidechain_frames,
         renamed_gt_frames,
-        side_chain_frames_cdr_mask, ####
+        sidechain_cdr_frames_mask,
         sidechain_atom_pos,
         renamed_atom14_gt_positions,
-        sidechain_atom_pos_cdr_mask, ####
+        sidechain_cdr_points_mask,
         l1_clamp_distance=clamp_distance,
         l1_clamp_distance_large=intercdr_distance,
         cdr_mask=cdr_mask,
@@ -435,7 +535,9 @@ def sidechain_fape_loss(
         eps=eps,
     )
     
-    return fape + cdr_fape
+    cdr_fape_loss = torch.mean(cdr_fape, axis=(0,2,3)) 
+    fape_loss = torch.mean(fape, axis=(0,2,3))
+    return cdr_fape_loss + fape_loss
 
 def compute_prmsd_loss(
     pdev, # prmsd (b, l)
@@ -495,15 +597,16 @@ def compute_all_atom_clash_loss(
 
 def local_distance_loss(
         aatype,
-        atom14_pred_positions, # (B, L, 14, 3)
-        atom14_gt_exists, # (B, L, 14)
-        atom14_gt_positions, # (B, L, 14, 3)
-        diffuse_mask, # (L)
+        atom14_pred_positions, # (B, N, 14, 3)
+        renamed_atom14_gt_exists, # (B, N, 14)
+        renamed_atom14_gt_positions, # (B, N, 14, 3)
+        diffuse_mask, # (N)
+        gt_pseudo_beta # (B, N, 3)
         ):
     """
     In order to update interface properly, this loss will scan distance among interface atoms.
     """
-    # extract neighbor residues 
+    # extract neighbor residues from predicted structure 
     pred_pseudo_beta = pseudo_beta_fn(
         aatype,
         atom14_pred_positions,
@@ -514,27 +617,37 @@ def local_distance_loss(
     
     cdr_residues = torch.nonzero(diffuse_mask, as_tuple=True)[0]
     
-    neighbor_mask = (cb_distance_map[:, cdr_residues] < 8)  # (B, N_cdr, L)
-    neighbor_indices = torch.unique(torch.nonzero(neighbor_mask)[:, -1])  # (N_nb,)
+    neighbor_mask = (cb_distance_map[:, cdr_residues] < 8)  # (B, N_cdr, N)
+    pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+
+    # extract neighbor residues from gt structure and add to pred neighbors 
+    gt_cb_distance_map = torch.linalg.norm(
+        gt_pseudo_beta[:, :, None, :] - gt_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
+    
+    gt_neighbor_mask = (gt_cb_distance_map[:, cdr_residues] < 8)  # (B, N_cdr, N)
+    gt_neighbor_indices = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
+
+    neighbor_indices = torch.unique(torch.cat((pred_neighbor_indices, gt_neighbor_indices)))
 
     # calculate local all-atom log distance map  
     gt_pair_dists = torch.linalg.norm(
-        atom14_gt_positions[:, :, None, :, :] - atom14_gt_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    # gt_pair_dists = torch.log10(gt_pair_dists+1)
+        renamed_atom14_gt_positions[:, :, None, :, :] - renamed_atom14_gt_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
+    gt_pair_dists = torch.log10(gt_pair_dists+1)
     local_gt_pair_dists = gt_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
 
     pred_pair_dists = torch.linalg.norm(
         atom14_pred_positions[:, :, None, :, :] - atom14_pred_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    # pred_pair_dists = torch.log10(pred_pair_dists+1)
+    pred_pair_dists = torch.log10(pred_pair_dists+1)
     local_pred_pair_dists = pred_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
     
-    # make loss_mask with atom14_gt_exists
-    loss_mask = (atom14_gt_exists[:, :, None, :].bool()) & (atom14_gt_exists[:, None, :, :].bool()) # (B, N, N, 14)
+    # make loss_mask with atom14_gt_exists & atom14_alt_gt_exists
+    loss_mask = (renamed_atom14_gt_exists[:, :, None, :].bool()) & (renamed_atom14_gt_exists[:, None, :, :].bool()) # (B, N, N, 14)
     local_loss_mask = loss_mask[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
 
     # calculate loss (batch loss)
+    dist_err = (local_gt_pair_dists - local_pred_pair_dists) ** 2 * local_loss_mask
     dist_mat_loss = torch.sum(
-        (local_gt_pair_dists - local_pred_pair_dists) ** 2 * local_loss_mask,
+        dist_err,
         dim=(-1,-2,-3)
     ) 
     dist_mat_loss /= (torch.sum(local_loss_mask, dim=(-1,-2,-3)) + 1) # (B)

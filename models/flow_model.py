@@ -146,6 +146,8 @@ class FlowModel(nn.Module):
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._angle_conf = model_conf.angle
         self._prmsd_conf = model_conf.prmsd
+
+
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
         self.node_feature_net = NodeFeatureNet(model_conf.node_features)
@@ -265,6 +267,7 @@ class FlowModel(nn.Module):
         # Main trunk
         all_atom_outputs = []
 
+
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
         node_embed = init_node_embed * node_mask[..., None]
         edge_embed = init_edge_embed * edge_mask[..., None]
@@ -307,9 +310,10 @@ class FlowModel(nn.Module):
                 "unnormalized_angles": unnormalized_angles,
                 "angles": angles,
                 "positions": pred_xyz,
-                "rigids": curr_rigids.to_tensor_7(),
+                "rigids": backb_to_global.to_tensor_7(),
                 "sidechain_frames": all_frames_to_global.to_tensor_4x4()
             }
+
             all_atom_outputs.append(all_atom_preds)
 
         curr_rigids = self.rigids_nm_to_ang(curr_rigids)

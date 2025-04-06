@@ -52,28 +52,31 @@ class EdgeFeatureNet(nn.Module):
         relpos_feats = self.embed_relpos(pair_init)
         all_edge_feats = [relpos_feats]
 
-        # cdr을 가까운 residue로 보냈을 때 distogram
+
+        if self._cfg.embed_diffuse_mask:
+            diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
+            all_edge_feats.append(diff_feat[..., None])
+
         if self._cfg.embed_distogram:
             distogram_t = calc_distogram(
                 trans_t, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
+            distogram_t = distogram_t * diff_feat[..., None]
             all_edge_feats.append(distogram_t)
+            
             distogram_sc = calc_distogram(
                 trans_sc, min_bin=1e-3, max_bin=20.0, num_bins=self._cfg.num_bins)
             all_edge_feats.append(distogram_sc)
 
-        # cdr을 가까운 residue로 보냈을 때 unit_vector
         if self._cfg.embed_unit_vector:
             rigid_t = create_rigid(rotmats_t, trans_t)
             unit_vec_t = calc_unit_vector(rigid_t)
+            unit_vec_t = unit_vec_t * diff_feat[..., None]
             all_edge_feats.append(unit_vec_t)
 
             rigid_sc = create_rigid(rotmats_sc, trans_sc)
             unit_vec_sc = calc_unit_vector(rigid_sc)
             all_edge_feats.append(unit_vec_sc)
 
-        if self._cfg.embed_diffuse_mask:
-            diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
-            all_edge_feats.append(diff_feat[..., None])
 
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)

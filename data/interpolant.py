@@ -8,7 +8,7 @@ import copy
 from torch import autograd
 from motif_scaffolding import twisting
 
-# nm scale
+
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
     return noise - torch.mean(noise, dim=-2, keepdims=True)
@@ -95,9 +95,10 @@ class Interpolant:
         return new_xyz
         
     def _corrupt_trans(self, trans_1, t, res_mask, diffuse_mask):
-        trans_nm_0 = _centered_gaussian(*res_mask.shape, self._device)
+        trans_0 = _centered_gaussian(*res_mask.shape, self._device)
         masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
-        trans_0 = trans_nm_0 * du.NM_TO_ANG_SCALE
+        trans_0 = trans_0 * du.NM_TO_ANG_SCALE
+
         trans_0 = trans_0 + masked_trans
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1
         trans_t = _trans_diffuse_mask(trans_t, trans_1, diffuse_mask)
@@ -125,7 +126,7 @@ class Interpolant:
 
         # [B, N, 3]
         trans_1 = batch['trans_1']  # Angstrom
-
+        print(f'before_corrupt: {trans_1[0,0]}')
         # [B, N, 3, 3]
         rotmats_1 = batch['rotmats_1']
 
@@ -213,7 +214,10 @@ class Interpolant:
         # Set-up initial prior samples
         if trans_0 is None:
             trans_0 = _centered_gaussian(
-                num_batch, num_res, self._device) * du.NM_TO_ANG_SCALE
+                    num_batch, num_res, self._device)
+
+            trans_0 *= du.NM_TO_ANG_SCALE
+
             masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
             trans_0 = trans_0 + masked_trans
             trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)

@@ -91,12 +91,15 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
-
+    chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
+                                                                chain_feats['aatype'],
+                                                                chain_feats['all_atom_positions'],
+                                                                None)
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
         'rotmats_1': rotmats_1,
-        'trans_1': trans_1,
+        'trans_1': trans_1, # require centering 
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'res_idx': res_idx,
@@ -108,10 +111,19 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
         'chi_mask': chain_feats['chi_mask'],
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
-        'atom14_gt_positions': chain_feats['atom14_gt_positions'],
+        'atom14_gt_positions': chain_feats['atom14_gt_positions'], # require centering 
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
         'residx_atom14_to_atom37': chain_feats['residx_atom14_to_atom37'],
         'atom37_atom_exists': chain_feats['atom37_atom_exists'],
+        'pseudo_beta': chain_feats['pseudo_beta'], # require centering 
+        'atom14_alt_gt_positions': chain_feats['atom14_alt_gt_positions'], # require centering 
+        'atom14_alt_gt_exists': chain_feats['atom14_alt_gt_exists'],
+        'atom14_atom_is_ambiguous': chain_feats['atom14_atom_is_ambiguous'],
+        'backbone_rigid_tensor': chain_feats['backbone_rigid_tensor'], # require centering  (L, 4, 4)
+        'backbone_rigid_mask': chain_feats['backbone_rigid_mask'],
+        'rigidgroups_gt_frames': chain_feats['rigidgroups_gt_frames'], # require centering  (L, 8, 4, 4)
+        'rigidgroups_gt_exists': chain_feats['rigidgroups_gt_exists'],
+        'rigidgroups_alt_gt_frames': chain_feats['rigidgroups_alt_gt_frames'], # require centering (L, 8, 4, 4)
     }
 
 
@@ -279,6 +291,14 @@ class BaseDataset(Dataset):
             trans_1 -= motif_com[None, :]
             feats['trans_1'] = trans_1
             feats['atom14_gt_positions'] -= motif_com[None, :]
+            feats['pseudo_beta'] -= motif_com[None, :]
+            feats['atom14_alt_gt_positions'] -= motif_com[None, :]
+            feats['backbone_rigid_tensor'][:, :3, 3] -= motif_com[None, :]
+            feats['rigidgroups_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
+            feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
+
+            print(f'motif_com: {motif_com}')
+            print(f'trans_1: {trans_1[0]}')
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
