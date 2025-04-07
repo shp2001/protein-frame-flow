@@ -17,7 +17,7 @@ data:
 
   masking_scheduler: 
     mask_schedule: False
-    init_rate: 0.3
+    init_rate: 1.0
     masking_increase_ratio: 0.02
 
   sampler:
@@ -43,7 +43,6 @@ interpolant:
 
   trans:
     corrupt: True
-    scale: 4.0
     batch_ot: True
     sample_schedule: linear
     sample_temp: 1.0
@@ -74,7 +73,7 @@ experiment:
     bb_atom_scale: 0.1
     sc_atom_scale: 0.1
     trans_scale: 0.1
-    translation_loss_weight: 2.0
+    translation_loss_weight: 2.0 # 0.5~1.0 -> 1.0~2.0
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
     aux_loss_weight: 1.0
@@ -90,23 +89,23 @@ experiment:
 
     # fape loss
     aux_loss_use_fape_bb_loss: False
-    aux_loss_use_fape_sc_loss: False 
+    aux_loss_use_fape_sc_loss: False
 
-    aux_loss_chi_loss_weight: 0.5
-    aux_loss_bb_atom_loss_weight: 1.0
-    aux_loss_sc_atom_loss_weight: 0.3
-    aux_loss_pair_loss_weight: 0.2
-    aux_loss_final_layer_rmsd_weight: 0.5
-    aux_loss_all_atom_clash_loss_weight: 1000 # 0.1
-    aux_loss_local_dist_mat_loss_weight: 500 # 1.0
+    aux_loss_chi_loss_weight: 0.5 # 0.5 ~ 0.9
+    aux_loss_bb_atom_loss_weight: 0.5 # 1.5 ~ 5.0
+    aux_loss_sc_atom_loss_weight: 0.2 # 2.0 ~ 6.0
+    aux_loss_pair_loss_weight: 0.2 
+    aux_loss_final_layer_rmsd_weight: 0.5 
+    aux_loss_all_atom_clash_loss_weight: 1000 # 1e-5 ~ 1e-4
+    aux_loss_local_dist_mat_loss_weight: 1.0 # 0.5 ~ 4.0
 
     # fape loss
-    aux_loss_fape_bb_loss_weight: 10.0
-    aux_loss_fape_sc_loss_weight: 5.0
-    aux_loss_t_pass: 1.0
-
+    aux_loss_fape_bb_loss_weight: 5.0 # 0.2 ~ 0.3
+    aux_loss_fape_sc_loss_weight: 2.0 # 0.5 ~ 1.0
+    aux_loss_t_pass: 0.2
+    viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_partial_mask_rescaled
+    name: fm_tri_nm_scale
     project: se3-fm
   optimizer:
     warmup_steps: 0

@@ -82,24 +82,22 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats = data_transforms.atom37_to_torsion_angles(chain_feats)
     chain_feats = data_transforms.get_chi_angles(chain_feats)
     chain_feats = data_transforms.get_backbone_frames(chain_feats)
-    rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
-    rotmats_1 = rigids_1.get_rots().get_rot_mats()
-    trans_1 = rigids_1.get_trans()
+    chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
+                                                                chain_feats['aatype'],
+                                                                chain_feats['all_atom_positions'],
+                                                                None)
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
 
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
-    chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
-                                                                chain_feats['aatype'],
-                                                                chain_feats['all_atom_positions'],
-                                                                None)
+
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
-        'rotmats_1': rotmats_1,
-        'trans_1': trans_1, # require centering 
+        # 'rotmats_1': rotmats_1,
+        # 'trans_1': trans_1,
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'res_idx': res_idx,
@@ -111,7 +109,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
         'chi_mask': chain_feats['chi_mask'],
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
-        'atom14_gt_positions': chain_feats['atom14_gt_positions'], # require centering 
+        'atom14_gt_positions': chain_feats['atom14_gt_positions'],
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
         'residx_atom14_to_atom37': chain_feats['residx_atom14_to_atom37'],
         'atom37_atom_exists': chain_feats['atom37_atom_exists'],
@@ -119,7 +117,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'atom14_alt_gt_positions': chain_feats['atom14_alt_gt_positions'], # require centering 
         'atom14_alt_gt_exists': chain_feats['atom14_alt_gt_exists'],
         'atom14_atom_is_ambiguous': chain_feats['atom14_atom_is_ambiguous'],
-        'backbone_rigid_tensor': chain_feats['backbone_rigid_tensor'], # require centering  (L, 4, 4)
         'backbone_rigid_mask': chain_feats['backbone_rigid_mask'],
         'rigidgroups_gt_frames': chain_feats['rigidgroups_gt_frames'], # require centering  (L, 8, 4, 4)
         'rigidgroups_gt_exists': chain_feats['rigidgroups_gt_exists'],
@@ -166,7 +163,6 @@ class BaseDataset(Dataset):
         metadata_csv = metadata_csv.sort_values(
             'seq_len', ascending=False)
         self._create_split(metadata_csv)
-        self._cache = {}
         self._rng = np.random.default_rng(seed=self._dataset_cfg.seed)
 
     @property
@@ -218,24 +214,17 @@ class BaseDataset(Dataset):
             loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
-
-        # Large protein files are slow to read. Cache them.
-        use_cache = seq_len > self._dataset_cfg.cache_num_res
-        if use_cache and path in self._cache:
-            return self._cache[path]
         
         processed_row = _process_csv_row(path, raw_path, scaffold_idx)
         processed_row['masked_chain'] = masked_chain
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
-        if use_cache:
-            self._cache[path] = processed_row
         
         return processed_row
     
     def _sample_scaffold_mask(self, batch, rng):
-        trans_1 = batch['trans_1']
-        num_res = trans_1.shape[0]
+        aatype = batch['aatype']
+        num_res = aatype.shape[0]
         scaffold_idx = batch['scaffold_idx']
         scaffold_mask = torch.zeros(num_res)
 
@@ -269,8 +258,8 @@ class BaseDataset(Dataset):
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row = self.csv.iloc[row_idx]
-        feats = self.process_csv_row(csv_row)
-
+        chain_feats = self.process_csv_row(csv_row)
+        feats = chain_feats.copy()
         if self._dataset_cfg.add_plddt_mask:
             _add_plddt_mask(feats, self._dataset_cfg.min_plddt_threshold)
         else:
@@ -279,26 +268,32 @@ class BaseDataset(Dataset):
         if self.task == 'hallucination':
             feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
+            rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
+            rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+            trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
 
             # Center based on motif locations
             motif_mask = 1 - feats['diffuse_mask']
-            trans_1 = feats['trans_1']
             motif_1 = trans_1 * motif_mask[:, None]
             motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
             trans_1 -= motif_com[None, :]
-            feats['trans_1'] = trans_1
+ 
+            feats['rotmats_1'] = rotmats_1
             feats['atom14_gt_positions'] -= motif_com[None, :]
             feats['pseudo_beta'] -= motif_com[None, :]
-            feats['atom14_alt_gt_positions'] -= motif_com[None, :]
-            feats['backbone_rigid_tensor'][:, :3, 3] -= motif_com[None, :]
+
+            feats['backbone_rigid_tensor'] = du.create_rigid(rots=feats['rotmats_1'],
+                                                             trans=trans_1).to_tensor_4x4()
             feats['rigidgroups_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
+            feats['atom14_alt_gt_positions'] -= motif_com[None, None, :] 
             feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
 
-            print(f'motif_com: {motif_com}')
-            print(f'trans_1: {trans_1[0]}')
+            rigids_1 = rigid_utils.Rigid.from_tensor_4x4(feats['rigidgroups_gt_frames'])[:, 0]
+            feats['trans_1'] = rigids_1.get_trans()
+
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
@@ -334,7 +329,6 @@ class PdbDataset(BaseDataset):
         self._is_training = is_training
         self._dataset_cfg = dataset_cfg
         self.task = task
-        self._cache = {}
         self._rng = np.random.default_rng(seed=self._dataset_cfg.seed)
 
         # Process clusters

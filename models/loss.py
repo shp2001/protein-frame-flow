@@ -219,17 +219,20 @@ def compute_rmsd(
     compute_non_cdr=False
 ):
 
+    if mode == 'bb':
+        pred = pred[:, :, :, :3]
+        aligned_target = aligned_target[:, :, :3]
+        atom14_gt_exists = atom14_gt_exists[:, :, :3]
+    else:
+        pred = pred[:, :, :, 3:]
+        aligned_target = aligned_target[:, :, 3:]
+        atom14_gt_exists = atom14_gt_exists[:, :, 3:]
+
     mse = torch.nn.functional.mse_loss(
         pred,
         aligned_target[None, ...],
         reduction='none',
     ).mean(-1) # (o, b, L, a)
-
-
-    if mode == 'bb':
-        atom14_gt_exists = atom14_gt_exists[:, :, :3]
-    else:
-        atom14_gt_exists = atom14_gt_exists[:, :, 3:]
 
     mask = cdr_mask[..., None] * atom14_gt_exists # (b, L, a)
     cdr_mse = mse * mask[None, ...] # (o, b, L, a)
@@ -356,7 +359,6 @@ def compute_fape(
     normed_error = torch.sum(normed_error, dim=-1) # (O, B)
     normed_error = normed_error / (eps + torch.sum(positions_mask, dim=-1)) # (O, B)
     
-    print(f'normed_error: {normed_error.shape}')
     return normed_error
 
 # calculate only cdr-backbone loss 
@@ -377,6 +379,7 @@ def backbone_fape_loss(
         Rotation(rot_mats=pred_aff.get_rots().get_rot_mats(), quats=None),
         pred_aff.get_trans(),
     )
+
     # DISCREPANCY: DeepMind somehow gets a hold of a tensor_7 version of
     # backbone tensor, normalizes it, and then turns it back to a rotation
     # matrix. To avoid a potentially numerically unstable rotation matrix
@@ -450,7 +453,6 @@ def sidechain_fape_loss(
     ) * rigidgroups_gt_frames + alt_naming_is_better[
         ..., None, None, None
     ] * rigidgroups_alt_gt_frames
-
 
     # Steamroll the inputs
 
@@ -534,10 +536,9 @@ def sidechain_fape_loss(
         length_scale=length_scale,
         eps=eps,
     )
-    
-    cdr_fape_loss = torch.mean(cdr_fape, axis=(0,2,3)) 
-    fape_loss = torch.mean(fape, axis=(0,2,3))
-    return cdr_fape_loss + fape_loss
+
+
+    return (fape + cdr_fape) / 2
 
 def compute_prmsd_loss(
     pdev, # prmsd (b, l)
@@ -632,12 +633,10 @@ def local_distance_loss(
     # calculate local all-atom log distance map  
     gt_pair_dists = torch.linalg.norm(
         renamed_atom14_gt_positions[:, :, None, :, :] - renamed_atom14_gt_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    gt_pair_dists = torch.log10(gt_pair_dists+1)
     local_gt_pair_dists = gt_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
 
     pred_pair_dists = torch.linalg.norm(
         atom14_pred_positions[:, :, None, :, :] - atom14_pred_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    pred_pair_dists = torch.log10(pred_pair_dists+1)
     local_pred_pair_dists = pred_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
     
     # make loss_mask with atom14_gt_exists & atom14_alt_gt_exists
@@ -649,8 +648,8 @@ def local_distance_loss(
     dist_mat_loss = torch.sum(
         dist_err,
         dim=(-1,-2,-3)
-    ) 
-    dist_mat_loss /= (torch.sum(local_loss_mask, dim=(-1,-2,-3)) + 1) # (B)
-
+    )
+    dist_mat_loss = dist_mat_loss / (torch.sum(local_loss_mask, dim=(-1,-2,-3)) + 1) # (B)
+    dist_mat_loss = dist_mat_loss.sqrt()
     return dist_mat_loss
 

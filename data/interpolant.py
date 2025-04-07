@@ -126,7 +126,6 @@ class Interpolant:
 
         # [B, N, 3]
         trans_1 = batch['trans_1']  # Angstrom
-        print(f'before_corrupt: {trans_1[0,0]}')
         # [B, N, 3, 3]
         rotmats_1 = batch['rotmats_1']
 
