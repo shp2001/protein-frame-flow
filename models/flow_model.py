@@ -10,6 +10,32 @@ from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 
+class PerResidueRMSDPredictor(nn.Module):
+    def __init__(self, no_bins, c_in, c_hidden):
+        super(PerResidueRMSDPredictor, self).__init__()
+
+        self.no_bins = no_bins
+        self.c_in = c_in
+        self.c_hidden = c_hidden
+
+        self.layer_norm = nn.LayerNorm(self.c_in)
+
+        self.linear_1 = ipa_pytorch.Linear(self.c_in, self.c_hidden, init="relu")
+        self.linear_2 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
+        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.no_bins, init="final")
+
+        self.relu = nn.ReLU()
+
+    def forward(self, s):
+        s = self.layer_norm(s)
+        s = self.linear_1(s)
+        s = self.relu(s)
+        s = self.linear_2(s)
+        s = self.relu(s)
+        s = self.linear_3(s)
+
+        return s
+    
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden, use_original_sm):
         """
@@ -194,32 +220,12 @@ class FlowModel(nn.Module):
                 self._angle_conf.epsilon,
                 self._angle_conf.use_original_sm
             )
+        
+        self.prmsd = nn.ModuleDict()
         if self._prmsd_conf.use_prmsd:
-            self.prmsd_node_transform = nn.Sequential(
-                ipa_pytorch.Linear(self._prmsd_conf.c_s, self._prmsd_conf.c_s),
-                nn.ReLU(),
-                nn.LayerNorm(self._prmsd_conf.c_s), 
+            self.prmsd = PerResidueRMSDPredictor(
+                no_bins=self._prmsd_conf.no_bins, c_in=self._prmsd_conf.c_s, c_hidden=self._prmsd_conf.c_hidden
             )
-            self.prmsd_edge_transform = nn.Sequential(
-                ipa_pytorch.Linear(
-                    self._prmsd_conf.c_z,
-                    self._prmsd_conf.c_z
-                ),
-                nn.ReLU(),
-                nn.LayerNorm(self._prmsd_conf.c_z)
-            )
-            self.prmsd_ipa = ipa_pytorch.IPAEncoder(
-                dim=self._prmsd_conf.c_s,
-                pairwise_repr_dim=self._prmsd_conf.c_z,
-                depth=self._prmsd_conf.num_blocks,
-                heads=self._prmsd_conf.no_heads,
-                require_pairwise_repr=True
-            )
-
-            self.prmsd_linear = ipa_pytorch.Linear(
-                self._prmsd_conf.c_s,
-                1
-                )
             
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
@@ -321,22 +327,7 @@ class FlowModel(nn.Module):
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
 
         if self._prmsd_conf.use_prmsd:
-
-            prmsd_node = self.prmsd_node_transform(init_node_embed) 
-            prmsd_edge = self.prmsd_edge_transform(init_edge_embed)
-            rots = curr_rigids.get_rots().get_rot_mats().detach()
-            trans = curr_rigids.get_trans().detach()
-
-            prmsd_node = self.prmsd_ipa(
-                                        prmsd_node,
-                                        translations=trans,
-                                        rotations=rots,
-                                        mask=node_mask.bool(),
-                                        pairwise_repr=prmsd_edge
-                                        )
-
-            prmsd = torch.nn.functional.relu(self.prmsd_linear(prmsd_node)).squeeze(-1) # (*, 128) -> (*, 1)
-            all_atom_outputs["prmsd"] = prmsd
+            all_atom_outputs["prmsd"] = self.prmsd(node_embed)
         else:
             all_atom_outputs['prmsd'] = torch.zeros(node_embed.shape[0], node_embed.shape[1])
 

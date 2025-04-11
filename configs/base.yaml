@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 4
+    num_workers: 6
     prefetch_factor: 10
 
   masking_scheduler: 
@@ -23,12 +23,12 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
-    max_num_res_squared: 160_000
+    max_num_res_squared: 100_000
 
   # Cropping 
   ab_threshold: 40
   general_threshold: 40
-  max_num_res: 450
+  max_num_res: 400
 
 interpolant:
   min_t: 1e-2
@@ -63,6 +63,7 @@ interpolant:
   scaling_nm_ang: ${model.scaling_nm_ang}
 
 experiment:
+  add_modules: False
   debug: True
   seed: 123
   num_devices: 1
@@ -73,7 +74,7 @@ experiment:
     bb_atom_scale: 0.1
     sc_atom_scale: 0.1
     trans_scale: 0.1
-    translation_loss_weight: 2.0 # 0.5~1.0 -> 1.0~2.0
+    translation_loss_weight: 2.0 # 1.0~1.5 -> 2.0~3.0
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
     aux_loss_weight: 1.0
@@ -83,7 +84,7 @@ experiment:
     aux_loss_use_chi_loss: True
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_prsmd_loss: False
+    aux_loss_use_prmsd_loss: ${model.prmsd.use_prmsd}
     aux_loss_use_all_atom_clash_loss: True
     aux_loss_use_local_dist_mat_loss: True 
 
@@ -91,21 +92,22 @@ experiment:
     aux_loss_use_fape_bb_loss: False
     aux_loss_use_fape_sc_loss: False
 
-    aux_loss_chi_loss_weight: 0.5 # 0.5 ~ 0.9
-    aux_loss_bb_atom_loss_weight: 0.5 # 1.5 ~ 5.0
-    aux_loss_sc_atom_loss_weight: 0.2 # 2.0 ~ 6.0
+    aux_loss_chi_loss_weight: 1.0 # 0.7 ~ 0.9
+    aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0
+    aux_loss_sc_atom_loss_weight: 0.5 # 0.7 ~ 1.5
     aux_loss_pair_loss_weight: 0.2 
-    aux_loss_final_layer_rmsd_weight: 0.5 
-    aux_loss_all_atom_clash_loss_weight: 1000 # 1e-5 ~ 1e-4
-    aux_loss_local_dist_mat_loss_weight: 1.0 # 0.5 ~ 4.0
-
+    aux_loss_final_layer_rmsd_weight: 1.0 
+    aux_loss_all_atom_clash_loss_weight: 100 # 5e-5 ~ 1e-4
+    aux_loss_local_dist_mat_loss_weight: 2.0 # 1.0 ~ 1.5
+    aux_loss_prmsd_loss_weight: 1
+    
     # fape loss
-    aux_loss_fape_bb_loss_weight: 5.0 # 0.2 ~ 0.3
-    aux_loss_fape_sc_loss_weight: 2.0 # 0.5 ~ 1.0
+    aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
+    aux_loss_fape_sc_loss_weight: 2.0 # 0.3 ~ 0.7
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_nm_scale
+    name: fm_tri_fape_layer6
     project: se3-fm
   optimizer:
     warmup_steps: 0

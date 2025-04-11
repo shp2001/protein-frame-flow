@@ -47,6 +47,18 @@ class Experiment:
         log.info(f"Training with devices: {self._train_device_ids}")
         self._module: LightningModule = FlowModule(self._cfg)
 
+        if self._exp_cfg.add_modules:
+            # 기존 모델 weight 로드
+            state_dict = torch.load(cfg.experiment.warm_start, map_location='cpu')["state_dict"]
+            # 필요한 부분만 추출해서 로드
+            flow_state_dict = {k.replace("flow.", ""): v for k, v in state_dict.items() if k.startswith("flow.")}
+
+            # FlowModule에만 로드
+            self._module.model.load_state_dict(flow_state_dict, strict=False)
+            for name, param in self._module.model.named_parameters():
+
+                log.info(f"Found prmsd param: {name}")
+
     def _setup_dataset(self):
         if self._data_cfg.dataset == 'scope':
             self._train_dataset, self._valid_dataset = eu.dataset_creation(
@@ -98,10 +110,14 @@ class Experiment:
             enable_model_summary=True,
             devices=self._train_device_ids,
         )
+        # trainer.fit(
+        #     model=self._module,
+        #     datamodule=self._datamodule,
+        #     ckpt_path=self._exp_cfg.warm_start
+        # )
         trainer.fit(
             model=self._module,
             datamodule=self._datamodule,
-            ckpt_path=self._exp_cfg.warm_start
         )
 
 

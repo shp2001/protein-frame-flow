@@ -540,32 +540,84 @@ def sidechain_fape_loss(
 
     return (fape + cdr_fape) / 2
 
-def compute_prmsd_loss(
-    pdev, # prmsd (b, l)
-    pred_position, # predicted structure (b, l, 14, 3)
-    atom14_gt_positions, # gt stucture  (b, l, 14, 3)
-    cdr_mask, # (b, l)
-):
+# def compute_prmsd_loss(
+#     pdev, # prmsd (b, l)
+#     pred_position, # predicted structure (b, l, 14, 3)
+#     atom14_gt_positions, # gt stucture  (b, l, 14, 3)
+#     cdr_mask, # (b, l)
+# ):
+#     print(f'pdev: {pdev[0]}')
+#     ca_pred = pred_position[:, :, 1] # (b, l, 3)
+#     ca_target = atom14_gt_positions[:, :, 1]
 
-    ca_pred = pred_position[:, :, 1] # (b, l, 3)
-    ca_target = atom14_gt_positions[:, :, 1]
+#     bb_dev = (ca_pred - ca_target).norm(dim=-1) # (b, l)
 
-    bb_dev = (ca_pred - ca_target).norm(dim=-1) # (b, l)
-    loss = torch.nn.functional.l1_loss(
-        pdev,
-        bb_dev,
-        reduction='none',
+#     loss = torch.nn.functional.l1_loss(
+#         pdev,
+#         bb_dev,
+#         reduction='none',
+#     )
+
+#     cdr_loss = torch.sum(
+#         loss * cdr_mask,
+#         dim=-1,
+#     ) / (torch.sum(
+#         cdr_mask,
+#         dim=-1,
+#     )) # (b)
+#     print(f'cdr_loss: {cdr_loss}')
+#     debug_loss = torch.sum(loss, dim=-1) / bb_dev.shape[1]
+#     return debug_loss + cdr_loss
+
+def softmax_cross_entropy(logits, labels):
+    loss = -1 * torch.sum(
+        labels * torch.nn.functional.log_softmax(logits, dim=-1),
+        dim=-1,
     )
+    return loss
 
-    cdr_loss = torch.sum(
-        loss * cdr_mask,
-        dim=-1,
-    ) / (torch.sum(
-        cdr_mask,
-        dim=-1,
-    )*3) # (b)
+def compute_prmsd_loss(
+    logits: torch.Tensor, # prmsd (b, L, 50)
+    all_atom_pred_pos: torch.Tensor, 
+    all_atom_positions: torch.Tensor, # atom14_renamed_positions
+    all_atom_mask: torch.Tensor, # atom14_renamed_exists
+    cdr_mask: torch.Tensor,
+    cutoff: float = 20.0,
+    no_bins: int = 50,
+    eps: float = 1e-10,
+    **kwargs,
+) -> torch.Tensor:
+    print(torch.max(logits[0],axis=-1))
+    ca_pos = residue_constants.atom_order["CA"]
+    all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
+    all_atom_positions = all_atom_positions[..., ca_pos, :]
+    all_atom_mask = all_atom_mask[..., ca_pos]  # keep dim
 
-    return cdr_loss
+    dev = torch.sqrt(torch.sum((all_atom_pred_pos - all_atom_positions) ** 2, dim=-1))
+    mask = cdr_mask * all_atom_mask # (b, L)
+
+    # bin 경계: [0.0, 0.2, 0.4, ..., 10.0]
+    bin_width = cutoff / (no_bins-1)
+    bin_index = torch.floor(torch.minimum(dev, torch.tensor(cutoff)) / bin_width).long()
+    dev_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
+    errors = softmax_cross_entropy(logits, dev_one_hot) # (B, L)
+
+
+    # 조건에 해당하는 마스크 생성 (bool 타입)
+    error_mask = dev[0] > 1  # (B, L)
+
+    # dev_one_hot에서 해당 인덱스만 뽑기
+    selected_dev = dev[0][error_mask]
+    selected_dev_one_hot = dev_one_hot[0][error_mask]  # shape: (?, 50)
+    # print(f'dev: {torch.max(selected_dev)}')
+    # print(f'selected_dev_one_hot: {selected_dev_one_hot[0]}')
+
+
+    loss = torch.sum(errors * mask, dim=-1) / (
+        eps + torch.sum(mask, dim=-1)
+    )
+    print(loss)
+    return loss
 
 def compute_all_atom_clash_loss(
         atom14_pred_positions,

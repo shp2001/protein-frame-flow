@@ -279,20 +279,17 @@ class BaseDataset(Dataset):
             motif_mask = 1 - feats['diffuse_mask']
             motif_1 = trans_1 * motif_mask[:, None]
             motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
-            trans_1 -= motif_com[None, :]
- 
+            trans_1 = trans_1 - motif_com[None, :]
+            feats['trans_1'] = trans_1
             feats['rotmats_1'] = rotmats_1
-            feats['atom14_gt_positions'] -= motif_com[None, :]
-            feats['pseudo_beta'] -= motif_com[None, :]
+            feats['atom14_gt_positions'] = feats['atom14_gt_positions'] - motif_com[None, :]
+            feats['pseudo_beta'] = feats['pseudo_beta'] - motif_com[None, :]
 
             feats['backbone_rigid_tensor'] = du.create_rigid(rots=feats['rotmats_1'],
                                                              trans=trans_1).to_tensor_4x4()
-            feats['rigidgroups_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
-            feats['atom14_alt_gt_positions'] -= motif_com[None, None, :] 
-            feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] -= motif_com[None, None, :]
-
-            rigids_1 = rigid_utils.Rigid.from_tensor_4x4(feats['rigidgroups_gt_frames'])[:, 0]
-            feats['trans_1'] = rigids_1.get_trans()
+            feats['rigidgroups_gt_frames'][:, :, :3, 3] = feats['rigidgroups_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
+            feats['atom14_alt_gt_positions'] = feats['atom14_alt_gt_positions'] - motif_com[None, None, :] 
+            feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] = feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
 
         else:
             raise ValueError(f'Unknown task {self.task}')

@@ -82,31 +82,31 @@ class FlowModule(LightningModule):
     def on_train_start(self):
         self._epoch_start_time = time.time()
 
-    # def on_train_batch_start(self, batch, batch_idx):
-    #     # 모든 학습 가능한 파라미터 초기화
-    #     for p in self.parameters():
-    #         if p.requires_grad:
-    #             p.grad = None
+    def on_train_batch_start(self, batch, batch_idx):
+        # 모든 학습 가능한 파라미터 초기화
+        for p in self.parameters():
+            if p.requires_grad:
+                p.grad = None
         
-    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
-    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+        # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
+        self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
-    # def on_train_batch_end(self, outputs, batch, batch_idx):
-    #     # Backward 이후 gradient가 계산된 파라미터 추적
-    #     grads = {}
-    #     for n, p in self.named_parameters():
-    #         if p.requires_grad and p.grad is not None:
-    #             grads[id(p)] = n
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # Backward 이후 gradient가 계산된 파라미터 추적
+        grads = {}
+        for n, p in self.named_parameters():
+            if p.requires_grad and p.grad is not None:
+                grads[id(p)] = n
         
-    #     # 사용되지 않은 파라미터 찾기
-    #     unused = [self._params_before[id_p] for id_p in self._params_before 
-    #             if id_p not in grads]
+        # 사용되지 않은 파라미터 찾기
+        unused = [self._params_before[id_p] for id_p in self._params_before 
+                if id_p not in grads]
         
-    #     if unused:
-    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-    #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
-    #     else:
-    #         print("✅ 모든 파라미터가 사용되었습니다.")
+        if unused:
+            print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+            raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+        else:
+            print("✅ 모든 파라미터가 사용되었습니다.")
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
         self.log(
@@ -150,15 +150,15 @@ class FlowModule(LightningModule):
         so3_norm_scale = 1 - torch.min(
             so3_t[..., None], torch.tensor(training_cfg.t_normalize_clip))
         
-        gt_atom14_pos *= training_cfg.bb_atom_scale / r3_norm_scale[..., None] # scaling 
+        gt_atom14_pos = gt_atom14_pos * training_cfg.bb_atom_scale / r3_norm_scale[..., None] # scaling 
         gt_bb_atoms = gt_atom14_pos[:, :, :3] # scaling 
 
-        alt_atom14_pos *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        gt_pseudo_beta *= training_cfg.bb_atom_scale / r3_norm_scale
+        alt_atom14_pos = alt_atom14_pos * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
+        gt_pseudo_beta = gt_pseudo_beta * training_cfg.bb_atom_scale / r3_norm_scale
 
-        backbone_rigid_tensor[..., :3, 3] *= training_cfg.bb_atom_scale / r3_norm_scale
-        rigidgroups_gt_frames[..., :3, 3] *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        rigidgroups_alt_gt_frames[..., :3, 3] *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
+        backbone_rigid_tensor[..., :3, 3] = backbone_rigid_tensor[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale
+        rigidgroups_gt_frames[..., :3, 3] = rigidgroups_gt_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
+        rigidgroups_alt_gt_frames[..., :3, 3] = rigidgroups_alt_gt_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Model output predictions.
         model_output = self.model(noisy_batch)
@@ -173,8 +173,8 @@ class FlowModule(LightningModule):
         
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
-        pred_rigids[..., 4:] *= training_cfg.bb_atom_scale / r3_norm_scale
-        pred_sidechain_frames[..., :3, 3] *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
+        pred_rigids[..., 4:] = pred_rigids[..., 4:] * training_cfg.bb_atom_scale / r3_norm_scale
+        pred_sidechain_frames[..., :3, 3] = pred_sidechain_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
         if torch.any(torch.isnan(pred_rots_vf)):
             raise ValueError('NaN encountered in pred_rots_vf')
@@ -182,13 +182,11 @@ class FlowModule(LightningModule):
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
+
         alt_naming_is_better = renamed_dict['alt_naming_is_better']
-        renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions']
-
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists']
+        renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
-        renamed_atom14_gt_positions *= training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        print(f'renamed_atom14_gt_positions: {renamed_atom14_gt_positions.shape}')
         # Translation VF loss
         loss_denom = torch.sum(loss_mask, dim=-1) * 3
         trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
@@ -206,21 +204,26 @@ class FlowModule(LightningModule):
         ) / loss_denom
 
         # Backbone atom loss
-        bb_atom_loss = compute_rmsd(pred_atom_14_list,
-                                renamed_atom14_gt_positions,
-                                cdr_mask=noisy_batch['diffuse_mask'],
-                                atom14_gt_exists=renamed_atom14_gt_exists,
-                                mode='bb',
-                                compute_non_cdr=False
-                                )
+        bb_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_bb_loss:
+            bb_atom_loss = compute_rmsd(pred_atom_14_list,
+                                    renamed_atom14_gt_positions,
+                                    cdr_mask=noisy_batch['diffuse_mask'],
+                                    atom14_gt_exists=renamed_atom14_gt_exists,
+                                    mode='bb',
+                                    compute_non_cdr=False
+                                    )
+                                
         # sc atom loss (final layer만 계산)
-        sc_atom_loss = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
-                                renamed_atom14_gt_positions,
-                                cdr_mask=noisy_batch['diffuse_mask'],
-                                atom14_gt_exists=renamed_atom14_gt_exists,
-                                mode='sc',
-                                compute_non_cdr=True
-                                )    
+        sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_sc_atom_loss:
+            sc_atom_loss = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
+                                    renamed_atom14_gt_positions,
+                                    cdr_mask=noisy_batch['diffuse_mask'],
+                                    atom14_gt_exists=renamed_atom14_gt_exists,
+                                    mode='sc',
+                                    compute_non_cdr=True
+                                    )    
 
         # torsion angle loss 
         chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
@@ -338,20 +341,21 @@ class FlowModule(LightningModule):
             + sc_fape_loss * training_cfg.aux_loss_use_fape_sc_loss * training_cfg.aux_loss_fape_sc_loss_weight 
         )
 
+        # calculate prmsd 
+        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_prmsd_loss:
+            prmsd_loss = compute_prmsd_loss(logits=pred_rmsd,
+                                    all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
+                                    all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
+                                    all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
+                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
+
         # calculate violation loss
         violation_loss = (
             all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
+            + prmsd_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         )
 
-        # calculate prmsd 
-        if self._model_cfg.prmsd.use_prmsd:
-            prmsd_loss = compute_prmsd_loss(pdev=pred_rmsd,
-                                    pred_position=pred_atom_14, # predicted structure (b, l, 14, 3)
-                                    atom14_gt_positions=gt_atom14_pos, # gt stucture  (b, l, 14, 3)
-                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
-
-
-            auxiliary_loss += prmsd_loss * training_cfg.aux_loss_use_prmsd_loss
 
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -369,17 +373,18 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        print({
-            "r3_t": r3_t,
-            "trans_loss": trans_loss,
-            "bb_atom_loss": bb_atom_loss,
-            'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
-            'all_atom_clash_loss': all_atom_clash_loss,
-            'local_dist_mat_loss': local_dist_mat_loss,
-            'bb_fape_loss': bb_fape_loss,
-            'sc_fape_loss': sc_fape_loss
-        })
+        # print({
+        #     "r3_t": r3_t,
+        #     "trans_loss": trans_loss,
+        #     "bb_atom_loss": bb_atom_loss,
+        #     'sc_atom_loss': sc_atom_loss,
+        #     'chi_loss': chi_loss,
+        #     'all_atom_clash_loss': all_atom_clash_loss,
+        #     'local_dist_mat_loss': local_dist_mat_loss,
+        #     'bb_fape_loss': bb_fape_loss,
+        #     'sc_fape_loss': sc_fape_loss,
+        #     'prmsd': prmsd_loss
+        # })
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,
