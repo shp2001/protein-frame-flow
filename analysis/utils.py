@@ -44,6 +44,7 @@ def write_prot_to_pdb(
         no_indexing=False,
         b_factors=None,
     ):
+
     if overwrite:
         max_existing_idx = 0
     else:

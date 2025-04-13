@@ -5,6 +5,7 @@ from data import residue_constants
 from openfold.utils.loss import between_residue_clash_loss
 from openfold.data.data_transforms import pseudo_beta_fn
 from openfold.utils.rigid_utils import Rigid, Rotation
+from openfold.utils.tensor_utils import permute_final_dims
 
 def compute_renamed_ground_truth(
     batch: Dict[str, torch.Tensor],
@@ -576,6 +577,21 @@ def softmax_cross_entropy(logits, labels):
     )
     return loss
 
+def compute_prmsd(prmsd: torch.Tensor) -> torch.Tensor:
+    """Computes plddt from the model output. The output is a histogram of unnormalised
+    plddt.
+
+    Args:
+        plddt (torch.Tensor): (B, n, 50) output from the model
+
+    Returns:
+        torch.Tensor: (B, n) plddt scores
+    """
+    pdf = torch.nn.functional.softmax(prmsd, dim=-1)
+    vbins = torch.linspace(0, 20, steps=50).to(prmsd.device).float()
+    output = pdf @ vbins  # (B, n)
+    return output
+
 def compute_prmsd_loss(
     logits: torch.Tensor, # prmsd (b, L, 50)
     all_atom_pred_pos: torch.Tensor, 
@@ -587,7 +603,6 @@ def compute_prmsd_loss(
     eps: float = 1e-10,
     **kwargs,
 ) -> torch.Tensor:
-    print(torch.max(logits[0],axis=-1))
     ca_pos = residue_constants.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
@@ -603,20 +618,112 @@ def compute_prmsd_loss(
     errors = softmax_cross_entropy(logits, dev_one_hot) # (B, L)
 
 
-    # 조건에 해당하는 마스크 생성 (bool 타입)
-    error_mask = dev[0] > 1  # (B, L)
-
-    # dev_one_hot에서 해당 인덱스만 뽑기
-    selected_dev = dev[0][error_mask]
-    selected_dev_one_hot = dev_one_hot[0][error_mask]  # shape: (?, 50)
-    # print(f'dev: {torch.max(selected_dev)}')
-    # print(f'selected_dev_one_hot: {selected_dev_one_hot[0]}')
-
-
     loss = torch.sum(errors * mask, dim=-1) / (
         eps + torch.sum(mask, dim=-1)
     )
-    print(loss)
+
+    return loss
+
+def compute_plddt(logits: torch.Tensor) -> torch.Tensor:
+    num_bins = logits.shape[-1]
+    bin_width = 1.0 / num_bins
+    bounds = torch.arange(
+        start=0.5 * bin_width, end=1.0, step=bin_width, device=logits.device
+    )
+    probs = torch.nn.functional.softmax(logits, dim=-1)
+    pred_lddt_ca = torch.sum(
+        probs * bounds.view(*((1,) * len(probs.shape[:-1])), *bounds.shape),
+        dim=-1,
+    )
+    return pred_lddt_ca * 100
+
+def lddt(
+    all_atom_pred_pos: torch.Tensor,
+    all_atom_positions: torch.Tensor,
+    all_atom_mask: torch.Tensor, # (b, L, 14)
+    cutoff: float = 15.0,
+    eps: float = 1e-10,
+    per_residue: bool = True,
+) -> torch.Tensor:
+    n = all_atom_mask.shape[-2]
+    dmat_true = torch.sqrt(
+        eps
+        + torch.sum(
+            (all_atom_positions[..., None, :] - all_atom_positions[..., None, :, :])
+            ** 2,
+            dim=-1,
+        )
+    )
+
+    dmat_pred = torch.sqrt(
+        eps
+        + torch.sum(
+            (all_atom_pred_pos[..., None, :] - all_atom_pred_pos[..., None, :, :]) ** 2,
+            dim=-1,
+        )
+    )
+    dists_to_score = (
+        (dmat_true < cutoff)
+        * all_atom_mask
+        * permute_final_dims(all_atom_mask, (1, 0))
+        * (1.0 - torch.eye(n, device=all_atom_mask.device))
+    )
+
+    dist_l1 = torch.abs(dmat_true - dmat_pred)
+
+    score = (
+        (dist_l1 < 0.5).type(dist_l1.dtype)
+        + (dist_l1 < 1.0).type(dist_l1.dtype)
+        + (dist_l1 < 2.0).type(dist_l1.dtype)
+        + (dist_l1 < 4.0).type(dist_l1.dtype)
+    )
+    score = score * 0.25
+
+    dims = (-1,) if per_residue else (-2, -1)
+    norm = 1.0 / (eps + torch.sum(dists_to_score, dim=dims))
+    score = norm * (eps + torch.sum(dists_to_score * score, dim=dims))
+
+    return score
+
+def lddt_loss(
+    logits: torch.Tensor,
+    all_atom_pred_pos: torch.Tensor,
+    all_atom_positions: torch.Tensor,
+    all_atom_mask: torch.Tensor, # (b, L, 14)
+    cdr_mask: torch.Tensor, # (b, L)
+    cutoff: float = 15.0,
+    no_bins: int = 50,
+    eps: float = 1e-10,
+    **kwargs,
+) -> torch.Tensor:
+    n = all_atom_mask.shape[-2]
+
+    ca_pos = residue_constants.atom_order["CA"]
+    all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
+    all_atom_positions = all_atom_positions[..., ca_pos, :]
+    all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
+
+    score = lddt(
+        all_atom_pred_pos, all_atom_positions, all_atom_mask, cutoff=cutoff, eps=eps
+    )
+
+    score = score.detach()
+
+    bin_index = torch.floor(score * no_bins).long()
+    bin_index = torch.clamp(bin_index, max=(no_bins - 1))
+    lddt_ca_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
+
+    errors = softmax_cross_entropy(logits, lddt_ca_one_hot)
+    all_atom_mask = all_atom_mask.squeeze(-1)
+    
+    print(f'all_atom_mask: {all_atom_mask.shape}')
+    loss = torch.sum(errors * all_atom_mask, dim=-1) / (
+        eps + torch.sum(all_atom_mask, dim=-1)
+    )
+
+    # Average over the batch dimension
+    loss = torch.mean(loss)
+
     return loss
 
 def compute_all_atom_clash_loss(

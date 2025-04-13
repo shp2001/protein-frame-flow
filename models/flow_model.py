@@ -22,7 +22,7 @@ class PerResidueRMSDPredictor(nn.Module):
 
         self.linear_1 = ipa_pytorch.Linear(self.c_in, self.c_hidden, init="relu")
         self.linear_2 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.no_bins, init="final")
+        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.no_bins)
 
         self.relu = nn.ReLU()
 
@@ -328,6 +328,8 @@ class FlowModel(nn.Module):
 
         if self._prmsd_conf.use_prmsd:
             all_atom_outputs["prmsd"] = self.prmsd(node_embed)
+            # print("PRMSD head output mean:", all_atom_outputs["prmsd"].mean().item())
+            # print("PRMSD head output std:", all_atom_outputs["prmsd"].std().item())
         else:
             all_atom_outputs['prmsd'] = torch.zeros(node_embed.shape[0], node_embed.shape[1])
 

@@ -173,7 +173,7 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
     chain_index = prot.chain_index.squeeze().astype(int)
 
   b_factors = prot.b_factors
-
+  print(f'b: {b_factors.shape}')
   if np.any(aatype > residue_constants.restype_num):
     raise ValueError('Invalid aatypes.')
 
@@ -199,8 +199,10 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
       atom_index += 1  # Atom index increases at the TER symbol.
 
     res_name_3 = res_1to3(aatype[i])
-    for atom_name, pos, mask, b_factor in zip(
-        atom_types, atom_positions[i], atom_mask[i], b_factors[i]):
+    for atom_name, pos, mask in zip(
+        atom_types, atom_positions[i], atom_mask[i]):
+      
+      b_factor = b_factors[i]
       if mask < 0.5:
         continue
 

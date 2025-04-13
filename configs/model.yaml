@@ -59,7 +59,7 @@ model:
     use_original_sm: true
 
   prmsd:
-    use_prmsd: False
+    use_prmsd: True
     c_s: ${model.node_embed_size}
     c_hidden: 256
     no_bins: 50

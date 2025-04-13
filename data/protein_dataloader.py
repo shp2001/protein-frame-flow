@@ -35,7 +35,6 @@ class ProteinData(LightningDataModule):
         """
         device = mask.device
         B, L = mask.shape
-        print(f'ratio: {masking_ratio}')
         # 1. [1, L] 크기의 확률 텐서 생성 → 배치 전체에 동일 적용
         prob_matrix = torch.rand((1, L), device=device)  # 차원 확장
         
@@ -45,9 +44,10 @@ class ProteinData(LightningDataModule):
             torch.ones_like(mask),                       # True면 1 유지
             torch.zeros_like(mask)                       # False면 0으로 마스킹
         )
-        
-        if torch.all(new_mask == 0):
-            new_mask = mask
+
+        for i in range(B): 
+            if torch.all(new_mask[i] == 0):
+                new_mask[i] = mask[i]
 
         return new_mask
 
@@ -60,7 +60,6 @@ class ProteinData(LightningDataModule):
                 cropped_feat = {}
                 if len(feat['scaffold_idx'].keys()) == 12:
                     cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
-                                                    threshold=self.data_cfg.ab_threshold,
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
                                                     max_len=max_len,
@@ -69,7 +68,6 @@ class ProteinData(LightningDataModule):
 
                 if len(feat['scaffold_idx'].keys()) == 2:
                     cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
-                                    threshold=self.data_cfg.general_threshold,
                                     loop_mask=feat['diffuse_mask'],
                                     nan_mask=feat['res_mask'],
                                     max_len=max_len,
@@ -125,7 +123,6 @@ class ProteinData(LightningDataModule):
             # masking scheduling 
             if mask_schedule:
                 cropped_batch['diffuse_mask'] = self.apply_probabilistic_mask(cropped_batch['diffuse_mask'], self.masking_ratio) 
-                print(f'masking_ratio: {self.masking_ratio}')
             return cropped_batch
         return collate_fn
     

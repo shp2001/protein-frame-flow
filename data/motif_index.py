@@ -164,7 +164,7 @@ def get_distance_map(trans_1):
 
     return distance_map
 
-def crop_antigen(trans_1, threshold, cdr_mask, nan_mask, max_len, seq_list=None): 
+def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list=None): 
     chain_len_list = [len(seq) for seq in seq_list]
 
     ab_len = sum(chain_len_list[:2])
@@ -199,7 +199,7 @@ def crop_antigen(trans_1, threshold, cdr_mask, nan_mask, max_len, seq_list=None)
 
 ######################## crop_general_protein ########################
 
-def crop_general_protein(trans_1, threshold, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list=None):  
+def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list=None):  
     first_chain_len = int(first_chain_len)
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)

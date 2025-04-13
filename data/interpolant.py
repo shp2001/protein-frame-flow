@@ -7,7 +7,7 @@ from data import all_atom
 import copy
 from torch import autograd
 from motif_scaffolding import twisting
-
+from models.loss import compute_prmsd
 
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
@@ -387,6 +387,7 @@ class Interpolant:
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
 
+        prmsd = compute_prmsd(prmsd)
         return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):

@@ -82,31 +82,31 @@ class FlowModule(LightningModule):
     def on_train_start(self):
         self._epoch_start_time = time.time()
 
-    def on_train_batch_start(self, batch, batch_idx):
-        # 모든 학습 가능한 파라미터 초기화
-        for p in self.parameters():
-            if p.requires_grad:
-                p.grad = None
+    # def on_train_batch_start(self, batch, batch_idx):
+    #     # 모든 학습 가능한 파라미터 초기화
+    #     for p in self.parameters():
+    #         if p.requires_grad:
+    #             p.grad = None
         
-        # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
-        self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
+    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        # Backward 이후 gradient가 계산된 파라미터 추적
-        grads = {}
-        for n, p in self.named_parameters():
-            if p.requires_grad and p.grad is not None:
-                grads[id(p)] = n
+    # def on_train_batch_end(self, outputs, batch, batch_idx):
+    #     # Backward 이후 gradient가 계산된 파라미터 추적
+    #     grads = {}
+    #     for n, p in self.named_parameters():
+    #         if p.requires_grad and p.grad is not None:
+    #             grads[id(p)] = n
         
-        # 사용되지 않은 파라미터 찾기
-        unused = [self._params_before[id_p] for id_p in self._params_before 
-                if id_p not in grads]
+    #     # 사용되지 않은 파라미터 찾기
+    #     unused = [self._params_before[id_p] for id_p in self._params_before 
+    #             if id_p not in grads]
         
-        if unused:
-            print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-            raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
-        else:
-            print("✅ 모든 파라미터가 사용되었습니다.")
+    #     if unused:
+    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+    #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+    #     else:
+    #         print("✅ 모든 파라미터가 사용되었습니다.")
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
         self.log(
@@ -373,18 +373,18 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        # print({
-        #     "r3_t": r3_t,
-        #     "trans_loss": trans_loss,
-        #     "bb_atom_loss": bb_atom_loss,
-        #     'sc_atom_loss': sc_atom_loss,
-        #     'chi_loss': chi_loss,
-        #     'all_atom_clash_loss': all_atom_clash_loss,
-        #     'local_dist_mat_loss': local_dist_mat_loss,
-        #     'bb_fape_loss': bb_fape_loss,
-        #     'sc_fape_loss': sc_fape_loss,
-        #     'prmsd': prmsd_loss
-        # })
+        print({
+            "r3_t": r3_t,
+            "trans_loss": trans_loss,
+            "bb_atom_loss": bb_atom_loss,
+            'sc_atom_loss': sc_atom_loss,
+            'chi_loss': chi_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss,
+            'bb_fape_loss': bb_fape_loss,
+            'sc_fape_loss': sc_fape_loss,
+            'prmsd': prmsd_loss
+        })
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,
@@ -396,8 +396,7 @@ class FlowModule(LightningModule):
             'dist_mat_loss': dist_mat_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'bb_fape_loss': bb_fape_loss,
-            'sc_fape_loss': sc_fape_loss
+            'prmsd_loss': prmsd_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
@@ -444,7 +443,8 @@ class FlowModule(LightningModule):
                 aatype=batch['aatype'].cpu(),
                 chain_index=batch['chain_idx'].cpu(),
                 no_indexing=False,
-                overwrite=True
+                overwrite=True,
+                b_factors=prmsd[i]
             )
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
@@ -571,13 +571,7 @@ class FlowModule(LightningModule):
         for k,v in total_losses.items():
             self._log_scalar(
                 f"train/{k}", v, prog_bar=False, batch_size=num_batch)
-        
-        # 사용되지 않은 파라미터 찾기
-        params_after = {n: p.requires_grad for n, p in self.named_parameters() if p.requires_grad}
-        unused_params = [n for n in params_before if not params_after[n]]
-        
-        if unused_params:
-            print(f"⚠️ Unused parameters: {unused_params}")
+
         # Losses to track. Stratified across t.
         so3_t = torch.squeeze(noisy_batch['so3_t'])
         self._log_scalar(

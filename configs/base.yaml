@@ -12,23 +12,23 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 6
+    num_workers: 0
     prefetch_factor: 10
 
   masking_scheduler: 
-    mask_schedule: False
-    init_rate: 1.0
+    mask_schedule: True
+    init_rate: 0.3
     masking_increase_ratio: 0.02
 
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
-    max_num_res_squared: 100_000
+    max_num_res_squared: 160_000
 
   # Cropping 
   ab_threshold: 40
   general_threshold: 40
-  max_num_res: 400
+  max_num_res: 450
 
 interpolant:
   min_t: 1e-2
@@ -55,7 +55,7 @@ interpolant:
       cutoff: 5.0
 
   sampling:
-    num_timesteps: 100
+    num_timesteps: 20
     do_sde: False
 
   self_condition: ${model.edge_features.self_condition}
@@ -64,7 +64,7 @@ interpolant:
 
 experiment:
   add_modules: False
-  debug: True
+  debug: False
   seed: 123
   num_devices: 1
   warm_start: null
@@ -99,7 +99,7 @@ experiment:
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_all_atom_clash_loss_weight: 100 # 5e-5 ~ 1e-4
     aux_loss_local_dist_mat_loss_weight: 2.0 # 1.0 ~ 1.5
-    aux_loss_prmsd_loss_weight: 1
+    aux_loss_prmsd_loss_weight: 0.02 # 3.0 ~ 6.0
     
     # fape loss
     aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
@@ -107,7 +107,7 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_fape_layer6
+    name: fm_tri_prmsd
     project: se3-fm
   optimizer:
     warmup_steps: 0
@@ -122,7 +122,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     strategy: ddp
-    check_val_every_n_epoch: 4
+    check_val_every_n_epoch: 2
     accumulate_grad_batches: 2
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
