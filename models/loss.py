@@ -643,7 +643,8 @@ def compute_plddt(logits: torch.Tensor, # (b, L, 50)
 def lddt(
     all_atom_pred_pos: torch.Tensor,
     all_atom_positions: torch.Tensor,
-    all_atom_mask: torch.Tensor, # (b, L, 14)
+    all_atom_mask: torch.Tensor,
+    cdr_mask: torch.Tensor,
     cutoff: float = 15.0,
     eps: float = 1e-10,
     per_residue: bool = True,
@@ -673,7 +674,8 @@ def lddt(
     )
 
     dist_l1 = torch.abs(dmat_true - dmat_pred)
-
+    # if len(torch.nonzero(cdr_mask[0])) > 20:
+    #     print(dist_l1[0, 80:100, 80:100])
     score = (
         (dist_l1 < 0.5).type(dist_l1.dtype)
         + (dist_l1 < 1.0).type(dist_l1.dtype)
@@ -707,7 +709,7 @@ def lddt_loss(
     all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
 
     score = lddt(
-        all_atom_pred_pos, all_atom_positions, all_atom_mask, cutoff=cutoff, eps=eps
+        all_atom_pred_pos, all_atom_positions, all_atom_mask, cutoff=cutoff, eps=eps, cdr_mask=cdr_mask
     )
 
     score = score.detach()
@@ -715,7 +717,8 @@ def lddt_loss(
     bin_index = torch.floor(score * no_bins).long()
     bin_index = torch.clamp(bin_index, max=(no_bins - 1))
     lddt_ca_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
-
+    # if len(torch.nonzero(cdr_mask[0])) > 20:
+    #     print(f'lddt_ca_one_hot: {torch.nonzero(lddt_ca_one_hot[0])}')
     errors = softmax_cross_entropy(logits, lddt_ca_one_hot)
     all_atom_mask = all_atom_mask.squeeze(-1)
 

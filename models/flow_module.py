@@ -170,7 +170,7 @@ class FlowModule(LightningModule):
         pred_rigids = model_output['all_atom_preds']['rigids']
         pred_sidechain_frames = model_output['all_atom_preds']['sidechain_frames']
         pred_rmsd = model_output['all_atom_preds']['prmsd']
-        
+
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
         pred_rigids[..., 4:] = pred_rigids[..., 4:] * training_cfg.bb_atom_scale / r3_norm_scale
@@ -328,6 +328,16 @@ class FlowModule(LightningModule):
                 use_clamped_fape=False
             )
 
+        # calculate prmsd 
+        plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_prmsd_loss:
+            print(f"positions_before_prmsd: {model_output['all_atom_preds']['positions'][-1] - renamed_dict['renamed_atom14_gt_positions']}")
+            plddt_loss = lddt_loss(logits=pred_rmsd,
+                                    all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
+                                    all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
+                                    all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
+                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
+            
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
         auxiliary_loss = (
@@ -339,23 +349,13 @@ class FlowModule(LightningModule):
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
             + bb_fape_loss * training_cfg.aux_loss_use_fape_bb_loss * training_cfg.aux_loss_fape_bb_loss_weight 
             + sc_fape_loss * training_cfg.aux_loss_use_fape_sc_loss * training_cfg.aux_loss_fape_sc_loss_weight 
+            + plddt_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         )
-
-        # calculate prmsd 
-        plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        if training_cfg.aux_loss_use_prmsd_loss:
-            plddt_loss = lddt_loss(logits=pred_rmsd,
-                                    all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
-                                    all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-                                    all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
-                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
 
         # calculate violation loss
         violation_loss = (
             all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
-            + plddt_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         )
-
 
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -373,18 +373,18 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        print({
-            "r3_t": r3_t,
-            "trans_loss": trans_loss,
-            "bb_atom_loss": bb_atom_loss,
-            'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
-            'all_atom_clash_loss': all_atom_clash_loss,
-            'local_dist_mat_loss': local_dist_mat_loss,
-            'bb_fape_loss': bb_fape_loss,
-            'sc_fape_loss': sc_fape_loss,
-            'plddt_loss': plddt_loss
-        })
+        # print({
+        #     "r3_t": r3_t,
+        #     "trans_loss": trans_loss,
+        #     "bb_atom_loss": bb_atom_loss,
+        #     'sc_atom_loss': sc_atom_loss,
+        #     'chi_loss': chi_loss,
+        #     'all_atom_clash_loss': all_atom_clash_loss,
+        #     'local_dist_mat_loss': local_dist_mat_loss,
+        #     'bb_fape_loss': bb_fape_loss,
+        #     'sc_fape_loss': sc_fape_loss,
+        #     'plddt_loss': plddt_loss
+        # })
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,

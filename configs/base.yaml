@@ -16,7 +16,7 @@ data:
     prefetch_factor: 10
 
   masking_scheduler: 
-    mask_schedule: True
+    mask_schedule: False
     init_rate: 0.3
     masking_increase_ratio: 0.02
 
@@ -64,10 +64,10 @@ interpolant:
 
 experiment:
   add_modules: False
-  debug: False
+  debug: True
   seed: 123
   num_devices: 1
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_10.0_scale_fape/2025-04-09_19-20-07/epoch=143-step=163008.ckpt
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -107,7 +107,7 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_plddt
+    name: fm_tri_plddt_ft
     project: se3-fm
   optimizer:
     warmup_steps: 0
