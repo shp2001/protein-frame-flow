@@ -331,8 +331,7 @@ class FlowModule(LightningModule):
         # calculate prmsd 
         plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         if training_cfg.aux_loss_use_prmsd_loss:
-            print(f"positions_before_prmsd: {model_output['all_atom_preds']['positions'][-1] - renamed_dict['renamed_atom14_gt_positions']}")
-            plddt_loss = lddt_loss(logits=pred_rmsd,
+            plddt_loss = compute_prmsd_loss(logits=pred_rmsd,
                                     all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
@@ -373,18 +372,18 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        # print({
-        #     "r3_t": r3_t,
-        #     "trans_loss": trans_loss,
-        #     "bb_atom_loss": bb_atom_loss,
-        #     'sc_atom_loss': sc_atom_loss,
-        #     'chi_loss': chi_loss,
-        #     'all_atom_clash_loss': all_atom_clash_loss,
-        #     'local_dist_mat_loss': local_dist_mat_loss,
-        #     'bb_fape_loss': bb_fape_loss,
-        #     'sc_fape_loss': sc_fape_loss,
-        #     'plddt_loss': plddt_loss
-        # })
+        print({
+            "r3_t": r3_t,
+            "trans_loss": trans_loss,
+            "bb_atom_loss": bb_atom_loss,
+            'sc_atom_loss': sc_atom_loss,
+            'chi_loss': chi_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss,
+            'bb_fape_loss': bb_fape_loss,
+            'sc_fape_loss': sc_fape_loss,
+            'plddt_loss': plddt_loss
+        })
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,

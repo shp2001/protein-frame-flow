@@ -577,7 +577,8 @@ def softmax_cross_entropy(logits, labels):
     )
     return loss
 
-def compute_prmsd(prmsd: torch.Tensor) -> torch.Tensor:
+def compute_prmsd(prmsd: torch.Tensor,
+                  cdr_mask: torch.Tensor) -> torch.Tensor:
     """Computes plddt from the model output. The output is a histogram of unnormalised
     plddt.
 
@@ -587,9 +588,15 @@ def compute_prmsd(prmsd: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: (B, n) plddt scores
     """
+    print(prmsd.shape)
     pdf = torch.nn.functional.softmax(prmsd, dim=-1)
-    vbins = torch.linspace(0, 20, steps=50).to(prmsd.device).float()
+    vbins = torch.linspace(0, 15, steps=50).to(prmsd.device).float()
+    print(f'pdf: {pdf.shape}')
+    print(f'vbins: {vbins.shape}')
     output = pdf @ vbins  # (B, n)
+    if cdr_mask is not None:
+        output[cdr_mask == 0] = 0.0
+
     return output
 
 def compute_prmsd_loss(
@@ -598,7 +605,7 @@ def compute_prmsd_loss(
     all_atom_positions: torch.Tensor, # atom14_renamed_positions
     all_atom_mask: torch.Tensor, # atom14_renamed_exists
     cdr_mask: torch.Tensor,
-    cutoff: float = 20.0,
+    cutoff: float = 15.0,
     no_bins: int = 50,
     eps: float = 1e-10,
     **kwargs,

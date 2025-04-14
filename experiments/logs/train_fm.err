@@ -2,11 +2,11 @@ wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use 
 wandb: wandb version 0.19.9 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250413_160627-eqe08znv
+wandb: Run data is saved locally in ./wandb/run-20250414_220018-bb8d09c7
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run fm_tri_plddt
+wandb: Syncing run fm_tri_plddt_ft
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/eqe08znv
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/bb8d09c7
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -21,10 +21,9 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
 ------------------------------------
-0 | model | FlowModel | 9.5 M 
+0 | model | FlowModel | 12.5 M
 ------------------------------------
-9.5 M     Trainable params
+12.5 M    Trainable params
 0         Non-trainable params
-9.5 M     Total params
-37.903    Total estimated model params size (MB)
-wandb: 429 encountered (Filestream rate limit exceeded, retrying in 2.5 seconds.), retrying request
+12.5 M    Total params
+49.937    Total estimated model params size (MB)
