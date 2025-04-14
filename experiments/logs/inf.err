@@ -9,4 +9,44 @@ All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-slurmstepd: error: *** JOB 781395 ON gpu02 CANCELLED AT 2025-04-03T18:00:44 ***
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 109, in run
+    sampler.run_sampling()
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 99, in run_sampling
+    trainer.predict(self._flow_module, dataloaders=dataloader)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 852, in predict
+    return call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
+    return function(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 894, in _predict_impl
+    results = self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1018, in _run_stage
+    return self.predict_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/utilities.py", line 181, in _decorator
+    return loop_run(self, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/prediction_loop.py", line 110, in run
+    batch, batch_idx, dataloader_idx = next(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
+    self._fetch_next_batch(self.dataloader_iter)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
+    batch = next(iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
+    out = next(self._iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 123, in __next__
+    out = next(self.iterators[0])
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 633, in __next__
+    data = self._next_data()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 677, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 54, in fetch
+    return self.collate_fn(data)
+  File "/home/psh/protein-frame-flow/experiments/inference_loader.py", line 292, in collate_fn
+    cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
+TypeError: crop_antigen() got an unexpected keyword argument 'threshold'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

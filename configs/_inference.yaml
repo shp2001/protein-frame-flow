@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_crop_450/2025-03-27_22-56-13/epoch=107-step=122256.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_prmsd/2025-04-12_23-40-33/epoch=63-step=72448.ckpt
 
   use_gpu: True
   num_gpus: 2
@@ -30,7 +30,7 @@ inference:
       corrupt: True
       sample_schedule: linear
     sampling:
-      num_timesteps: 100
+      num_timesteps: 20
     self_condition: True
 
     twisting:
@@ -75,7 +75,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/benchmark_after210930/meta/metadata_2.csv
+    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
     samples_per_target: 100

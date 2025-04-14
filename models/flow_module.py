@@ -342,9 +342,9 @@ class FlowModule(LightningModule):
         )
 
         # calculate prmsd 
-        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         if training_cfg.aux_loss_use_prmsd_loss:
-            prmsd_loss = compute_prmsd_loss(logits=pred_rmsd,
+            plddt_loss = lddt_loss(logits=pred_rmsd,
                                     all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
@@ -353,7 +353,7 @@ class FlowModule(LightningModule):
         # calculate violation loss
         violation_loss = (
             all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
-            + prmsd_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
+            + plddt_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         )
 
 
@@ -383,7 +383,7 @@ class FlowModule(LightningModule):
             'local_dist_mat_loss': local_dist_mat_loss,
             'bb_fape_loss': bb_fape_loss,
             'sc_fape_loss': sc_fape_loss,
-            'prmsd': prmsd_loss
+            'plddt_loss': plddt_loss
         })
         return {
             "trans_loss": trans_loss,
@@ -396,7 +396,7 @@ class FlowModule(LightningModule):
             'dist_mat_loss': dist_mat_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'prmsd_loss': prmsd_loss
+            'plddt_loss': plddt_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):

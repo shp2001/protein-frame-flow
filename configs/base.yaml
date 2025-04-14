@@ -99,7 +99,7 @@ experiment:
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_all_atom_clash_loss_weight: 100 # 5e-5 ~ 1e-4
     aux_loss_local_dist_mat_loss_weight: 2.0 # 1.0 ~ 1.5
-    aux_loss_prmsd_loss_weight: 0.02 # 3.0 ~ 6.0
+    aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
     
     # fape loss
     aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
@@ -107,7 +107,7 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_prmsd
+    name: fm_tri_plddt
     project: se3-fm
   optimizer:
     warmup_steps: 0

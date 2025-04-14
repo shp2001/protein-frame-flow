@@ -624,17 +624,20 @@ def compute_prmsd_loss(
 
     return loss
 
-def compute_plddt(logits: torch.Tensor) -> torch.Tensor:
+def compute_plddt(logits: torch.Tensor, # (b, L, 50)
+                  cdr_mask = None) -> torch.Tensor:
     num_bins = logits.shape[-1]
     bin_width = 1.0 / num_bins
     bounds = torch.arange(
         start=0.5 * bin_width, end=1.0, step=bin_width, device=logits.device
     )
-    probs = torch.nn.functional.softmax(logits, dim=-1)
+    probs = torch.nn.functional.softmax(logits, dim=-1) # (b, L)
     pred_lddt_ca = torch.sum(
         probs * bounds.view(*((1,) * len(probs.shape[:-1])), *bounds.shape),
         dim=-1,
-    )
+    ) # (b, L)
+    if cdr_mask is not None:
+        pred_lddt_ca[cdr_mask == 0] = 1.0
     return pred_lddt_ca * 100
 
 def lddt(
@@ -715,14 +718,11 @@ def lddt_loss(
 
     errors = softmax_cross_entropy(logits, lddt_ca_one_hot)
     all_atom_mask = all_atom_mask.squeeze(-1)
-    
-    print(f'all_atom_mask: {all_atom_mask.shape}')
+
+    all_atom_mask = all_atom_mask * cdr_mask
     loss = torch.sum(errors * all_atom_mask, dim=-1) / (
         eps + torch.sum(all_atom_mask, dim=-1)
     )
-
-    # Average over the batch dimension
-    loss = torch.mean(loss)
 
     return loss
 

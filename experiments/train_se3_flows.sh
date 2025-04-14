@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_tri_prmsd
+#SBATCH -J fm_tri_plddt
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
