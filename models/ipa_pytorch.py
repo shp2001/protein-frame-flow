@@ -230,6 +230,26 @@ class StructureModuleTransition(nn.Module):
 
         return s
 
+class pRMSDTransition(nn.Module):
+    def __init__(self, c, num_bins):
+        super(pRMSDTransition, self).__init__()
+
+        self.c = c
+        self.num_bins = num_bins
+
+        self.linear_1 = Linear(self.c, self.c, init="relu")
+        self.linear_2 = Linear(self.c, self.c, init="relu")
+        self.linear_3 = Linear(self.c, self.num_bins)
+        self.relu = nn.ReLU()
+
+    def forward(self, s):
+        s = self.linear_1(s)
+        s = self.relu(s)
+        s = self.linear_2(s)
+        s = self.relu(s)
+        s = self.linear_3(s)
+
+        return s
 
 class EdgeTransition(nn.Module):
     def __init__(
@@ -528,7 +548,7 @@ class prmsd_InvariantPointAttention(nn.Module):
         require_pairwise_repr = True,
         eps = 1e-8
     ):
-        super().__init__()
+        super(prmsd_InvariantPointAttention).__init__()
         self.eps = eps
         self.heads = heads
         self.require_pairwise_repr = require_pairwise_repr

@@ -588,11 +588,8 @@ def compute_prmsd(prmsd: torch.Tensor,
     Returns:
         torch.Tensor: (B, n) plddt scores
     """
-    print(prmsd.shape)
     pdf = torch.nn.functional.softmax(prmsd, dim=-1)
     vbins = torch.linspace(0, 15, steps=50).to(prmsd.device).float()
-    print(f'pdf: {pdf.shape}')
-    print(f'vbins: {vbins.shape}')
     output = pdf @ vbins  # (B, n)
     if cdr_mask is not None:
         output[cdr_mask == 0] = 0.0

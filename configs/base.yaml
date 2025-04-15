@@ -67,7 +67,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_10.0_scale_fape/2025-04-09_19-20-07/epoch=143-step=163008.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_plddt_scratch/2025-04-15_14-18-02/last.ckpt
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -107,7 +107,7 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_plddt_ft
+    name: fm_tri_plddt_scratch
     project: se3-fm
   optimizer:
     warmup_steps: 0

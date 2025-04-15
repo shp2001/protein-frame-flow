@@ -69,3 +69,4 @@ model:
     seq_tfmr_num_heads: 4
     seq_tfmr_num_layers: 2
     num_blocks: 2
+    num_bins: 50

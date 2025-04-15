@@ -2,11 +2,11 @@ wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use 
 wandb: wandb version 0.19.9 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250414_220018-bb8d09c7
+wandb: Run data is saved locally in ./wandb/run-20250415_224345-2h79uo64
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run fm_tri_plddt_ft
+wandb: Syncing run fm_tri_plddt_scratch
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/bb8d09c7
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/2h79uo64
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -17,13 +17,237 @@ distributed_backend=nccl
 All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
+Restoring states from the checkpoint path at /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_plddt_scratch/2025-04-15_14-18-02/last.ckpt
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
 ------------------------------------
-0 | model | FlowModel | 12.5 M
+0 | model | FlowModel | 10.7 M
 ------------------------------------
-12.5 M    Trainable params
+10.7 M    Trainable params
 0         Non-trainable params
-12.5 M    Total params
-49.937    Total estimated model params size (MB)
+10.7 M    Total params
+42.813    Total estimated model params size (MB)
+Restored all states from the checkpoint at /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_plddt_scratch/2025-04-15_14-18-02/last.ckpt
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 142, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 113, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
+    return function(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
+    self.fit_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
+    self.advance(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 219, in advance
+    batch_output = self.automatic_optimization.run(trainer.optimizers[0], kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 181, in run
+    closure()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 142, in __call__
+    self._result = self.closure(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 128, in closure
+    step_output = self._step_fn()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 315, in _training_step
+    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 293, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 330, in training_step
+    return self.model(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1156, in forward
+    output = self._run_ddp_forward(*inputs, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1110, in _run_ddp_forward
+    return module_to_run(*inputs[0], **kwargs[0])  # type: ignore[index]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/overrides/base.py", line 90, in forward
+    output = self._forward_module.training_step(*inputs, **kwargs)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 568, in training_step
+    batch_losses = self.model_step(noisy_batch)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 183, in model_step
+    renamed_dict = compute_renamed_ground_truth(noisy_batch,
+  File "/home/psh/protein-frame-flow/models/loss.py", line 46, in compute_renamed_ground_truth
+    (
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_tensor.py", line 40, in wrapped
+    return f(*args, **kwargs)
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 716.00 MiB (GPU 0; 23.56 GiB total capacity; 22.01 GiB already allocated; 292.06 MiB free; 22.84 GiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: 
+wandb: Run history:
+wandb:                                   epoch ▁▁██
+wandb:               train/all_atom_clash_loss █▁
+wandb: train/all_atom_clash_loss t=[0.00,0.25) ▁
+wandb: train/all_atom_clash_loss t=[0.25,0.50) █▁
+wandb: train/all_atom_clash_loss t=[0.50,0.75) ▁▁
+wandb: train/all_atom_clash_loss t=[0.75,1.00) █▁
+wandb:                    train/auxiliary_loss █▁
+wandb:      train/auxiliary_loss t=[0.00,0.25) ▁
+wandb:      train/auxiliary_loss t=[0.25,0.50) █▁
+wandb:      train/auxiliary_loss t=[0.50,0.75) ▁▁
+wandb:      train/auxiliary_loss t=[0.75,1.00) █▁
+wandb:                        train/batch_size █▁
+wandb:                      train/bb_atom_loss █▁
+wandb:        train/bb_atom_loss t=[0.00,0.25) ▁
+wandb:        train/bb_atom_loss t=[0.25,0.50) █▁
+wandb:        train/bb_atom_loss t=[0.50,0.75) ▁▁
+wandb:        train/bb_atom_loss t=[0.75,1.00) █▁
+wandb:                          train/chi_loss █▁
+wandb:            train/chi_loss t=[0.00,0.25) ▁
+wandb:            train/chi_loss t=[0.25,0.50) █▁
+wandb:            train/chi_loss t=[0.50,0.75) ▁▁
+wandb:            train/chi_loss t=[0.75,1.00) █▁
+wandb:                     train/dist_mat_loss ▁▁
+wandb:       train/dist_mat_loss t=[0.00,0.25) ▁
+wandb:       train/dist_mat_loss t=[0.25,0.50) ▁▁
+wandb:       train/dist_mat_loss t=[0.50,0.75) ▁▁
+wandb:       train/dist_mat_loss t=[0.75,1.00) ▁▁
+wandb:                train/epoch_time_minutes ▁
+wandb:               train/examples_per_second █▁
+wandb:                            train/length ▁█
+wandb:               train/local_dist_mat_loss █▁
+wandb: train/local_dist_mat_loss t=[0.00,0.25) ▁
+wandb: train/local_dist_mat_loss t=[0.25,0.50) █▁
+wandb: train/local_dist_mat_loss t=[0.50,0.75) ▁▁
+wandb: train/local_dist_mat_loss t=[0.75,1.00) █▁
+wandb:                              train/loss █▁
+wandb:                        train/motif_size ▁█
+wandb:                        train/plddt_loss ▁█
+wandb:          train/plddt_loss t=[0.00,0.25) ▁
+wandb:          train/plddt_loss t=[0.25,0.50) █▁
+wandb:          train/plddt_loss t=[0.50,0.75) ▁▁
+wandb:          train/plddt_loss t=[0.75,1.00) █▁
+wandb:                              train/r3_t █▁
+wandb:                      train/rots_vf_loss █▁
+wandb:        train/rots_vf_loss t=[0.00,0.25) ▁
+wandb:        train/rots_vf_loss t=[0.25,0.50) █▁
+wandb:        train/rots_vf_loss t=[0.50,0.75) ▁▁
+wandb:        train/rots_vf_loss t=[0.75,1.00) █▁
+wandb:                      train/sc_atom_loss █▁
+wandb:        train/sc_atom_loss t=[0.00,0.25) ▁
+wandb:        train/sc_atom_loss t=[0.25,0.50) █▁
+wandb:        train/sc_atom_loss t=[0.50,0.75) ▁▁
+wandb:        train/sc_atom_loss t=[0.75,1.00) █▁
+wandb:               train/scaffolding_percent █▁
+wandb:                       train/se3_vf_loss █▁
+wandb:         train/se3_vf_loss t=[0.00,0.25) ▁
+wandb:         train/se3_vf_loss t=[0.25,0.50) █▁
+wandb:         train/se3_vf_loss t=[0.50,0.75) ▁▁
+wandb:         train/se3_vf_loss t=[0.75,1.00) █▁
+wandb:                             train/so3_t █▁
+wandb:                        train/trans_loss █▁
+wandb:          train/trans_loss t=[0.00,0.25) ▁
+wandb:          train/trans_loss t=[0.25,0.50) █▁
+wandb:          train/trans_loss t=[0.50,0.75) ▁▁
+wandb:          train/trans_loss t=[0.75,1.00) █▁
+wandb:                     trainer/global_step ▁▁▅█
+wandb:                   valid/ca_ca_deviation ▁
+wandb:               valid/ca_ca_valid_percent ▁
+wandb:                      valid/coil_percent ▁
+wandb:                     valid/h3_trans_loss ▁
+wandb:                     valid/helix_percent ▁
+wandb:                  valid/non_coil_percent ▁
+wandb:                 valid/num_ca_ca_clashes ▁
+wandb:                valid/radius_of_gyration ▁
+wandb:                    valid/strand_percent ▁
+wandb:                        valid/trans_loss ▁
+wandb: 
+wandb: Run summary:
+wandb:                                   epoch 14
+wandb:               train/all_atom_clash_loss 1e-05
+wandb: train/all_atom_clash_loss t=[0.00,0.25) 3e-05
+wandb: train/all_atom_clash_loss t=[0.25,0.50) 1e-05
+wandb: train/all_atom_clash_loss t=[0.50,0.75) 2e-05
+wandb: train/all_atom_clash_loss t=[0.75,1.00) 0.0
+wandb:                    train/auxiliary_loss 1.38992
+wandb:      train/auxiliary_loss t=[0.00,0.25) 0.0
+wandb:      train/auxiliary_loss t=[0.25,0.50) 1.38992
+wandb:      train/auxiliary_loss t=[0.50,0.75) 2.06195
+wandb:      train/auxiliary_loss t=[0.75,1.00) 2.44726
+wandb:                        train/batch_size 1.0
+wandb:                      train/bb_atom_loss 0.27181
+wandb:        train/bb_atom_loss t=[0.00,0.25) 0.29442
+wandb:        train/bb_atom_loss t=[0.25,0.50) 0.27181
+wandb:        train/bb_atom_loss t=[0.50,0.75) 0.52612
+wandb:        train/bb_atom_loss t=[0.75,1.00) 0.35966
+wandb:                          train/chi_loss 0.36754
+wandb:            train/chi_loss t=[0.00,0.25) 0.39249
+wandb:            train/chi_loss t=[0.25,0.50) 0.36754
+wandb:            train/chi_loss t=[0.50,0.75) 0.49031
+wandb:            train/chi_loss t=[0.75,1.00) 0.35526
+wandb:                     train/dist_mat_loss 0.0
+wandb:       train/dist_mat_loss t=[0.00,0.25) 0.0
+wandb:       train/dist_mat_loss t=[0.25,0.50) 0.0
+wandb:       train/dist_mat_loss t=[0.50,0.75) 0.0
+wandb:       train/dist_mat_loss t=[0.75,1.00) 0.0
+wandb:                train/epoch_time_minutes 0.22763
+wandb:               train/examples_per_second 3.1852
+wandb:                            train/length 400.0
+wandb:               train/local_dist_mat_loss 0.23891
+wandb: train/local_dist_mat_loss t=[0.00,0.25) 0.14746
+wandb: train/local_dist_mat_loss t=[0.25,0.50) 0.23891
+wandb: train/local_dist_mat_loss t=[0.50,0.75) 0.3346
+wandb: train/local_dist_mat_loss t=[0.75,1.00) 0.60241
+wandb:                              train/loss 1.91925
+wandb:                        train/motif_size 392.0
+wandb:                        train/plddt_loss 2.46476
+wandb:          train/plddt_loss t=[0.00,0.25) 2.14396
+wandb:          train/plddt_loss t=[0.25,0.50) 2.46476
+wandb:          train/plddt_loss t=[0.50,0.75) 2.75192
+wandb:          train/plddt_loss t=[0.75,1.00) 0.9947
+wandb:                              train/r3_t 0.40386
+wandb:                      train/rots_vf_loss 0.42753
+wandb:        train/rots_vf_loss t=[0.00,0.25) 0.34688
+wandb:        train/rots_vf_loss t=[0.25,0.50) 0.42753
+wandb:        train/rots_vf_loss t=[0.50,0.75) 0.53827
+wandb:        train/rots_vf_loss t=[0.75,1.00) 0.28061
+wandb:                      train/sc_atom_loss 0.27195
+wandb:        train/sc_atom_loss t=[0.00,0.25) 0.15004
+wandb:        train/sc_atom_loss t=[0.25,0.50) 0.27195
+wandb:        train/sc_atom_loss t=[0.50,0.75) 0.40706
+wandb:        train/sc_atom_loss t=[0.75,1.00) 0.85031
+wandb:               train/scaffolding_percent 0.02
+wandb:                       train/se3_vf_loss 1.91925
+wandb:         train/se3_vf_loss t=[0.00,0.25) 0.36408
+wandb:         train/se3_vf_loss t=[0.25,0.50) 1.91925
+wandb:         train/se3_vf_loss t=[0.50,0.75) 2.79818
+wandb:         train/se3_vf_loss t=[0.75,1.00) 2.85246
+wandb:                             train/so3_t 0.40386
+wandb:                        train/trans_loss 0.1018
+wandb:          train/trans_loss t=[0.00,0.25) 0.01721
+wandb:          train/trans_loss t=[0.25,0.50) 0.1018
+wandb:          train/trans_loss t=[0.50,0.75) 0.19633
+wandb:          train/trans_loss t=[0.75,1.00) 0.12419
+wandb:                     trainer/global_step 15849
+wandb:                   valid/ca_ca_deviation 0.55423
+wandb:               valid/ca_ca_valid_percent 0.93484
+wandb:                      valid/coil_percent 0.4825
+wandb:                     valid/h3_trans_loss 1.06352
+wandb:                     valid/helix_percent 0.0725
+wandb:                  valid/non_coil_percent 0.5175
+wandb:                 valid/num_ca_ca_clashes 0.0
+wandb:                valid/radius_of_gyration 2.30015
+wandb:                    valid/strand_percent 0.445
+wandb:                        valid/trans_loss 0.79152
+wandb: 
+wandb: 🚀 View run fm_tri_plddt_scratch at: https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/2h79uo64
+wandb: Synced 6 W&B file(s), 1 media file(s), 2 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20250415_224345-2h79uo64/logs

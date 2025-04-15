@@ -297,7 +297,8 @@ class FlowModule(LightningModule):
                                                             noisy_batch['atom14_gt_exists'],
                                                             noisy_batch['res_idx'],
                                                             noisy_batch['residx_atom14_to_atom37'])
-        
+            
+            all_atom_clash_loss = all_atom_clash_loss
         # # backbone fape loss 
         bb_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         if training_cfg.aux_loss_use_fape_bb_loss:
@@ -336,7 +337,10 @@ class FlowModule(LightningModule):
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
                                     cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
-            
+
+            final_prmsd = compute_prmsd(pred_rmsd, cdr_mask=noisy_batch['diffuse_mask'])
+            print(f"prmsd_max: {torch.max(final_prmsd[0])}")
+
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
         auxiliary_loss = (
@@ -355,7 +359,6 @@ class FlowModule(LightningModule):
         violation_loss = (
             all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
         )
-
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -419,6 +422,7 @@ class FlowModule(LightningModule):
             pair_init=batch['pair_init']
         )
         
+        print(f'prmsd_final_val : {torch.max(prmsd)}')
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
         for i in range(pred_positions.shape[0]):

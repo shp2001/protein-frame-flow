@@ -207,26 +207,15 @@ class FlowModel(nn.Module):
             for b in range(self._prmsd_conf.num_blocks):
                 self.prmsd[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
                 self.prmsd[f'ipa_ln_{b}'] = nn.LayerNorm(self._prmsd_conf.c_s)
-                tfmr_in = self._prmsd_conf.c_s
-                tfmr_layer = torch.nn.TransformerEncoderLayer(
-                    d_model=tfmr_in,
-                    nhead=self._prmsd_conf.seq_tfmr_num_heads,
-                    dim_feedforward=tfmr_in,
-                    batch_first=True,
-                    dropout=0.0,
-                    norm_first=False
-                )
-                self.prmsd[f'seq_tfmr_{b}'] = torch.nn.TransformerEncoder(
-                    tfmr_layer, self._prmsd_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
-                self.prmsd[f'post_tfmr_{b}'] = ipa_pytorch.Linear(
-                    tfmr_in, self._prmsd_conf.c_s, init="final")
-                self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
-                    c=self._prmsd_conf.c_s)
+                
+                if b < self._prmsd_conf.num_blocks - 1:
+                    self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
+                        c=self._prmsd_conf.c_s)
+                else:
+                    self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.pRMSDTransition(
+                        c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
+                    )
 
-            self.prmsd_linear = ipa_pytorch.Linear(
-                self._prmsd_conf.c_s,
-                50, # prmsd bins 개수 
-                )
             
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
@@ -283,7 +272,7 @@ class FlowModel(nn.Module):
                 edge_embed,
                 curr_rigids,
                 node_mask)
-            ipa_embed *= node_mask[..., None]
+            ipa_embed = ipa_embed * node_mask[..., None]
             node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + ipa_embed)
             seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](
                 node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
@@ -299,12 +288,12 @@ class FlowModel(nn.Module):
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed, curr_rigids, edge_mask
                     )
-                    edge_embed *= edge_mask[..., None]
+                    edge_embed = edge_embed * edge_mask[..., None]
                
                 else:
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed)
-                    edge_embed *= edge_mask[..., None]
+                    edge_embed = edge_embed * edge_mask[..., None]
 
             unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
 
@@ -343,17 +332,15 @@ class FlowModel(nn.Module):
                     prmsd_rigids,
                     node_mask
                 )
-                prmsd_ipa_embed *= node_mask[..., None]
+                # prmsd_ipa_embed *= node_mask[..., None]
                 prmsd_node = self.prmsd[f'ipa_ln_{b}'](prmsd_node + prmsd_ipa_embed)
-                prmsd_seq_tfmr_out = self.prmsd[f'seq_tfmr_{b}'](
-                node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
+                
+                if b < self._prmsd_conf.num_blocks - 1:
+                    prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
+                    prmsd_node = prmsd_node * node_mask[..., None]
+                else:
+                    prmsd_node = self.prmsd[f'prmsd_transition_{b}'](prmsd_node)
 
-                prmsd_node = prmsd_node + self.prmsd[f'post_tfmr_{b}'](prmsd_seq_tfmr_out)
-                prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
-                prmsd_node = prmsd_node * node_mask[..., None]
-
-            # print(f'prmsd_node after attention: {prmsd_node}')
-            prmsd_node = self.prmsd_linear(prmsd_node) # (b, L, 50)
             # print(f'prmsd_before_relu: {prmsd_node}')
             all_atom_outputs["prmsd"] = prmsd_node
         else:
