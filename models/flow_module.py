@@ -440,6 +440,14 @@ class FlowModule(LightningModule):
 
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
+            b_factors = prmsd[i].cpu().numpy()
+            if (b_factors==0).all():
+                b_factor_alt = diffuse_mask.cpu().numpy()
+                b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
+            
+            else:
+                b_factors = np.tile((b_factors)[:, None], (1, 37))
+
             saved_path = au.write_prot_to_pdb(
                 final_pos,
                 file_path=os.path.join(sample_dir, pdb_id+'.pbd'),
@@ -447,7 +455,7 @@ class FlowModule(LightningModule):
                 chain_index=batch['chain_idx'].cpu(),
                 no_indexing=False,
                 overwrite=True,
-                b_factors=prmsd[i]
+                b_factors=b_factors
             )
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
@@ -723,6 +731,7 @@ class FlowModule(LightningModule):
                 bb_prot_traj=bb_traj,
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
                 b_factors=prmsd,
+                diffuse_mask=diffuse_mask[i].cpu().numpy(),
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,

@@ -386,8 +386,11 @@ class Interpolant:
         # Convert trajectories to atom37.
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
-        prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
-        print(f'prmsd_final_val : {torch.max(prmsd_final)}')
+        if not (prmsd == 0).all():
+            prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
+            print(f'prmsd_final_val : {torch.max(prmsd_final)}')
+        else:
+            prmsd_final = prmsd 
         return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):

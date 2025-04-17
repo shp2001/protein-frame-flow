@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_all_atom_anchor_sam_3
+#SBATCH -J fm_tri_loc
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
 #SBATCH --mem=30g

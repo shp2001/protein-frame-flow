@@ -12,11 +12,11 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 4
+    num_workers: 0
     prefetch_factor: 10
 
   masking_scheduler: 
-    mask_schedule: False
+    mask_schedule: True
     init_rate: 0.3
     masking_increase_ratio: 0.02
 
@@ -67,7 +67,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_plddt_scratch/2025-04-15_14-18-02/last.ckpt
+  warm_start: null
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -97,7 +97,7 @@ experiment:
     aux_loss_sc_atom_loss_weight: 0.5 # 0.7 ~ 1.5
     aux_loss_pair_loss_weight: 0.2 
     aux_loss_final_layer_rmsd_weight: 1.0 
-    aux_loss_all_atom_clash_loss_weight: 100 # 5e-5 ~ 1e-4
+    aux_loss_all_atom_clash_loss_weight: 1000 # 5e-5 ~ 1e-4
     aux_loss_local_dist_mat_loss_weight: 2.0 # 1.0 ~ 1.5
     aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
     
@@ -107,7 +107,7 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_plddt_scratch
+    name: fm_tri_5.0_scale_partial_mask
     project: se3-fm
   optimizer:
     warmup_steps: 0

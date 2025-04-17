@@ -290,12 +290,10 @@ def collate_fn(batch):
         cropped_feat = {}
 
         cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
-                                                    threshold=60,
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
                                                     max_len=450,
                                                     seq_list=feat['chain_seq_list'],
-                                                    crop_antibody=False
                                                     )
         # del feat['masked_chain']
         # del feat['first_chain_len']

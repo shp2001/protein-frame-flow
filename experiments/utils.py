@@ -199,6 +199,7 @@ def save_traj(
         x0_traj: np.ndarray,
         output_dir: str,
         b_factors: np.ndarray,
+        diffuse_mask: np.ndarray,
         save_traj_bool,
         aatype = None,
         chain_index = None
@@ -231,7 +232,11 @@ def save_traj(
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
 
     # Use b-factors to specify which residues are diffused.
-    b_factors = np.tile((b_factors)[:, None], (1, 37))
+    if (b_factors==0).all():
+        b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
+    
+    else:
+        b_factors = np.tile((b_factors)[:, None], (1, 37))
     
     sample_path = au.write_prot_to_pdb(
         sample,
