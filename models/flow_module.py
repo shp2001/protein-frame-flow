@@ -170,6 +170,8 @@ class FlowModule(LightningModule):
         pred_rigids = model_output['all_atom_preds']['rigids']
         pred_sidechain_frames = model_output['all_atom_preds']['sidechain_frames']
         pred_rmsd = model_output['all_atom_preds']['prmsd']
+        pred_beta_distogram = model_output['pair_outputs'][:self._model_cfg.ipa.num_blocks-2]
+        pred_all_atom ###############################################################
 
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)

@@ -9,133 +9,7 @@ from data import utils as du
 from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-
-class AngleResnetBlock(nn.Module):
-    def __init__(self, c_hidden, use_original_sm):
-        """
-        Args:
-            c_hidden:
-                Hidden channel dimension
-        """
-        super(AngleResnetBlock, self).__init__()
-
-        self.c_hidden = c_hidden
-        self.use_original_sm = use_original_sm
-
-        if not self.use_original_sm:
-            self.linear_1 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_2 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="final")
-
-        self.relu = nn.ReLU()
-
-    def forward(self, a: torch.Tensor) -> torch.Tensor:
-        s_initial = a
-
-        if not self.use_original_sm:
-            a = self.relu(a)
-            a = self.linear_1(a)
-        a = self.relu(a)
-        a = self.linear_2(a)
-        a = self.relu(a)
-        a = self.linear_3(a)
-
-        return a + s_initial
-
-
-class AngleResnet(nn.Module):
-    """
-    Implements Algorithm 20, lines 11-14
-    """
-
-    def __init__(self, c_in, c_hidden, no_blocks, no_angles, epsilon, use_original_sm):
-        """
-        Args:
-            c_in:
-                Input channel dimension
-            c_hidden:
-                Hidden channel dimension
-            no_blocks:
-                Number of resnet blocks
-            no_angles:
-                Number of torsion angles to generate
-            epsilon:
-                Small constant for normalization
-            use_original_sm:
-                If True implement line 11 of algorithm 20 correctly else use the ABB3 implementation.
-        """
-        super(AngleResnet, self).__init__()
-
-        self.c_in = c_in
-        self.c_hidden = c_hidden
-        self.no_blocks = no_blocks
-        self.no_angles = no_angles
-        self.eps = epsilon
-        self.use_original_sm = use_original_sm
-
-        if self.use_original_sm:
-            self.linear_in = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-            self.linear_initial = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-
-        self.layers = nn.ModuleList()
-        for _ in range(self.no_blocks):
-            layer = AngleResnetBlock(
-                c_hidden=self.c_hidden, use_original_sm=self.use_original_sm
-            )
-            self.layers.append(layer)
-
-        self.linear_out = ipa_pytorch.Linear(self.c_hidden, self.no_angles * 2)
-
-        self.relu = nn.ReLU()
-
-    def forward(
-        self, s: torch.Tensor, s_initial: torch.Tensor
-    ):
-        """
-        Args:
-            s:
-                [*, C_hidden] single embedding
-            s_initial:
-                [*, C_hidden] single embedding as of the start of the
-                StructureModule
-        Returns:
-            [*, no_angles, 2] predicted angles
-        """
-        # NOTE: The ReLU's applied to the inputs are absent from the supplement
-        # pseudocode but present in the source. For maximal compatibility with
-        # the pretrained weights, I'm going with the source.
-
-        # [*, C_hidden]
-        if self.use_original_sm:
-            s_initial = self.relu(s_initial)
-            s_initial = self.linear_initial(s_initial)
-            s = self.relu(s)
-            s = self.linear_in(s)
-            s = s + s_initial
-        else:
-            s = torch.cat((s, s_initial), dim=-1)
-
-        for l in self.layers:
-            s = l(s)
-
-        s = self.relu(s)
-
-        # [*, no_angles * 2]
-        s = self.linear_out(s)
-
-        # [*, no_angles, 2]
-        s = s.view(s.shape[:-1] + (-1, 2))
-
-        unnormalized_s = s
-        norm_denom = torch.sqrt(
-            torch.clamp(
-                torch.sum(s**2, dim=-1, keepdim=True),
-                min=self.eps,
-            )
-        )
-        s = s / norm_denom
-
-        return unnormalized_s, s
+from models.heads import AAContactHead, DistogramHead, AngleResnet
     
 class FlowModel(nn.Module):
 
@@ -145,6 +19,8 @@ class FlowModel(nn.Module):
         self._ipa_conf = model_conf.ipa
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._angle_conf = model_conf.angle
+        self._distogram_conf = model_conf.distogram_head
+        self._aa_contact_conf = model_conf.aa_contact_head
         self._prmsd_conf = model_conf.prmsd
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
@@ -174,10 +50,15 @@ class FlowModel(nn.Module):
             self.trunk[f'bb_update_{b}'] = ipa_pytorch.BackboneUpdate(
                 self._ipa_conf.c_s, use_rot_updates=True)
 
+            # 0, 1, 2
             if b < self._ipa_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
                     self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-                
+                    if b != self._ipa_conf.num_blocks-2:
+                        self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
+                                                                          self._aa_contact_conf)
+                    else:
+                        self.trunk[f'aa_contact_head{b}'] = AAContactHead(self._ipa_conf.c_z)
                 else:
                     edge_in = self._model_conf.edge_embed_size
                     self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
@@ -185,6 +66,7 @@ class FlowModel(nn.Module):
                         edge_embed_in=edge_in,
                         edge_embed_out=self._model_conf.edge_embed_size,
                     )
+
 
         self.angle_resnet = AngleResnet(
                 self._ipa_conf.c_s,
@@ -226,7 +108,8 @@ class FlowModel(nn.Module):
         rotmats_t = input_feats['rotmats_t']
         pair_init = input_feats['pair_init']
         aatype = input_feats['aatype']
-        
+        atom14_gt_exists = input_feats['atom14_gt_exists']
+
         # Initialize node and edge embeddings
         init_node_embed = self.node_feature_net(
             r3_t,
@@ -260,6 +143,7 @@ class FlowModel(nn.Module):
 
         # Main trunk
         all_atom_outputs = []
+        pair_outputs = []
 
 
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
@@ -267,6 +151,9 @@ class FlowModel(nn.Module):
         edge_embed = init_edge_embed * edge_mask[..., None]
 
         for b in range(self._ipa_conf.num_blocks):
+            contact_probs = None
+            all_atom_contact_map = None 
+
             ipa_embed = self.trunk[f'ipa_{b}'](
                 node_embed,
                 edge_embed,
@@ -289,12 +176,24 @@ class FlowModel(nn.Module):
                         node_embed, edge_embed, curr_rigids, edge_mask
                     )
                     edge_embed = edge_embed * edge_mask[..., None]
-               
+    
                 else:
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed)
                     edge_embed = edge_embed * edge_mask[..., None]
 
+                if b < self._ipa_conf.num_blocks-2:
+                    contact_probs = self.trunk[f'distogram_head_{b}'](edge_embed)
+                
+                else:
+                    all_atom_contact_map = self.trunk[f'aa_contact_head{b}'](edge_embed, atom14_gt_exists)
+
+            if contact_probs != None:
+                pair_outputs.append(contact_probs)
+
+            if all_atom_contact_map != None:
+                pair_outputs.append(all_atom_contact_map)
+                
             unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
 
             backb_to_global = self.rigids_nm_to_ang(curr_rigids)
@@ -305,7 +204,7 @@ class FlowModel(nn.Module):
                 "angles": angles,
                 "positions": pred_xyz,
                 "rigids": backb_to_global.to_tensor_7(),
-                "sidechain_frames": all_frames_to_global.to_tensor_4x4()
+                "sidechain_frames": all_frames_to_global.to_tensor_4x4(),
             }
 
             all_atom_outputs.append(all_atom_preds)
@@ -349,5 +248,6 @@ class FlowModel(nn.Module):
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
-            'all_atom_preds': all_atom_outputs
+            'all_atom_preds': all_atom_outputs,
+            'pair_outputs': pair_outputs # b-1개의 pair 기반 output (b-2개는 beta carbon distogram, 마지막은 all atom contact map)
         }

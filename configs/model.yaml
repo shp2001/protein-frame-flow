@@ -50,6 +50,11 @@ model:
     k_linear: 0 # residue index 상에서 앞뒤로 존재하는 얘들을 강제로 포함
     inf: 1e9
     pair_dropout: 0.25
+    
+  distogram_head: 
+    first_break: 2
+    last_break: 22
+    num_bins: 64
 
   angle:
     c_resnet: 256
