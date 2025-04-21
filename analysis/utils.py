@@ -3,7 +3,12 @@ import os
 import re
 from data import protein
 from openfold.utils import rigid_utils
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+import torch 
+from openfold.data.data_transforms import pseudo_beta_fn
+from data.motif_index import find_anchor
 
 Rigid = rigid_utils.Rigid
 
@@ -76,3 +81,93 @@ def write_prot_to_pdb(
             raise ValueError(f'Invalid positions shape {prot_pos.shape}')
         f.write('END')
     return save_path
+
+def get_cdr_and_neighbors(aatype, atom14_pred_positions,
+                          original_diffuse_mask, diffuse_mask,
+                          gt_pseudo_beta,
+                          ):
+        # extract neighbor residues from predicted structure 
+    pred_pseudo_beta = pseudo_beta_fn(
+        aatype,
+        atom14_pred_positions,
+        None
+    )
+
+    cb_distance_map = torch.linalg.norm(
+        pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
+    
+    anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
+    if len(anchor_residues) > 2: # ab dataset -> extract only_h3 
+        anchor_residues = anchor_residues[4:6]
+    else: # ppi dataset -> use original residues  
+        anchor_residues = anchor_residues
+
+    # print(f'anchor_residues: {anchor_residues}')
+    # print(f'anchor_residues: {anchor_residues}')
+    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if diffuse_mask[i]==1]
+    cdr_residues = torch.tensor(cdr_residues)
+
+    neighbor_mask_list = []
+    for b in range(cb_distance_map.shape[0]):
+        neighbor_mask = (cb_distance_map[b, cdr_residues] < 8.0)  # (B, N_cdr, N)
+        pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+        neighbor_mask_list.append(pred_neighbor_indices)
+    
+    pred_neighbor = torch.cat(neighbor_mask_list, dim=0)
+
+    # extract neighbor residues from gt structure and add to pred neighbors 
+    gt_cb_distance_map = torch.linalg.norm(
+        gt_pseudo_beta[:, :, None, :] - gt_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
+    
+    neighbor_mask_list = []
+    for b in range(cb_distance_map.shape[0]):
+        neighbor_mask = (gt_cb_distance_map[b, cdr_residues] < 8.0)  # (B, N_cdr, N)
+        gt_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+        neighbor_mask_list.append(gt_neighbor_indices)
+
+    gt_neighbor = torch.cat(neighbor_mask_list)
+
+    neighbor_indices = torch.unique(torch.cat((pred_neighbor, gt_neighbor)))
+
+    return cdr_residues, neighbor_indices
+
+def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_path):
+    """
+    Visualizes a [L, L, 14] contact map as a 2D heatmap by reducing the 14 atom-pair dimension
+    and saves it to a unique file path.
+    
+    Args:
+        contact_map (torch.Tensor): [L, L, 14] tensor (gt_contact_map * local_loss_mask)[0]
+        title (str): Title of the plot
+        output_path (str): Path to save the output image (e.g., 'contact_map.png')
+    """
+    # [L, L, 14] -> [L, L]로 축소: 14개 원자 쌍 중 하나라도 1이면 1로 설정
+    contact_map = contact_map[cdr_residues][:, neighbor]
+    if len(contact_map.shape) > 2:
+        contact_map_2d = contact_map[:, :, 14]  # [L, L]
+
+    # 히트맵 그리기
+    plt.figure(figsize=(6, 3))
+    ax = sns.heatmap(
+        contact_map_2d.detach().cpu().numpy(), 
+        cmap="Reds", 
+        cbar=True, 
+        cbar_kws={"shrink": 0.4},
+        xticklabels=neighbor.cpu().numpy().tolist(), 
+        yticklabels=cdr_residues.cpu().numpy().tolist(),
+        square=True
+    )
+    plt.title(title)
+    plt.xlabel("Neighbors Index", fontsize=6)
+    plt.ylabel("H3 CDR Index", fontsize=6)
+    plt.xticks(rotation=90, fontsize=4)
+    plt.yticks(rotation=0, fontsize=4) 
+    # 출력 디렉토리 생성
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # 이미지 저장
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    print(f"Contact map saved to: {output_path}")
+
+    # 플롯 닫기 (메모리 관리)
+    plt.close()

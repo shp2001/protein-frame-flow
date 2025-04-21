@@ -7,6 +7,88 @@ from openfold.data.data_transforms import pseudo_beta_fn
 from openfold.utils.rigid_utils import Rigid, Rotation
 from openfold.utils.tensor_utils import permute_final_dims
 
+from models.utils import calc_distogram
+from data.motif_index import find_anchor
+from itertools import combinations_with_replacement
+
+import torch
+
+import os 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
+
+def get_unique_filepath(output_path):
+    """
+    Checks if output_path exists and appends _number if it does.
+    
+    Args:
+        output_path (str): Desired file path (e.g., 'contact_map.png')
+    
+    Returns:
+        str: Unique file path (e.g., 'contact_map_1.png' if 'contact_map.png' exists)
+    """
+    base, ext = os.path.splitext(output_path)
+    counter = 0
+    new_path = output_path
+    
+    while os.path.exists(new_path):
+        counter += 1
+        new_path = f"{base}_{counter}{ext}"
+    
+    return new_path
+
+def visualize_contact_map(contact_map, cdr_residues=None, neighbor=None, title="Contact Map", output_path="/home/psh/protein-frame-flow/experiments/loss_mask_Cb_CH2/contact_map.png"):
+    """
+    Visualizes a [L, L, 14] contact map as a 2D heatmap by reducing the 14 atom-pair dimension
+    and saves it to a unique file path.
+    
+    Args:
+        contact_map (torch.Tensor): [L, L, 14] tensor (gt_contact_map * local_loss_mask)[0]
+        title (str): Title of the plot
+        output_path (str): Path to save the output image (e.g., 'contact_map.png')
+    """
+    # [L, L, 14] -> [L, L]로 축소: 14개 원자 쌍 중 하나라도 1이면 1로 설정
+    contact_map_2d = contact_map[:, :, 50]  # [L, L]
+
+    # 히트맵 그리기
+    plt.figure(figsize=(6, 3))
+
+    if cdr_residues != None:
+        sns.heatmap(
+            contact_map_2d.cpu().numpy(), 
+            cmap="Reds", 
+            cbar=True, 
+            xticklabels=neighbor.cpu().numpy().tolist(), 
+            yticklabels=cdr_residues.cpu().numpy().tolist(),
+            square=True
+        )
+    else:
+        sns.heatmap(
+            contact_map_2d.cpu().numpy(), 
+            cmap="Reds", 
+            cbar=True, 
+            square=True
+        )
+
+    plt.title(title)
+    plt.xlabel("Neighbors Index", fontsize=6)
+    plt.ylabel("H3 CDR Index", fontsize=6)
+    plt.xticks(rotation=90, fontsize=4)
+    plt.yticks(rotation=0, fontsize=4) 
+
+    # 출력 디렉토리 생성
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # 고유한 파일 경로 생성
+    unique_output_path = get_unique_filepath(output_path)
+
+    # 이미지 저장
+    plt.savefig(unique_output_path, dpi=300, bbox_inches="tight")
+    print(f"Contact map saved to: {unique_output_path}")
+
+    # 플롯 닫기 (메모리 관리)
+    plt.close()
+
 def compute_renamed_ground_truth(
     batch: Dict[str, torch.Tensor],
     atom14_pred_positions: torch.Tensor,
@@ -763,13 +845,15 @@ def compute_all_atom_clash_loss(
     return between_residue_clashes['mean_loss']
 
 def local_distance_loss(
-        aatype,
-        atom14_pred_positions, # (B, N, 14, 3)
-        renamed_atom14_gt_exists, # (B, N, 14)
-        renamed_atom14_gt_positions, # (B, N, 14, 3)
-        diffuse_mask, # (N)
-        gt_pseudo_beta # (B, N, 3)
-        ):
+    aatype,
+    atom14_pred_positions, # (B, N, 14, 3)
+    renamed_atom14_gt_exists, # (B, N, 14)
+    renamed_atom14_gt_positions, # (B, N, 14, 3)
+    diffuse_mask, # (N)
+    original_diffuse_mask, # (N)
+    gt_pseudo_beta, # (B, N, 3)
+    scale_factor
+    ):
     """
     In order to update interface properly, this loss will scan distance among interface atoms.
     """
@@ -779,43 +863,173 @@ def local_distance_loss(
         atom14_pred_positions,
         None
     )
+
     cb_distance_map = torch.linalg.norm(
         pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
     
-    cdr_residues = torch.nonzero(diffuse_mask, as_tuple=True)[0]
+    anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
+    if len(anchor_residues) > 2: # ab dataset -> extract only_h3 
+        anchor_residues = anchor_residues[4:6]
+    else: # ppi dataset -> use original residues  
+        anchor_residues = anchor_residues
+
+    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if diffuse_mask[i]==1]
+    cdr_residues = torch.tensor(cdr_residues)
+
+    neighbor_mask_list = []
+    for b in range(cb_distance_map.shape[0]):
+        neighbor_mask = (cb_distance_map[b, cdr_residues] < 8.0 * scale_factor[b])  # (B, N_cdr, N)
+        pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+        neighbor_mask_list.append(pred_neighbor_indices)
     
-    neighbor_mask = (cb_distance_map[:, cdr_residues] < 8)  # (B, N_cdr, N)
-    pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+    pred_neighbor = torch.cat(neighbor_mask_list, dim=0)
 
     # extract neighbor residues from gt structure and add to pred neighbors 
     gt_cb_distance_map = torch.linalg.norm(
         gt_pseudo_beta[:, :, None, :] - gt_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
     
-    gt_neighbor_mask = (gt_cb_distance_map[:, cdr_residues] < 8)  # (B, N_cdr, N)
-    gt_neighbor_indices = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
+    neighbor_mask_list = []
+    for b in range(cb_distance_map.shape[0]):
+        neighbor_mask = (gt_cb_distance_map[b, cdr_residues] < 8.0 * scale_factor[b])  # (B, N_cdr, N)
+        gt_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+        neighbor_mask_list.append(gt_neighbor_indices)
 
-    neighbor_indices = torch.unique(torch.cat((pred_neighbor_indices, gt_neighbor_indices)))
+    gt_neighbor = torch.cat(neighbor_mask_list)
 
-    # calculate local all-atom log distance map  
-    gt_pair_dists = torch.linalg.norm(
-        renamed_atom14_gt_positions[:, :, None, :, :] - renamed_atom14_gt_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    local_gt_pair_dists = gt_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
+    neighbor_indices = torch.unique(torch.cat((pred_neighbor, gt_neighbor)))
 
-    pred_pair_dists = torch.linalg.norm(
-        atom14_pred_positions[:, :, None, :, :] - atom14_pred_positions[:, None, :, :, :], dim=-1) # (B, N, N, 14)
-    local_pred_pair_dists = pred_pair_dists[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
+    # calculate gt distance map 
+    device = renamed_atom14_gt_exists.device
+    pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
+    i_idx = torch.tensor([i for i, j in pair_indices], device=device)
+    j_idx = torch.tensor([j for i, j in pair_indices], device=device)
+
+    atom_i = renamed_atom14_gt_positions[:, :, i_idx].unsqueeze(2)  # (B, L, 1, 105, 3)
+    atom_j = renamed_atom14_gt_positions[:, :, j_idx].unsqueeze(1)  # (B, 1, L, 105, 3)
+    gt_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
     
-    # make loss_mask with atom14_gt_exists & atom14_alt_gt_exists
-    loss_mask = (renamed_atom14_gt_exists[:, :, None, :].bool()) & (renamed_atom14_gt_exists[:, None, :, :].bool()) # (B, N, N, 14)
-    local_loss_mask = loss_mask[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 14)
+    local_gt_pair_dists = gt_distance_map[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 105)
+
+    # calculate pred distance map
+    pred_atom_i = atom14_pred_positions[:, :, i_idx].unsqueeze(2)  # (B, L, 1, 105, 3)
+    pred_atom_j = atom14_pred_positions[:, :, j_idx].unsqueeze(1)  # (B, 1, L, 105, 3)
+    pred_distance_map = torch.norm(pred_atom_i - pred_atom_j, dim=-1)  # (B, L, L, 105)
+
+    local_pred_pair_dists = pred_distance_map[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 105)
+
+    # make loss mask
+    exists_i = renamed_atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
+    exists_j = renamed_atom14_gt_exists[:, :, j_idx]  # (B, L, 105)
+
+    mask_i = exists_i.unsqueeze(2)  # (B, L, 1, 105)
+    mask_j = exists_j.unsqueeze(1)  # (B, 1, L, 105)
+    loss_mask = mask_i * mask_j # (B, L, L, 105)
+    local_loss_mask = loss_mask[:, cdr_residues][:, :, neighbor_indices] # (B, N_cdr, N, 105)
 
     # calculate loss (batch loss)
-    dist_err = (local_gt_pair_dists - local_pred_pair_dists) ** 2 * local_loss_mask
+    dist_err = (local_gt_pair_dists - local_pred_pair_dists) ** 2
+    dist_err = dist_err * local_loss_mask
     dist_mat_loss = torch.sum(
         dist_err,
         dim=(-1,-2,-3)
     )
     dist_mat_loss = dist_mat_loss / (torch.sum(local_loss_mask, dim=(-1,-2,-3)) + 1) # (B)
-    dist_mat_loss = dist_mat_loss.sqrt()
-    return dist_mat_loss
+    return dist_mat_loss, neighbor_indices, cdr_residues
 
+def b_carbon_distogram_loss(
+    pred_cb_distogram: torch.Tensor,  # (O-2, B, L, L, 64)
+    gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
+    res_mask: torch.Tensor,
+    neighbor_indices: torch.Tensor, # (N)
+    cdr_residues: torch.Tensor, # (N)
+    eps: float = 1e-10
+):
+    # 1. Ground truth distogram 계산 (one-hot 인코딩 포함)
+    gt_cb_distogram = calc_distogram(  
+        gt_pseudo_beta,
+        min_bin=2.0,
+        max_bin=22.0,
+        num_bins=64
+    ).unsqueeze(0) # (B, L, L, 64), one-hot
+
+    # 2. Cross entropy: - sum y * log p
+    loss_per_pair = -torch.sum(gt_cb_distogram * torch.log(pred_cb_distogram), dim=-1)  # (O-2, B, L, L)
+    loss_per_pair = torch.mean(loss_per_pair, dim=0) # (B, L, L)
+
+    # total loss 
+    edge_mask = res_mask[:, None] * res_mask[:, :, None] # (B, L, L)
+    masked_loss = loss_per_pair * edge_mask
+    loss = torch.sum(masked_loss, dim=(1,2)) / (torch.sum(edge_mask, dim=(1,2)) + eps)
+
+    # local loss  
+    local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
+    local_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
+    local_masked_loss = local_loss_per_pair * local_mask
+    local_loss = torch.sum(local_masked_loss, dim=(1,2)) / (torch.sum(local_mask, dim=(1,2)) + eps)
+
+    return local_loss + loss
+    
+
+def aa_contact_map_loss(
+    pred_aa_contact_map: torch.Tensor,  # (B, L, L, 14)
+    renamed_atom14_gt_positions: torch.Tensor,  # (B, L, 14, 3)
+    renamed_atom14_gt_exists: torch.Tensor, # (B, L, 14)
+    neighbor_indices: torch.Tensor, # (N)
+    cdr_residues: torch.Tensor, # (N)
+    distance_threshold: float = 10.0,
+    eps: float = 1e-10
+):
+
+    device = pred_aa_contact_map.device
+
+    # make pairwise all atom contact map 
+    pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
+    i_idx = torch.tensor([i for i, j in pair_indices], device=device)
+    j_idx = torch.tensor([j for i, j in pair_indices], device=device)
+
+    atom_i = renamed_atom14_gt_positions[:, :, i_idx]  # (B, L, 105, 3)
+    atom_j = renamed_atom14_gt_positions[:, :, j_idx]  # (B, L, 105, 3)
+
+    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
+    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
+    gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
+
+    gt_contact_map = (gt_aa_distance_map < distance_threshold).float()  # (B, L, L, 105)
+
+    # make pairwise all atom contact map mask 
+    exists_i = renamed_atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
+    exists_j = renamed_atom14_gt_exists[:, :, j_idx]  # (B, L, 105)
+
+    mask_i = exists_i.unsqueeze(2)  # (B, L, 1, 105)
+    mask_j = exists_j.unsqueeze(1)  # (B, 1, L, 105)
+
+    edge_mask = mask_i * mask_j  # (B, L, L, 105)
+
+    # calculate BCE
+    loss_per_pair = torch.nn.functional.binary_cross_entropy(
+        pred_aa_contact_map,
+        gt_contact_map,
+        reduction="none"
+    )  # (B, L, L, 105)
+
+    # calculate loss
+    masked_loss = loss_per_pair * edge_mask
+    loss = torch.sum(masked_loss, dim=(1,2,3)) / (torch.sum(edge_mask, dim=(1,2,3)) + eps)
+
+    # calculate local loss
+    local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
+    local_loss_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
+    local_masked_loss = local_loss_per_pair * local_loss_mask
+    local_loss = torch.sum(local_masked_loss, dim=(1,2,3)) / (torch.sum(local_loss_mask, dim=(1,2,3)) + eps)
+
+    # for debugging
+    num_ones = torch.sum((gt_contact_map * edge_mask)[:, cdr_residues][:, :, neighbor_indices])
+    total_elements = torch.sum(local_loss_mask) # B * L * L * 105
+    ratio_ones = num_ones / total_elements
+
+    # visualize_contact_map(gt_contact_map[0,:,:])
+    # visualize_contact_map(gt_contact_map[:, cdr_residues][:, :, neighbor_indices][0], cdr_residues, neighbor_indices)
+    print(f"Ratio of 1s in gt_contact_map: {ratio_ones:.4f}")
+    # print(f"total_elements: {total_elements:.4f}")
+    # print(f"num_ones: {num_ones:.4f}")
+    return loss + local_loss

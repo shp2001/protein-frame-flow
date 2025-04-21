@@ -160,6 +160,7 @@ class Interpolant:
             raise ValueError('NaN in rotmats_t during corruption')
         noisy_batch['rotmats_t'] = rotmats_t
         noisy_batch['pair_init'] = batch['pair_init']
+
         return noisy_batch
     
     def rot_sample_kappa(self, t):
@@ -234,7 +235,7 @@ class Interpolant:
             'res_mask': res_mask,
             'diffuse_mask': diffuse_mask,
             'res_idx': res_idx,
-            'pair_init': pair_init
+            'pair_init': pair_init,
         }
 
         motif_scaffolding = False
@@ -377,6 +378,8 @@ class Interpolant:
         pred_rotmats_1 = model_out['pred_rotmats']
         prmsd = model_out['all_atom_preds']['prmsd']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
+        contact_map = model_out['pair_outputs'][-1]
+        
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
         )
@@ -391,7 +394,7 @@ class Interpolant:
             print(f'prmsd_final_val : {torch.max(prmsd_final)}')
         else:
             prmsd_final = prmsd 
-        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, pred_trans_1, pred_rotmats_1
+        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, contact_map, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

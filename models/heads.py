@@ -21,17 +21,15 @@ class AAContactHead(nn.Module):
         super(AAContactHead, self).__init__()
 
         self.c_z = c_z
-        self.linear = ipa_pytorch.Linear(self.c_z, 14, init="final")
+        self.linear = ipa_pytorch.Linear(self.c_z, 105, init="glorot")
         self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, z, atom14_gt_exists):  
+    def forward(self, z):  
         """
         Args:
             z:
                 [*, N_res, N_res, C_z] pair embedding
-            
-            atom14_gt_exists:
-                [*, N_res, 14]
+    
         Returns:
             [*, N, N, no_bins] distogram probability distribution
         """
@@ -42,12 +40,6 @@ class AAContactHead(nn.Module):
         right_half = left_half.transpose(-2, -3)
         logits = left_half + right_half # (*, N, N, 14)
         logits = self.sigmoid(logits)
-
-        mask_i = atom14_gt_exists.unsqueeze(2)  # (*, N, 1, 14)
-        mask_j = atom14_gt_exists.unsqueeze(1)  # (*, 1, N, 14)
-        mask = mask_i * mask_j
-
-        logits = logits * mask
 
         return logits
 
@@ -69,8 +61,8 @@ class DistogramHead(nn.Module):
         self.c_z = c_z
         self.config = config 
         
-        self.linear = ipa_pytorch.Linear(self.c_z, self.config.num_bins, init="final")
-        self.softmax = nn.Softmax()
+        self.linear = ipa_pytorch.Linear(self.c_z, self.config.num_bins, init="glorot")
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, z):  
         """
@@ -89,22 +81,22 @@ class DistogramHead(nn.Module):
         left_half = self.linear(z)
         right_half = left_half.transpose(-2, -3)
         logits = left_half + right_half # (*, N, N, 14)
-        probs = self.softmax(logits, axis=-1) 
+        probs = self.softmax(logits) 
 
-        breaks = np.linspace(self.config.first_break,
-                                self.config.last_break,
-                                self.config.num_bins-1)
+        # breaks = np.linspace(self.config.first_break,
+        #                         self.config.last_break,
+        #                         self.config.num_bins-1)
         
-        bin_tops = np.append(breaks, breaks[-1] + (breaks[-1] + breaks[-2]))
-        bin_tops = torch.tensor(bin_tops)
-        threshold = 8 + 1e-3 # _CONTACT_THRESHOLD + _CONTACT_EPSILON
-        is_contact_bin = 1.0 * (bin_tops <= threshold)
+        # bin_tops = np.append(breaks, breaks[-1] + (breaks[-1] + breaks[-2]))
+        # bin_tops = torch.tensor(bin_tops)
+        # threshold = 8 + 1e-3 # _CONTACT_THRESHOLD + _CONTACT_EPSILON
+        # is_contact_bin = 1.0 * (bin_tops <= threshold)
         
-        contact_probs = torch.einsum(
-            'ijk,k->ij', probs, is_contact_bin
-        )
+        # contact_probs = torch.einsum(
+        #     'ijk,k->ij', probs, is_contact_bin
+        # )
 
-        return contact_probs
+        return probs
     
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden, use_original_sm):

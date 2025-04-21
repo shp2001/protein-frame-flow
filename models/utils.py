@@ -22,6 +22,7 @@ def compute_distance_map(coords):
     dist_map = torch.norm(coords_exp1 - coords_exp2, dim=-1, keepdim=True)  # (b, L, L, 1)
 
     return dist_map
+
 def calc_distogram(pos, min_bin, max_bin, num_bins):
     # pos: (b, L, 3)
     dists_2d = torch.linalg.norm(

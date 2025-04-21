@@ -216,7 +216,7 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, fi
         
         distance_vectors = []
         loop_indices = [i for i in range(start+1, end)]
-        for i in loop_indices:
+        for i in anchor:
             distance_vectors.append(distance_map[i])
 
         distance_vectors = torch.stack(distance_vectors)

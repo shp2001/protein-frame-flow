@@ -20,7 +20,6 @@ class FlowModel(nn.Module):
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._angle_conf = model_conf.angle
         self._distogram_conf = model_conf.distogram_head
-        self._aa_contact_conf = model_conf.aa_contact_head
         self._prmsd_conf = model_conf.prmsd
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
@@ -56,9 +55,9 @@ class FlowModel(nn.Module):
                     self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
                     if b != self._ipa_conf.num_blocks-2:
                         self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
-                                                                          self._aa_contact_conf)
+                                                                          self._distogram_conf)
                     else:
-                        self.trunk[f'aa_contact_head{b}'] = AAContactHead(self._ipa_conf.c_z)
+                        self.trunk[f'aa_contact_head_{b}'] = AAContactHead(self._ipa_conf.c_z)
                 else:
                     edge_in = self._model_conf.edge_embed_size
                     self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
@@ -108,7 +107,6 @@ class FlowModel(nn.Module):
         rotmats_t = input_feats['rotmats_t']
         pair_init = input_feats['pair_init']
         aatype = input_feats['aatype']
-        atom14_gt_exists = input_feats['atom14_gt_exists']
 
         # Initialize node and edge embeddings
         init_node_embed = self.node_feature_net(
@@ -151,7 +149,7 @@ class FlowModel(nn.Module):
         edge_embed = init_edge_embed * edge_mask[..., None]
 
         for b in range(self._ipa_conf.num_blocks):
-            contact_probs = None
+            cb_distogram = None
             all_atom_contact_map = None 
 
             ipa_embed = self.trunk[f'ipa_{b}'](
@@ -183,13 +181,13 @@ class FlowModel(nn.Module):
                     edge_embed = edge_embed * edge_mask[..., None]
 
                 if b < self._ipa_conf.num_blocks-2:
-                    contact_probs = self.trunk[f'distogram_head_{b}'](edge_embed)
+                    cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
                 
                 else:
-                    all_atom_contact_map = self.trunk[f'aa_contact_head{b}'](edge_embed, atom14_gt_exists)
+                    all_atom_contact_map = self.trunk[f'aa_contact_head_{b}'](edge_embed)
 
-            if contact_probs != None:
-                pair_outputs.append(contact_probs)
+            if cb_distogram != None:
+                pair_outputs.append(cb_distogram)
 
             if all_atom_contact_map != None:
                 pair_outputs.append(all_atom_contact_map)

@@ -119,10 +119,10 @@ class ProteinData(LightningDataModule):
                 cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
             cropped_batch['raw_path'] = feat['raw_path']
-
+            cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
             # masking scheduling 
             if mask_schedule:
-                cropped_batch['diffuse_mask'] = self.apply_probabilistic_mask(cropped_batch['diffuse_mask'], self.masking_ratio) 
+                cropped_batch['diffuse_mask'] = self.apply_probabilistic_mask(cropped_batch['diffuse_mask'], self.masking_ratio)
             return cropped_batch
         return collate_fn
     
