@@ -873,7 +873,7 @@ def local_distance_loss(
     else: # ppi dataset -> use original residues  
         anchor_residues = anchor_residues
 
-    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if diffuse_mask[i]==1]
+    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1])]
     cdr_residues = torch.tensor(cdr_residues)
 
     neighbor_mask_list = []

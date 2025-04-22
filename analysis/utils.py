@@ -141,15 +141,13 @@ def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_pat
         title (str): Title of the plot
         output_path (str): Path to save the output image (e.g., 'contact_map.png')
     """
-    # [L, L, 14] -> [L, L]로 축소: 14개 원자 쌍 중 하나라도 1이면 1로 설정
-    contact_map = contact_map[cdr_residues][:, neighbor]
-    if len(contact_map.shape) > 2:
-        contact_map_2d = contact_map[:, :, 14]  # [L, L]
+
+    contact_map_interface = contact_map[cdr_residues][:, neighbor]
 
     # 히트맵 그리기
     plt.figure(figsize=(6, 3))
     ax = sns.heatmap(
-        contact_map_2d.detach().cpu().numpy(), 
+        contact_map_interface.detach().cpu().numpy(), 
         cmap="Reds", 
         cbar=True, 
         cbar_kws={"shrink": 0.4},

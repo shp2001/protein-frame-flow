@@ -472,10 +472,13 @@ class FlowModule(LightningModule):
             batch['pseudo_beta']
         )
 
-        # calculate cb contact map 
+        # calculate cb contact map (B, N, 14, 3)
         gt_cb_distance_map = torch.linalg.norm(
-        batch['pseudo_beta'][:, :, None, :] - batch['pseudo_beta'][:, None, :, :], dim=-1) # (B, N, N)
+        batch['atom14_gt_positions'][:, :, None, 4] - batch['atom14_gt_positions'][:, None, :, 4], dim=-1) # (B, N, N)
         gt_cb_contact_map = (gt_cb_distance_map < 10)
+
+        cb_mask = batch['atom14_gt_exists'][:, :, None, 4] *  batch['atom14_gt_exists'][:, None, :, 4]
+        gt_cb_contact_map = gt_cb_contact_map * cb_mask
 
         for i in range(num_batch):
             sample_dir = os.path.join(
@@ -504,7 +507,9 @@ class FlowModule(LightningModule):
                 b_factors=b_factors
             )
             
-            au.visualize_contact_map(contact_map[i], cdr_residues, neighbor_indices,
+            print(f'contact_map: {contact_map[i].shape}')
+            print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
+            au.visualize_contact_map(contact_map[i, :, :, 50], cdr_residues, neighbor_indices,
                                      title=pdb_id.split('_')[0] + '_pred',
                                      output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
             au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
