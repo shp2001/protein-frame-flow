@@ -82,8 +82,10 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats = data_transforms.make_atom14_masks(chain_feats)
     chain_feats = data_transforms.make_atom14_positions(chain_feats)
     chain_feats = data_transforms.atom37_to_frames(chain_feats)
-    chain_feats = data_transforms.atom37_to_torsion_angles(chain_feats)
-    chain_feats = data_transforms.get_chi_angles(chain_feats)
+    chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
+                                                                chain_feats['aatype'],
+                                                                chain_feats['all_atom_positions'],
+                                                                None)
     rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
     rotmats_1 = rigids_1.get_rots().get_rot_mats()
     trans_1 = rigids_1.get_trans()
@@ -92,7 +94,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
 
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
-
 
     return {
         'res_plddt': torch.tensor(res_plddt),
@@ -104,15 +105,11 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'res_idx': res_idx,
         'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
-        'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
-        'alt_torsion_angles_sin_cos': chain_feats['alt_torsion_angles_sin_cos'],
-        'torsion_angles_mask': chain_feats['torsion_angles_mask'],
-        'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
-        'chi_mask': chain_feats['chi_mask'],
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
         'atom14_gt_positions': chain_feats['atom14_gt_positions'],
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
-        'atom37_atom_exists': chain_feats['atom37_atom_exists']
+        'atom37_atom_exists': chain_feats['atom37_atom_exists'],
+        'pseudo_beta': chain_feats['pseudo_beta'],
     }
 
 
@@ -269,9 +266,12 @@ class BaseDataset(Dataset):
             trans_1 = feats['trans_1']
             motif_1 = trans_1 * motif_mask[:, None]
             motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
-            trans_1 -= motif_com[None, :]
+            trans_1 = trans_1 - motif_com[None, :]
             feats['trans_1'] = trans_1
-            feats['atom14_gt_positions'] -= motif_com[None, :]
+            feats['atom14_gt_positions'] = feats['atom14_gt_positions'] - motif_com[None, :]
+            feats['pseudo_beta'] = feats['pseudo_beta'] - motif_com[None, :]
+
+
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
@@ -326,8 +326,10 @@ def collate_fn(batch):
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
         cropped_feat['sample_id'] = feat['sample_id']
         del cropped_feat['chain_seq_list']
+        cropped_feat['original_diffuse_mask'] = cropped_feat['diffuse_mask']
 
         cropped_batch.append(cropped_feat)
+        
 
     cropped_batch = {key: [d[key] for d in cropped_batch] for key in cropped_batch[0].keys()}   
 

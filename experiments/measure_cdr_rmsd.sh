@@ -9,5 +9,6 @@
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd.err
 
 
-echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/measure_cdr_rmsd.py --pred_dir /home/psh/protein-frame-flow/inference_outputs/fm_tri_10.0_scale_partial_mask/2025-04-18_22-49-53/epoch=145-step=165272/run_2025-04-21_19-33-30 --label_dir /home/psh/benchmark_after210930/pdb_only_ab > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
+echo "Measure CDR Metric.py"
+sleep 43200
+python -u -W ignore /home/psh/protein-frame-flow/experiments/measure_cdr_rmsd.py --pred_dir /home/psh/protein-frame-flow/inference_outputs/fm_tri_pair_loss_partial_mask/2025-04-21_20-47-54/epoch=89-step=101880_copy/run_2025-04-24_16-49-50 --label_dir /home/psh/benchmark_after210930/pdb_only_ab > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
