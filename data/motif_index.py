@@ -164,12 +164,17 @@ def get_distance_map(trans_1):
 
     return distance_map
 
-def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list=None): 
+def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, mode='ab'): 
     chain_len_list = [len(seq) for seq in seq_list]
 
-    ab_len = sum(chain_len_list[:2])
-    ag_len = sum(chain_len_list[2:])
+    if mode == 'ab':
+        ab_len = sum(chain_len_list[:2])
+        ag_len = sum(chain_len_list[2:])
     
+    else:
+        ab_len = sum(chain_len_list[:1])
+        ag_len = sum(chain_len_list[1:])
+
     residue_indices = None
 
     # ag이 max_ag_len 미만인 경우 전부 포함
@@ -178,10 +183,10 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list=None):
         ag_idx = [i for i in range(ab_len, ab_len+ag_len) if nan_mask[i]==1]
         residue_indices = ab_idx + ag_idx
 
-    # ag이 400 residue 이상인 경우 cropping   
+    # ag이 max_ag_len 이상인 경우 cropping   
     else:
         distance_map = get_distance_map(trans_1)
-        anchor_indices = find_anchor(cdr_mask)
+        anchor_indices = find_anchor(cdr_mask, only_h3=True)
         
         distance_vectors = []
         for i in anchor_indices:

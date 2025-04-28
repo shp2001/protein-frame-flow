@@ -51,26 +51,35 @@ class ProteinData(LightningDataModule):
 
         return new_mask
 
-    def create_collate_fn(self, max_len, mask_schedule):
+    def create_collate_fn(self, ab_max_len, general_max_len, mask_schedule):
         def collate_fn(batch):
             cropped_batch = []
             # masking_ratio = self.trainer.datamodule.masking_ratio if hasattr(self, 'trainer') else self.masking_ratio
             for feat in batch:
                 # crop the feats
                 cropped_feat = {}
-                if len(feat['scaffold_idx'].keys()) == 12:
+                mode = feat['mode']
+                if mode == 'ab':
                     cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=max_len,
-                                                    seq_list=feat['chain_seq_list']
+                                                    max_len=ab_max_len,
+                                                    seq_list=feat['chain_seq_list'],
+                                                    mode='ab'
                                                     )
-
-                if len(feat['scaffold_idx'].keys()) == 2:
+                if mode == 'nanobody':
+                    cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
+                                                    cdr_mask=feat['diffuse_mask'],
+                                                    nan_mask=feat['res_mask'],
+                                                    max_len=ab_max_len-100,
+                                                    seq_list=feat['chain_seq_list'],
+                                                    mode='nanobody'
+                                                    )   
+                if mode == 'general':
                     cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
                                     loop_mask=feat['diffuse_mask'],
                                     nan_mask=feat['res_mask'],
-                                    max_len=max_len,
+                                    max_len=general_max_len,
                                     masked_chain=feat['masked_chain'],
                                     first_chain_len=feat['first_chain_len'],
                                     seq_list=feat['chain_seq_list']
@@ -79,7 +88,7 @@ class ProteinData(LightningDataModule):
                 # del feat['masked_chain']
                 # del feat['first_chain_len']
 
-                not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path']
+                not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
     
                 for key in feat.keys():
                     if key not in not_crop_key:
@@ -118,6 +127,7 @@ class ProteinData(LightningDataModule):
             for key in cropped_batch.keys():                
                 cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
+            cropped_batch['mode'] = feat['mode']
             cropped_batch['raw_path'] = feat['raw_path']
             cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
             # masking scheduling 
@@ -140,7 +150,7 @@ class ProteinData(LightningDataModule):
             prefetch_factor=None if num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=True,
             persistent_workers=True if num_workers > 0 else False,
-            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=self.data_cfg.masking_scheduler.mask_schedule)
+            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=self.data_cfg.general_max_num_res, mask_schedule=self.data_cfg.masking_scheduler.mask_schedule)
         )
 
     def val_dataloader(self):
@@ -150,7 +160,7 @@ class ProteinData(LightningDataModule):
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
-            collate_fn=self.create_collate_fn(max_len=self.data_cfg.max_num_res, mask_schedule=False)
+            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=None, mask_schedule=False)
         )
 
     def predict_dataloader(self):
@@ -193,7 +203,7 @@ class LengthBatcher:
 
         # Each replica needs the same number of batches. We set the number
         # of batches to arbitrarily be the number of examples per replica.
-        self.ab_count = self._data_csv[self._data_csv['mode'] == 'ab'].groupby('cluster').ngroups
+        self.ab_count = self._data_csv[self._data_csv['mode'].isin(['ab', 'nanobody'])].groupby('cluster').ngroups
         num_batches = self.ab_count * 2
 
         self._num_batches = num_batches
@@ -207,10 +217,9 @@ class LengthBatcher:
 
         if 'cluster' in self._data_csv.keys():
             random_seed = self.seed + self.epoch
-            ab_cluster_sample = self._data_csv[self._data_csv['mode'] == 'ab'].groupby('cluster').sample(
+            ab_cluster_sample = self._data_csv[self._data_csv['mode'].isin(['ab', 'nanobody'])].groupby('cluster').sample(
                 1, random_state=random_seed
             )
-
             general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
                 self.ab_count , random_state=random_seed, replace=False
             ) 

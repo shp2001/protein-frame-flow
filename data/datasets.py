@@ -208,6 +208,12 @@ class BaseDataset(Dataset):
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
 
+        if csv_row['mode'] == 'nanobody':
+            cdr_types = ['h1', 'h2', 'h3']
+            for cdr in cdr_types:
+                scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
+                scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
 
@@ -219,16 +225,17 @@ class BaseDataset(Dataset):
         processed_row['masked_chain'] = masked_chain
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
-        
+        processed_row['mode'] = csv_row['mode']
         return processed_row
     
     def _sample_scaffold_mask(self, batch, rng):
         aatype = batch['aatype']
+        mode = batch['mode']
         num_res = aatype.shape[0]
         scaffold_idx = batch['scaffold_idx']
         scaffold_mask = torch.zeros(num_res)
 
-        if len(scaffold_idx.keys()) == 2: # general loop PPI
+        if mode == 'general': # general loop PPI
             loop_indices = []
             for scf, idx in scaffold_idx.items():
                 loop_indices.append(idx)
@@ -236,7 +243,7 @@ class BaseDataset(Dataset):
 
             scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
 
-        elif len(scaffold_idx.keys()) == 12: # antibody-antigen
+        elif mode == 'ab': # antibody-antigen
             cdr_indices = []
             for scf, idx in scaffold_idx.items():
                 cdr_indices.append(idx)
@@ -244,6 +251,14 @@ class BaseDataset(Dataset):
             for i in range(6):
                 scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
 
+        elif mode == 'nanobody': # Nanobody-antigen
+            cdr_indices = []
+            for scf, idx in scaffold_idx.items():
+                cdr_indices.append(idx)
+            cdr_indices = sorted(cdr_indices)
+            for i in range(3):
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+                
         return scaffold_mask * batch['res_mask']
     
     def setup_inpainting(self, feats, rng):

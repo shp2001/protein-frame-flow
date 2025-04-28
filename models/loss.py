@@ -868,8 +868,11 @@ def local_distance_loss(
         pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
     
     anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
+    if anchor_residues == []:
+        print(f'diffuse_mask: {diffuse_mask}')
     if len(anchor_residues) > 2: # ab dataset -> extract only_h3 
         anchor_residues = anchor_residues[4:6]
+
     else: # ppi dataset -> use original residues  
         anchor_residues = anchor_residues
 

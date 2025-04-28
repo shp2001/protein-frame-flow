@@ -124,7 +124,7 @@ class FlowModule(LightningModule):
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
         num_batch, num_res = loss_mask.shape
-
+        print(f'{noisy_batch["raw_path"]}')
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']

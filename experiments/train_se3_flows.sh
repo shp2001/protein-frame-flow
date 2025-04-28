@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_tri_pair_loss_partial_mask
+#SBATCH -J fm_tri_pair_loss_nano
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g

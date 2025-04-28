@@ -76,7 +76,15 @@ def process_file(file_path: str, write_dir: str, cfg: str):
             start, end = mi.cdr_indices(file_path, cdr_type)
             metadata[f'{cdr_type}_start'] = start
             metadata[f'{cdr_type}_end'] = end
+
+    if mode == 'nanobody':
+        cdr_types = ['h1', 'h2', 'h3']
+        for cdr_type in cdr_types:
+            start, end = mi.cdr_indices(file_path, cdr_type)
+            metadata[f'{cdr_type}_start'] = start
+            metadata[f'{cdr_type}_end'] = end
     
+
     if mode == 'general':
         loop_json_dir = cfg['shared']['loop_dir']
         json_filename = os.path.basename(file_path).replace('.pdb', '.json')

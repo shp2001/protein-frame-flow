@@ -9,8 +9,8 @@ shared:
   min_motif_percent: 1
   max_motif_percent: 1
 
-  # General Loop PPI dataset or Antibody Dataset
-  mode: ab
+  # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
+  mode: nanobody
   loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
   
   # masking scheduling 
@@ -41,10 +41,10 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/train/merged_metadata.csv
+  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano.csv
   valid_csv_path: /home/psh/data/valid/meta/metadata.csv
 
-  train_cluster_path: /home/psh/data/train/both_wantigen_70_loop_final_train.json
+  train_cluster_path: /home/psh/data/train/wantigen_70_loop_final_train.json
   valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
 
   max_cache_size: ${shared.max_cache_size}
