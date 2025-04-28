@@ -100,9 +100,13 @@ def main(args):
             print(f'start to measure {filename}')
             
             for sample in os.listdir(pred_subdir):
+                
                 predicted_filepath = os.path.join(pred_subdir, sample, 'sample_1.pdb')
                 only_ab_filepath = os.path.join(pred_subdir, sample, 'only_ab.pdb')
+                output_file = os.path.join(pred_subdir, sample, 'cdr_rmsd.json')
 
+                if os.path.exists(output_file):
+                    continue
                 a = renumber_pdb(predicted_filepath)
                 extract_first_two_chains(predicted_filepath, only_ab_filepath)
                 label_filepath = os.path.join(label_dir, filename + '.pdb')
@@ -122,7 +126,6 @@ def main(args):
                     print(f"Skipping {filename} due to renumbering issue.")
                     continue
                 
-                output_file = os.path.join(pred_subdir, sample, 'cdr_rmsd.json')
                 # 메트릭 계산 및 결과 저장
                 results = get_ab_metrics(only_ab_filepath, label_filepath, output_file)
 
