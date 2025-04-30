@@ -124,7 +124,7 @@ class FlowModule(LightningModule):
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
         num_batch, num_res = loss_mask.shape
-        print(f'{noisy_batch["raw_path"]}')
+
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
@@ -295,7 +295,8 @@ class FlowModule(LightningModule):
                 noisy_batch['diffuse_mask'][0],
                 noisy_batch['original_diffuse_mask'][0],
                 gt_pseudo_beta, # scaled 
-                scale_factor 
+                scale_factor,
+                noisy_batch['mode']
             )   # local_loss_mask: (B, N, N, 14)
         
         # calculate pair feature loss (beta carbon contact prob)
@@ -407,17 +408,17 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        print({
-            "r3_t": r3_t,
-            "trans_loss": trans_loss,
-            "bb_atom_loss": bb_atom_loss,
-            'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
-            'all_atom_clash_loss': all_atom_clash_loss,
-            'local_dist_mat_loss': local_dist_mat_loss,
-            'distogram_loss': distogram_loss,
-            'contact_map_loss': contact_map_loss
-        })
+        # print({
+        #     "r3_t": r3_t,
+        #     "trans_loss": trans_loss,
+        #     "bb_atom_loss": bb_atom_loss,
+        #     'sc_atom_loss': sc_atom_loss,
+        #     'chi_loss': chi_loss,
+        #     'all_atom_clash_loss': all_atom_clash_loss,
+        #     'local_dist_mat_loss': local_dist_mat_loss,
+        #     'distogram_loss': distogram_loss,
+        #     'contact_map_loss': contact_map_loss
+        # })
 
         return {
             "trans_loss": trans_loss,
@@ -507,8 +508,8 @@ class FlowModule(LightningModule):
                 b_factors=b_factors
             )
             
-            print(f'contact_map: {contact_map[i].shape}')
-            print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
+            # print(f'contact_map: {contact_map[i].shape}')
+            # print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
             au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
                                      title=pdb_id.split('_')[0] + '_pred',
                                      output_path=os.path.join(sample_dir, 'pred_contact_map.png'))

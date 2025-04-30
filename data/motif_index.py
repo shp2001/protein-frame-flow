@@ -204,7 +204,7 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, mode='ab'):
 
 ######################## crop_general_protein ########################
 
-def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list=None):  
+def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list):  
     first_chain_len = int(first_chain_len)
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)

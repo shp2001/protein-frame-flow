@@ -84,7 +84,6 @@ def visualize_contact_map(contact_map, cdr_residues=None, neighbor=None, title="
 
     # 이미지 저장
     plt.savefig(unique_output_path, dpi=300, bbox_inches="tight")
-    print(f"Contact map saved to: {unique_output_path}")
 
     # 플롯 닫기 (메모리 관리)
     plt.close()
@@ -852,7 +851,8 @@ def local_distance_loss(
     diffuse_mask, # (N)
     original_diffuse_mask, # (N)
     gt_pseudo_beta, # (B, N, 3)
-    scale_factor
+    scale_factor,
+    mode
     ):
     """
     In order to update interface properly, this loss will scan distance among interface atoms.
@@ -868,12 +868,15 @@ def local_distance_loss(
         pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
     
     anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
-    if anchor_residues == []:
-        print(f'diffuse_mask: {diffuse_mask}')
-    if len(anchor_residues) > 2: # ab dataset -> extract only_h3 
-        anchor_residues = anchor_residues[4:6]
 
-    else: # ppi dataset -> use original residues  
+
+    if mode not in ['ab', 'nanobody', 'general']:
+        raise ValueError('Mode should be one of [ab, nanobody, general]')
+    
+    if mode == 'nanobody' or mode == 'ab': # ab dataset -> extract only_h3 
+        anchor_residues = anchor_residues[4:6]
+        
+    if mode == 'general': # ppi dataset -> use original residues  
         anchor_residues = anchor_residues
 
     cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1])]
@@ -1025,14 +1028,4 @@ def aa_contact_map_loss(
     local_masked_loss = local_loss_per_pair * local_loss_mask
     local_loss = torch.sum(local_masked_loss, dim=(1,2,3)) / (torch.sum(local_loss_mask, dim=(1,2,3)) + eps)
 
-    # for debugging
-    num_ones = torch.sum((gt_contact_map * edge_mask)[:, cdr_residues][:, :, neighbor_indices])
-    total_elements = torch.sum(local_loss_mask) # B * L * L * 105
-    ratio_ones = num_ones / total_elements
-
-    # visualize_contact_map(gt_contact_map[0,:,:])
-    # visualize_contact_map(gt_contact_map[:, cdr_residues][:, :, neighbor_indices][0], cdr_residues, neighbor_indices)
-    print(f"Ratio of 1s in gt_contact_map: {ratio_ones:.4f}")
-    # print(f"total_elements: {total_elements:.4f}")
-    # print(f"num_ones: {num_ones:.4f}")
     return loss + local_loss

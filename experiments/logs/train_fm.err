@@ -1,12 +1,12 @@
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.19.10 is available!  To upgrade, please run:
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.19.10 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250429_001159-c3cnn5jg
+wandb: Run data is saved locally in ./wandb/run-20250429_154614-5t2qe7xo
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run fm_tri_pair_loss_nano
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/c3cnn5jg
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/5t2qe7xo
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs

@@ -9,10 +9,8 @@ from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import crop_antigen, embed_relpos, crop_general_protein
 from itertools import accumulate
-from collections import defaultdict
 import bisect
 
-from openfold.data.data_transforms import reencode_cdr_mask
 
 class ProteinData(LightningDataModule):
 
@@ -53,27 +51,31 @@ class ProteinData(LightningDataModule):
 
     def create_collate_fn(self, ab_max_len, general_max_len, mask_schedule):
         def collate_fn(batch):
+            print(batch[0]['raw_path'])
             cropped_batch = []
             # masking_ratio = self.trainer.datamodule.masking_ratio if hasattr(self, 'trainer') else self.masking_ratio
-            for feat in batch:
+            for i, feat in enumerate(batch):
                 # crop the feats
                 cropped_feat = {}
                 mode = feat['mode']
+                if mode not in ['ab', 'nanobody', 'general']:
+                    raise ValueError('Mode should be one of [ab, nanobody, general]')
+                
                 if mode == 'ab':
                     cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
                                                     max_len=ab_max_len,
                                                     seq_list=feat['chain_seq_list'],
-                                                    mode='ab'
+                                                    mode=mode
                                                     )
                 if mode == 'nanobody':
                     cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=ab_max_len-100,
+                                                    max_len=ab_max_len,
                                                     seq_list=feat['chain_seq_list'],
-                                                    mode='nanobody'
+                                                    mode=mode
                                                     )   
                 if mode == 'general':
                     cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
@@ -115,8 +117,6 @@ class ProteinData(LightningDataModule):
                 cropped_feat['csv_idx'] = feat['csv_idx']
                 cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
 
-                if len(feat['scaffold_idx'].keys()) == 12:
-                    cropped_feat['region_numeric'] = reencode_cdr_mask(cropped_feat['diffuse_mask'])
 
                 del cropped_feat['chain_seq_list']
 
@@ -124,7 +124,7 @@ class ProteinData(LightningDataModule):
 
             cropped_batch = {key: [d[key] for d in cropped_batch] for key in cropped_batch[0].keys()}   
 
-            for key in cropped_batch.keys():                
+            for key in cropped_batch.keys():     
                 cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
             cropped_batch['mode'] = feat['mode']
@@ -255,7 +255,7 @@ class LengthBatcher:
 
             batch_df = len_df
             batch_indices = batch_df['index']
-            batch_repeats = max(1, math.floor(max_batch_size / 1))  # 최소 1로 보장
+            batch_repeats = max(1, math.floor(max_batch_size))  # 최소 1로 보장
             sample_order.append([batch_indices] * batch_repeats)
 
         # Remove any length bias.
