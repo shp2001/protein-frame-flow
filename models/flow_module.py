@@ -287,14 +287,11 @@ class FlowModule(LightningModule):
 
         if training_cfg.aux_loss_use_local_dist_mat_loss:
             pred_atom_14 = pred_atom_14_list[-1]
-            local_dist_mat_loss, neighbor_indices, cdr_residues = local_distance_loss(
-                noisy_batch['aatype'],
+            local_dist_mat_loss, neighbor_indices_list, cdr_residues = local_distance_loss(
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
                 renamed_atom14_gt_positions, # scaled 
-                noisy_batch['diffuse_mask'][0],
                 noisy_batch['original_diffuse_mask'][0],
-                gt_pseudo_beta, # scaled 
                 scale_factor,
                 noisy_batch['mode']
             )   # local_loss_mask: (B, N, N, 14)
@@ -306,7 +303,7 @@ class FlowModule(LightningModule):
                 pred_cb_distogram=pred_cb_distogram, # non-scaled 
                 gt_pseudo_beta=noisy_batch['pseudo_beta'],
                 res_mask=noisy_batch['res_mask'],
-                neighbor_indices=neighbor_indices,
+                neighbor_indices_list=neighbor_indices_list,
                 cdr_residues=cdr_residues
             )
             # distogram_loss = distogram_loss * scale_factor.squeeze()
@@ -317,7 +314,7 @@ class FlowModule(LightningModule):
                 pred_aa_contact_map=pred_aa_contact_map,
                 renamed_atom14_gt_positions=renamed_dict['renamed_atom14_gt_positions'],
                 renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
-                neighbor_indices=neighbor_indices,
+                neighbor_indices_list=neighbor_indices_list,
                 cdr_residues=cdr_residues
             )
             # contact_map_loss = contact_map_loss * scale_factor.squeeze()
@@ -397,7 +394,7 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
         )
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
-        auxiliary_loss = torch.clamp(auxiliary_loss, max=15)
+        auxiliary_loss = torch.clamp(auxiliary_loss, max=18)
 
         violation_loss *= (
             (r3_t[:, 0] > training_cfg.viol_loss_t_pass)
@@ -408,17 +405,17 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
 
-        # print({
-        #     "r3_t": r3_t,
-        #     "trans_loss": trans_loss,
-        #     "bb_atom_loss": bb_atom_loss,
-        #     'sc_atom_loss': sc_atom_loss,
-        #     'chi_loss': chi_loss,
-        #     'all_atom_clash_loss': all_atom_clash_loss,
-        #     'local_dist_mat_loss': local_dist_mat_loss,
-        #     'distogram_loss': distogram_loss,
-        #     'contact_map_loss': contact_map_loss
-        # })
+        print({
+            "r3_t": r3_t,
+            "trans_loss": trans_loss,
+            "bb_atom_loss": bb_atom_loss,
+            'sc_atom_loss': sc_atom_loss,
+            'chi_loss': chi_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss,
+            'distogram_loss': distogram_loss,
+            'contact_map_loss': contact_map_loss
+        })
 
         return {
             "trans_loss": trans_loss,
@@ -438,6 +435,7 @@ class FlowModule(LightningModule):
 
     def validation_step(self, batch: Any, batch_idx: int):
         res_mask = batch['res_mask']
+        b = res_mask.shape[0]
         self.interpolant.set_device(res_mask.device)
         num_batch, num_res = res_mask.shape
         diffuse_mask = batch['diffuse_mask']
@@ -465,12 +463,14 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            batch['aatype'],
+        cdr_residues, neighbor_indices_list = au.get_cdr_and_neighbors(
             torch.tensor(pred_positions, device=batch['aatype'].device),
+            batch['atom14_gt_positions'],
+            batch['atom14_gt_exists'],
             batch['original_diffuse_mask'][0],
-            batch['diffuse_mask'][0],
-            batch['pseudo_beta']
+            batch['mode'],
+            scale_factor=torch.ones(b),
+            distance_threshold=5
         )
 
         # calculate cb contact map (B, N, 14, 3)
@@ -491,6 +491,7 @@ class FlowModule(LightningModule):
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
             b_factors = prmsd[i].cpu().numpy()
+            neighbor_indices = neighbor_indices_list[i]
             if (b_factors==0).all():
                 b_factor_alt = diffuse_mask.cpu().numpy()
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
@@ -771,12 +772,14 @@ class FlowModule(LightningModule):
         pred_positions = np.stack(pred_positions_37)
         prmsds = du.to_numpy(prmsd)
 
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            batch['aatype'],
+        cdr_residues, neighbor_indices_list = au.get_cdr_and_neighbors(
             torch.tensor(pred_positions, device=batch['aatype'].device),
+            batch['atom14_gt_positions'],
+            batch['atom14_gt_exists'],
             batch['original_diffuse_mask'][0],
-            batch['diffuse_mask'][0],
-            batch['pseudo_beta']
+            batch['mode'],
+            scale_factor=torch.ones(b),
+            distance_threshold=5
         )
 
         # calculate cb contact map (B, N, 14, 3)
@@ -792,6 +795,7 @@ class FlowModule(LightningModule):
             pred_position = pred_positions[i]
             prmsd = prmsds[i]
             bb_traj = bb_trajs[i]
+            neighbor_indices = neighbor_indices_list[i]
             os.makedirs(sample_dir, exist_ok=True)
             if 'aatype' in batch:
                 aatype = du.to_numpy(batch['aatype'].long())[0]

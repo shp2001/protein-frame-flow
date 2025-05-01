@@ -10,6 +10,8 @@ import torch
 from openfold.data.data_transforms import pseudo_beta_fn
 from data.motif_index import find_anchor
 
+from itertools import combinations_with_replacement
+
 Rigid = rigid_utils.Rigid
 
 
@@ -82,17 +84,17 @@ def write_prot_to_pdb(
         f.write('END')
     return save_path
 
-def get_cdr_and_neighbors(aatype, 
+def get_cdr_and_neighbors(
                           atom14_pred_positions,
                           atom14_gt_positions,
+                          atom14_gt_exists,
                           original_diffuse_mask, 
-                          diffuse_mask,
-                          gt_pseudo_beta,
-                          mode
+                          mode,
+                          scale_factor,
+                          distance_threshold=5
                           ):
     
     device = atom14_pred_positions.device
-
     # find anchor residues 
     anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
     if mode == 'ab' or mode == 'nanobody': # ab dataset -> extract only_h3 
@@ -100,7 +102,10 @@ def get_cdr_and_neighbors(aatype,
     else: # ppi dataset -> use original residues  
         anchor_residues = anchor_residues
 
-    # make pairwise all atom contact map 
+    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if original_diffuse_mask[i]==1]
+    cdr_residues = torch.tensor(cdr_residues)
+
+    # make pairwise all atom contact map (gt)
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
     i_idx = torch.tensor([i for i, j in pair_indices], device=device)
     j_idx = torch.tensor([j for i, j in pair_indices], device=device)
@@ -112,40 +117,39 @@ def get_cdr_and_neighbors(aatype,
     atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
     gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
 
+    # make pairwise all atom contact map (pred)
+    atom_i = atom14_pred_positions[:, :, i_idx]  # (B, L, 105, 3)
+    atom_j = atom14_pred_positions[:, :, j_idx]  # (B, L, 105, 3)
 
+    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
+    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
+    pred_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
 
+    # make pairwise all atom contact map mask 
+    exists_i = atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
+    exists_j = atom14_gt_exists[:, :, j_idx]  # (B, L, 105)
 
-    cb_distance_map = torch.linalg.norm(
-        pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
-    
+    mask_i = exists_i.unsqueeze(2)  # (B, L, 1, 105)
+    mask_j = exists_j.unsqueeze(1)  # (B, 1, L, 105)
 
+    edge_mask = mask_i * mask_j  # (B, L, L, 105)
 
-    # print(f'anchor_residues: {anchor_residues}')
-    # print(f'anchor_residues: {anchor_residues}')
-    cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if diffuse_mask[i]==1]
-    cdr_residues = torch.tensor(cdr_residues)
+    # find gt neighbors
+    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(float('inf'), device=device), gt_aa_distance_map) # (B, L, L, 105)
+    gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale_factor[0]), dim=-1)  # (N_cdr, N)
+    gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
 
-    neighbor_mask_list = []
-    for b in range(cb_distance_map.shape[0]):
-        neighbor_mask = (cb_distance_map[b, cdr_residues] < 8.0)  # (B, N_cdr, N)
+    # find pred neighbors
+    pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(float('inf'), device=device), pred_aa_distance_map) # (B, L, L, 105)
+    pred_neighbor_list = []
+    for b in range(pred_aa_distance_map.shape[0]):
+        neighbor_mask = (pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b])  # (N_cdr, N)
         pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
-        neighbor_mask_list.append(pred_neighbor_indices)
-    
-    pred_neighbor = torch.cat(neighbor_mask_list, dim=0)
+        pred_neighbor_list.append(pred_neighbor_indices)
 
-    # extract neighbor residues from gt structure and add to pred neighbors 
-    gt_cb_distance_map = torch.linalg.norm(
-        gt_pseudo_beta[:, :, None, :] - gt_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
-    
-    neighbor_mask_list = []
-    for b in range(cb_distance_map.shape[0]):
-        neighbor_mask = (gt_cb_distance_map[b, cdr_residues] < 8.0)  # (B, N_cdr, N)
-        gt_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
-        neighbor_mask_list.append(gt_neighbor_indices)
-
-    gt_neighbor = torch.cat(neighbor_mask_list)
-
-    neighbor_indices = torch.unique(torch.cat((pred_neighbor, gt_neighbor)))
+    neighbor_indices = []
+    for pred_neighbor in pred_neighbor_list:
+        neighbor_indices.append(torch.unique(torch.cat([pred_neighbor, gt_neighbor])))
 
     return cdr_residues, neighbor_indices
 
@@ -155,7 +159,7 @@ def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_pat
     and saves it to a unique file path.
     
     Args:
-        contact_map (torch.Tensor): [L, L, 14] tensor (gt_contact_map * local_loss_mask)[0]
+        contact_map (torch.Tensor): [L, L] tensor (gt_contact_map * local_loss_mask)[0]
         title (str): Title of the plot
         output_path (str): Path to save the output image (e.g., 'contact_map.png')
     """
@@ -183,7 +187,6 @@ def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_pat
 
     # 이미지 저장
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
-    print(f"Contact map saved to: {output_path}")
 
     # 플롯 닫기 (메모리 관리)
     plt.close()

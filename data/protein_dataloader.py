@@ -51,13 +51,13 @@ class ProteinData(LightningDataModule):
 
     def create_collate_fn(self, ab_max_len, general_max_len, mask_schedule):
         def collate_fn(batch):
-            print(batch[0]['raw_path'])
             cropped_batch = []
             # masking_ratio = self.trainer.datamodule.masking_ratio if hasattr(self, 'trainer') else self.masking_ratio
             for i, feat in enumerate(batch):
                 # crop the feats
                 cropped_feat = {}
                 mode = feat['mode']
+                # print(feat['raw_path'])
                 if mode not in ['ab', 'nanobody', 'general']:
                     raise ValueError('Mode should be one of [ab, nanobody, general]')
                 
