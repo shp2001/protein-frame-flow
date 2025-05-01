@@ -82,25 +82,43 @@ def write_prot_to_pdb(
         f.write('END')
     return save_path
 
-def get_cdr_and_neighbors(aatype, atom14_pred_positions,
-                          original_diffuse_mask, diffuse_mask,
+def get_cdr_and_neighbors(aatype, 
+                          atom14_pred_positions,
+                          atom14_gt_positions,
+                          original_diffuse_mask, 
+                          diffuse_mask,
                           gt_pseudo_beta,
+                          mode
                           ):
-        # extract neighbor residues from predicted structure 
-    pred_pseudo_beta = pseudo_beta_fn(
-        aatype,
-        atom14_pred_positions,
-        None
-    )
+    
+    device = atom14_pred_positions.device
+
+    # find anchor residues 
+    anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
+    if mode == 'ab' or mode == 'nanobody': # ab dataset -> extract only_h3 
+        anchor_residues = anchor_residues[4:6]
+    else: # ppi dataset -> use original residues  
+        anchor_residues = anchor_residues
+
+    # make pairwise all atom contact map 
+    pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
+    i_idx = torch.tensor([i for i, j in pair_indices], device=device)
+    j_idx = torch.tensor([j for i, j in pair_indices], device=device)
+
+    atom_i = atom14_gt_positions[:, :, i_idx]  # (B, L, 105, 3)
+    atom_j = atom14_gt_positions[:, :, j_idx]  # (B, L, 105, 3)
+
+    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
+    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
+    gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
+
+
+
 
     cb_distance_map = torch.linalg.norm(
         pred_pseudo_beta[:, :, None, :] - pred_pseudo_beta[:, None, :, :], dim=-1) # (B, N, N)
     
-    anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
-    if len(anchor_residues) > 2: # ab dataset -> extract only_h3 
-        anchor_residues = anchor_residues[4:6]
-    else: # ppi dataset -> use original residues  
-        anchor_residues = anchor_residues
+
 
     # print(f'anchor_residues: {anchor_residues}')
     # print(f'anchor_residues: {anchor_residues}')
