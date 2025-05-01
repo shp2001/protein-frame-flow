@@ -176,30 +176,35 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, mode='ab'):
         ag_len = sum(chain_len_list[1:])
 
     residue_indices = None
+    all_anchors = find_anchor(cdr_mask, only_h3=False)
+
+    ab_idx = []
+    for i in range(len(all_anchors)//2):
+        residues = [i for i in range(all_anchors[2*i]-6, all_anchors[2*i+1]+6) if nan_mask[i]==1]
+        ab_idx.extend(residues)
 
     # ag이 max_ag_len 미만인 경우 전부 포함
-    if sum(chain_len_list) <= max_len:
-        ab_idx = [i for i in range(ab_len) if nan_mask[i]==1]
+    if len(ab_idx) + ag_len <= max_len:
         ag_idx = [i for i in range(ab_len, ab_len+ag_len) if nan_mask[i]==1]
         residue_indices = ab_idx + ag_idx
 
     # ag이 max_ag_len 이상인 경우 cropping   
     else:
         distance_map = get_distance_map(trans_1)
-        anchor_indices = find_anchor(cdr_mask, only_h3=True)
+        h3_anchor = find_anchor(cdr_mask, only_h3=True)
         
         distance_vectors = []
-        for i in anchor_indices:
+        for i in h3_anchor:
             distance_vectors.append(distance_map[i])
 
         distance_vectors = torch.stack(distance_vectors)
         distance_vector, _ = torch.min(distance_vectors, dim=0)
         
         distance_ag = distance_vector[ab_len:]
-        values, indices = torch.topk(distance_ag, max_len-ab_len, largest=False)
+        values, indices = torch.topk(distance_ag, max_len-len(ab_idx), largest=False)
         indices = sorted([i + ab_len for i in indices if nan_mask[i]==1])
-        residue_indices = [i for i in range(ab_len) if nan_mask[i]==1] + indices
-
+        residue_indices = ab_idx + indices
+        
     return residue_indices
 
 ######################## crop_general_protein ########################

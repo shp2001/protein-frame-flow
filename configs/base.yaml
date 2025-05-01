@@ -23,13 +23,13 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 80
-    max_num_res_squared: 160_000
+    max_num_res_squared: 100_000
 
   # Cropping 
   ab_threshold: 40
   general_threshold: 40
-  ab_max_num_res: 450
-  general_max_num_res: 450
+  ab_max_num_res: 300
+  general_max_num_res: 300
 
 interpolant:
   min_t: 1e-2
@@ -110,7 +110,7 @@ experiment:
     aux_loss_t_pass: 0.2 
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_pair_loss_nano
+    name: fm_tri_pair_loss_nano_crop300
     project: se3-fm
   optimizer:
     warmup_steps: 0
