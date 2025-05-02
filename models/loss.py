@@ -866,6 +866,9 @@ def local_distance_loss(
         scale_factor,
         distance_threshold=5
     )
+    print("gt_distance_map.shape:", renamed_atom14_gt_positions.shape)
+    print("cdr_residues:", cdr_residues)
+    print("cdr_residues.max():", cdr_residues.max(), "cdr_residues.min():", cdr_residues.min())
 
     # calculate gt distance map
     device = renamed_atom14_gt_exists.device
@@ -894,7 +897,9 @@ def local_distance_loss(
     for b in range(atom14_pred_positions.shape[0]):
         # 배치 b의 neighbor_indices
         neighbor_indices_b = neighbor_indices_list[b]  # (N_nb_b,)
-
+        print("neighbor_indices_b:", neighbor_indices_b)
+        print("neighbor_indices_b.max():", neighbor_indices_b.max(), "neighbor_indices_b.min():", neighbor_indices_b.min())
+        print("cdr_residues.dtype:", cdr_residues.dtype, "neighbor_indices_b.dtype:", neighbor_indices_b.dtype)
         # 배치 b의 local pair distances
         local_gt_pair_dists_b = gt_distance_map[b:b+1, cdr_residues][:, :, neighbor_indices_b]  # (1, N_cdr, N_nb_b, 105)
         local_pred_pair_dists_b = pred_distance_map[b:b+1, cdr_residues][:, :, neighbor_indices_b]  # (1, N_cdr, N_nb_b, 105)

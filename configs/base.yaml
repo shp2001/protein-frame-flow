@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 8
+    num_workers: 0
     prefetch_factor: 10
 
   masking_scheduler: 

@@ -1,0 +1,443 @@
+wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.19.10 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.8
+wandb: Run data is saved locally in ./wandb/run-20250502_094658-0zmj1a0h
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run fm_tri_aa_nb_sample_x2
+wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/0zmj1a0h
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type      | Params
+------------------------------------
+0 | model | FlowModel | 9.4 M 
+------------------------------------
+9.4 M     Trainable params
+0         Non-trainable params
+9.4 M     Total params
+37.443    Total estimated model params size (MB)
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [64,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [65,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [66,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [67,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [68,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [69,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [70,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [159,0,0], thread: [71,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [15,0,0], thread: [126,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [15,0,0], thread: [127,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [155,0,0], thread: [125,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [155,0,0], thread: [126,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [155,0,0], thread: [127,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [0,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [1,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [2,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [3,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [4,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [5,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [6,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [7,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [8,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [9,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [10,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [11,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [12,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [13,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [14,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [15,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [179,0,0], thread: [16,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [89,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [90,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [91,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [92,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [93,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [94,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [75,0,0], thread: [95,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [88,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [89,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [90,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [91,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [92,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [93,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [94,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [214,0,0], thread: [95,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [52,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [53,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [54,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [55,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [56,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [57,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [58,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [59,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [60,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [61,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [62,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [135,0,0], thread: [63,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [71,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [72,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [73,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [74,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [75,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [76,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [77,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [78,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [79,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [80,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [81,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [82,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [83,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [84,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [85,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [86,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [87,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [88,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [89,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [90,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [91,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [92,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [93,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [94,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [95,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+Error executing job with overrides: []
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [96,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [97,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [98,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [99,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [100,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [101,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [102,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [103,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [104,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [105,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [106,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [107,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [108,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [109,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [110,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [111,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [112,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [113,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [114,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [115,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [116,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [117,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [118,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [119,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [120,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [121,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [122,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [123,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [124,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [125,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [126,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+../aten/src/ATen/native/cuda/IndexKernel.cu:92: operator(): block: [35,0,0], thread: [127,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
+Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
+    return function(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
+    self.fit_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
+    self.advance(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 219, in advance
+    batch_output = self.automatic_optimization.run(trainer.optimizers[0], kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 188, in run
+    self._optimizer_step(kwargs.get("batch_idx", 0), closure)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 266, in _optimizer_step
+    call._call_lightning_module_hook(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 145, in _call_lightning_module_hook
+    output = fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/module.py", line 1270, in optimizer_step
+    optimizer.step(closure=optimizer_closure)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/optimizer.py", line 161, in step
+    step_output = self._strategy.optimizer_step(self._optimizer, closure, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 257, in optimizer_step
+    optimizer_output = super().optimizer_step(optimizer, closure, model, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/strategy.py", line 231, in optimizer_step
+    return self.precision_plugin.optimizer_step(optimizer, model=model, closure=closure, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/plugins/precision/precision_plugin.py", line 116, in optimizer_step
+    return optimizer.step(closure=closure, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/optim/lr_scheduler.py", line 69, in wrapper
+    return wrapped(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/optim/optimizer.py", line 280, in wrapper
+    out = func(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/optim/optimizer.py", line 33, in _use_grad
+    ret = func(self, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/optim/adamw.py", line 148, in step
+    loss = closure()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/plugins/precision/precision_plugin.py", line 103, in _wrap_closure
+    closure_result = closure()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 142, in __call__
+    self._result = self.closure(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 128, in closure
+    step_output = self._step_fn()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 315, in _training_step
+    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 293, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 330, in training_step
+    return self.model(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1156, in forward
+    output = self._run_ddp_forward(*inputs, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1110, in _run_ddp_forward
+    return module_to_run(*inputs[0], **kwargs[0])  # type: ignore[index]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/overrides/base.py", line 90, in forward
+    output = self._forward_module.training_step(*inputs, **kwargs)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 638, in training_step
+    batch_losses = self.model_step(noisy_batch)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 290, in model_step
+    local_dist_mat_loss, neighbor_indices_list, cdr_residues = local_distance_loss(
+  File "/home/psh/protein-frame-flow/models/loss.py", line 904, in local_distance_loss
+    local_gt_pair_dists_b = gt_distance_map[b:b+1, cdr_residues][:, :, neighbor_indices_b]  # (1, N_cdr, N_nb_b, 105)
+RuntimeError: CUDA error: device-side assert triggered
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 142, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 113, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 67, in _call_and_handle_interrupt
+    trainer._teardown()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1003, in _teardown
+    self.strategy.teardown()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 430, in teardown
+    super().teardown()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/parallel.py", line 126, in teardown
+    super().teardown()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/strategy.py", line 494, in teardown
+    _optimizers_to_device(self.optimizers, torch.device("cpu"))
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/utilities/optimizer.py", line 28, in _optimizers_to_device
+    _optimizer_to_device(opt, device)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/utilities/optimizer.py", line 34, in _optimizer_to_device
+    optimizer.state[p] = apply_to_collection(v, Tensor, move_data_to_device, device, allow_frozen=True)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_utilities/core/apply_func.py", line 59, in apply_to_collection
+    v = apply_to_collection(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_utilities/core/apply_func.py", line 51, in apply_to_collection
+    return function(data, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/utilities/apply_func.py", line 101, in move_data_to_device
+    return apply_to_collection(batch, dtype=_TransferableDataType, function=batch_to)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_utilities/core/apply_func.py", line 51, in apply_to_collection
+    return function(data, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/utilities/apply_func.py", line 95, in batch_to
+    data_output = data.to(device, **kwargs)
+RuntimeError: CUDA error: device-side assert triggered
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: 
+wandb: Run history:
+wandb:                                   epoch ▁▁▁▁▁▁▁▁▁
+wandb:               train/all_atom_clash_loss ▁▂▂▇▁█▁▁▃
+wandb: train/all_atom_clash_loss t=[0.00,0.25) ▁▂▂▂▁██▁▁
+wandb: train/all_atom_clash_loss t=[0.25,0.50) ██▂▄▄▅▅▅▁
+wandb: train/all_atom_clash_loss t=[0.50,0.75) ▁▁▁▁███▁
+wandb: train/all_atom_clash_loss t=[0.75,1.00) ██▂▂▁▁▁▂▂
+wandb:                    train/auxiliary_loss █▁▆▅▁▃▆▁▆
+wandb:      train/auxiliary_loss t=[0.00,0.25) █▁▁▁▁▁▁▁▁
+wandb:      train/auxiliary_loss t=[0.25,0.50) ▅▅▆▁▁███▅
+wandb:      train/auxiliary_loss t=[0.50,0.75) ████▅▅▅▁
+wandb:      train/auxiliary_loss t=[0.75,1.00) ██▁▁▄▄▁██
+wandb:                        train/batch_size ▁▁▁▁▁█▅▁▁
+wandb:                      train/bb_atom_loss █▇▁▄▁▅▄▂▅
+wandb:        train/bb_atom_loss t=[0.00,0.25) █▇▇▇▁▄▄▂▂
+wandb:        train/bb_atom_loss t=[0.25,0.50) ▃▃▁▄▄▆▆▆█
+wandb:        train/bb_atom_loss t=[0.50,0.75) ████▆▆▆▁
+wandb:        train/bb_atom_loss t=[0.75,1.00) ▁▁▅▅██▇▆▆
+wandb:                          train/chi_loss ██▃▄▄▅▄▁▃
+wandb:            train/chi_loss t=[0.00,0.25) ████▄▆▆▁▁
+wandb:            train/chi_loss t=[0.25,0.50) ██▄▂▂▃▃▃▁
+wandb:            train/chi_loss t=[0.50,0.75) ████▇▇▇▁
+wandb:            train/chi_loss t=[0.75,1.00) ██▂▂▁▁▂▂▂
+wandb:                  train/contact_map_loss █▇▅▄▄▃▂▁▁
+wandb:    train/contact_map_loss t=[0.00,0.25) █▇▇▇▃▃▃▁▁
+wandb:    train/contact_map_loss t=[0.25,0.50) ██▆▄▄▃▃▃▁
+wandb:    train/contact_map_loss t=[0.50,0.75) ████▃▃▃▁
+wandb:    train/contact_map_loss t=[0.75,1.00) ██▄▄▃▃▁▁▁
+wandb:                     train/dist_mat_loss ▁▁▁▁▁▁▁▁▁
+wandb:       train/dist_mat_loss t=[0.00,0.25) ▁▁▁▁▁▁▁▁▁
+wandb:       train/dist_mat_loss t=[0.25,0.50) ▁▁▁▁▁▁▁▁▁
+wandb:       train/dist_mat_loss t=[0.50,0.75) ▁▁▁▁▁▁▁▁
+wandb:       train/dist_mat_loss t=[0.75,1.00) ▁▁▁▁▁▁▁▁▁
+wandb:                    train/distogram_loss █▇▂▁▇█▃▅▅
+wandb:      train/distogram_loss t=[0.00,0.25) ▇▇▇▇▅██▁▁
+wandb:      train/distogram_loss t=[0.25,0.50) ██▆▁▁▆▆▆▂
+wandb:      train/distogram_loss t=[0.50,0.75) ▁▁▁▁███▃
+wandb:      train/distogram_loss t=[0.75,1.00) ██▁▁▅▅▂▄▄
+wandb:               train/examples_per_second ▂▃▁▃▁█▂▃▃
+wandb:                            train/length █████▁███
+wandb:               train/local_dist_mat_loss █▅▄▁▂▆▄▄▅
+wandb: train/local_dist_mat_loss t=[0.00,0.25) █▅▅▅▁▄▄▃▃
+wandb: train/local_dist_mat_loss t=[0.25,0.50) ▃▃▅▁▁███▆
+wandb: train/local_dist_mat_loss t=[0.50,0.75) ▁▁▁▁███▅
+wandb: train/local_dist_mat_loss t=[0.75,1.00) ██▁▁▂▂▁▆▆
+wandb:                              train/loss █▁▆▅▁▃▆▁▆
+wandb:                        train/motif_size ▆▇██▇▁█▇▆
+wandb:                        train/plddt_loss ▁▁▁▁▁▁▁▁▁
+wandb:          train/plddt_loss t=[0.00,0.25) ▁▁▁▁▁▁▁▁▁
+wandb:          train/plddt_loss t=[0.25,0.50) ▁▁▁▁▁▁▁▁▁
+wandb:          train/plddt_loss t=[0.50,0.75) ▁▁▁▁▁▁▁▁
+wandb:          train/plddt_loss t=[0.75,1.00) ▁▁▁▁▁▁▁▁▁
+wandb:                              train/r3_t ▃▁█▅▁▃█▂▆
+wandb:                      train/rots_vf_loss ▄▇▂▆▇▄▁█▃
+wandb:        train/rots_vf_loss t=[0.00,0.25) ▂▇▇▇▆▁▁██
+wandb:        train/rots_vf_loss t=[0.25,0.50) ▁▁▇█████▆
+wandb:        train/rots_vf_loss t=[0.50,0.75) ████▃▃▃▁
+wandb:        train/rots_vf_loss t=[0.75,1.00) ▁▁▆▆▇▇▅██
+wandb:                      train/sc_atom_loss ▃▂▄▂▁▂█▁▃
+wandb:        train/sc_atom_loss t=[0.00,0.25) █▅▅▅▁▃▃▁▁
+wandb:        train/sc_atom_loss t=[0.25,0.50) ██▁▂▂▇▇▇▇
+wandb:        train/sc_atom_loss t=[0.50,0.75) ████▁▁▁▁
+wandb:        train/sc_atom_loss t=[0.75,1.00) ██▁▁▁▁▃▅▅
+wandb:               train/scaffolding_percent ▄▄▁▁▂█▁▄▄
+wandb:                       train/se3_vf_loss █▁▆▅▁▃▆▁▆
+wandb:         train/se3_vf_loss t=[0.00,0.25) █▁▁▁▁▁▁▁▁
+wandb:         train/se3_vf_loss t=[0.25,0.50) ▅▅▅▁▁███▅
+wandb:         train/se3_vf_loss t=[0.50,0.75) ████▆▆▆▁
+wandb:         train/se3_vf_loss t=[0.75,1.00) ▆▆▁▁▅▅▁██
+wandb:                             train/so3_t ▃▁█▅▁▃█▂▆
+wandb:                        train/trans_loss █▇▁▄▁▄▄▂▄
+wandb:          train/trans_loss t=[0.00,0.25) █▇▇▇▁▄▄▂▂
+wandb:          train/trans_loss t=[0.25,0.50) ▃▃▁▃▃▅▅▅█
+wandb:          train/trans_loss t=[0.50,0.75) ████▇▇▇▁
+wandb:          train/trans_loss t=[0.75,1.00) ▁▁▄▄██▇▆▆
+wandb:                     trainer/global_step ▁▂▃▄▅▅▆▇█
+wandb: 
+wandb: Run summary:
+wandb:                                   epoch 0
+wandb:               train/all_atom_clash_loss 0.00011
+wandb: train/all_atom_clash_loss t=[0.00,0.25) 7e-05
+wandb: train/all_atom_clash_loss t=[0.25,0.50) 0.0001
+wandb: train/all_atom_clash_loss t=[0.50,0.75) 0.00011
+wandb: train/all_atom_clash_loss t=[0.75,1.00) 7e-05
+wandb:                    train/auxiliary_loss 13.03157
+wandb:      train/auxiliary_loss t=[0.00,0.25) 0.0
+wandb:      train/auxiliary_loss t=[0.25,0.50) 12.97428
+wandb:      train/auxiliary_loss t=[0.50,0.75) 13.03157
+wandb:      train/auxiliary_loss t=[0.75,1.00) 18.0
+wandb:                        train/batch_size 1.0
+wandb:                      train/bb_atom_loss 1.28422
+wandb:        train/bb_atom_loss t=[0.00,0.25) 1.15142
+wandb:        train/bb_atom_loss t=[0.25,0.50) 1.36664
+wandb:        train/bb_atom_loss t=[0.50,0.75) 1.28422
+wandb:        train/bb_atom_loss t=[0.75,1.00) 1.1722
+wandb:                          train/chi_loss 0.81097
+wandb:            train/chi_loss t=[0.00,0.25) 0.70799
+wandb:            train/chi_loss t=[0.25,0.50) 0.75375
+wandb:            train/chi_loss t=[0.50,0.75) 0.81097
+wandb:            train/chi_loss t=[0.75,1.00) 0.81836
+wandb:                  train/contact_map_loss 1.1096
+wandb:    train/contact_map_loss t=[0.00,0.25) 1.1683
+wandb:    train/contact_map_loss t=[0.25,0.50) 1.04799
+wandb:    train/contact_map_loss t=[0.50,0.75) 1.1096
+wandb:    train/contact_map_loss t=[0.75,1.00) 1.17633
+wandb:                     train/dist_mat_loss 0.0
+wandb:       train/dist_mat_loss t=[0.00,0.25) 0.0
+wandb:       train/dist_mat_loss t=[0.25,0.50) 0.0
+wandb:       train/dist_mat_loss t=[0.50,0.75) 0.0
+wandb:       train/dist_mat_loss t=[0.75,1.00) 0.0
+wandb:                    train/distogram_loss 8.76176
+wandb:      train/distogram_loss t=[0.00,0.25) 8.70648
+wandb:      train/distogram_loss t=[0.25,0.50) 7.47052
+wandb:      train/distogram_loss t=[0.50,0.75) 8.76176
+wandb:      train/distogram_loss t=[0.75,1.00) 8.75375
+wandb:               train/examples_per_second 4.61183
+wandb:                            train/length 300.0
+wandb:               train/local_dist_mat_loss 1.76584
+wandb: train/local_dist_mat_loss t=[0.00,0.25) 1.47992
+wandb: train/local_dist_mat_loss t=[0.25,0.50) 1.81297
+wandb: train/local_dist_mat_loss t=[0.50,0.75) 1.76584
+wandb: train/local_dist_mat_loss t=[0.75,1.00) 3.31765
+wandb:                              train/loss 17.01663
+wandb:                        train/motif_size 241.0
+wandb:                        train/plddt_loss 0.0
+wandb:          train/plddt_loss t=[0.00,0.25) 0.0
+wandb:          train/plddt_loss t=[0.25,0.50) 0.0
+wandb:          train/plddt_loss t=[0.50,0.75) 0.0
+wandb:          train/plddt_loss t=[0.75,1.00) 0.0
+wandb:                              train/r3_t 0.66394
+wandb:                      train/rots_vf_loss 1.43808
+wandb:        train/rots_vf_loss t=[0.00,0.25) 1.6326
+wandb:        train/rots_vf_loss t=[0.25,0.50) 1.47279
+wandb:        train/rots_vf_loss t=[0.50,0.75) 1.43808
+wandb:        train/rots_vf_loss t=[0.75,1.00) 1.73437
+wandb:                      train/sc_atom_loss 0.9154
+wandb:        train/sc_atom_loss t=[0.00,0.25) 0.67783
+wandb:        train/sc_atom_loss t=[0.25,0.50) 0.83679
+wandb:        train/sc_atom_loss t=[0.50,0.75) 0.9154
+wandb:        train/sc_atom_loss t=[0.75,1.00) 1.80452
+wandb:               train/scaffolding_percent 0.19667
+wandb:                       train/se3_vf_loss 17.01663
+wandb:         train/se3_vf_loss t=[0.00,0.25) 3.59892
+wandb:         train/se3_vf_loss t=[0.25,0.50) 17.29767
+wandb:         train/se3_vf_loss t=[0.50,0.75) 17.01663
+wandb:         train/se3_vf_loss t=[0.75,1.00) 21.83513
+wandb:                             train/so3_t 0.66394
+wandb:                        train/trans_loss 2.43525
+wandb:          train/trans_loss t=[0.00,0.25) 1.96632
+wandb:          train/trans_loss t=[0.25,0.50) 2.85061
+wandb:          train/trans_loss t=[0.50,0.75) 2.43525
+wandb:          train/trans_loss t=[0.75,1.00) 2.02734
+wandb:                     trainer/global_step 8
+wandb: 
+wandb: 🚀 View run fm_tri_aa_nb_sample_x2 at: https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/0zmj1a0h
+wandb: Synced 6 W&B file(s), 1 media file(s), 3 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20250502_094658-0zmj1a0h/logs
+[W CUDAGuardImpl.h:124] Warning: CUDA warning: device-side assert triggered (function destroyEvent)
+terminate called after throwing an instance of 'c10::Error'
+  what():  CUDA error: device-side assert triggered
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+Exception raised from c10_cuda_check_implementation at ../c10/cuda/CUDAException.cpp:44 (most recent call first):
+frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x57 (0x7ff43727b4d7 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10.so)
+frame #1: c10::detail::torchCheckFail(char const*, char const*, unsigned int, std::string const&) + 0x64 (0x7ff43724536b in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10.so)
+frame #2: c10::cuda::c10_cuda_check_implementation(int, char const*, char const*, int, bool) + 0x118 (0x7ff43731ffa8 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10_cuda.so)
+frame #3: <unknown function> + 0x137bb (0x7ff4372f07bb in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10_cuda.so)
+frame #4: <unknown function> + 0x22d80 (0x7ff4372ffd80 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10_cuda.so)
+frame #5: <unknown function> + 0x4ccec6 (0x7ff4767bbec6 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+frame #6: <unknown function> + 0x3ee77 (0x7ff437260e77 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10.so)
+frame #7: c10::TensorImpl::~TensorImpl() + 0x1be (0x7ff43725969e in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10.so)
+frame #8: c10::TensorImpl::~TensorImpl() + 0x9 (0x7ff4372597b9 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libc10.so)
+frame #9: c10d::Reducer::~Reducer() + 0x254 (0x7ff4627fcfc4 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_cpu.so)
+frame #10: std::_Sp_counted_ptr<c10d::Reducer*, (__gnu_cxx::_Lock_policy)2>::_M_dispose() + 0x12 (0x7ff476e313c2 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+frame #11: std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release() + 0x48 (0x7ff476699f98 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+frame #12: <unknown function> + 0xb449c1 (0x7ff476e339c1 in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+frame #13: <unknown function> + 0x3b4bab (0x7ff4766a3bab in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+frame #14: <unknown function> + 0x3b5b1f (0x7ff4766a4b1f in /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/lib/libtorch_python.so)
+<omitting python frames>
+frame #63: __libc_start_main + 0xe5 (0x7ff4bd4207e5 in /lib64/libc.so.6)
+
+/var/spool/slurmd/job784067/slurm_script: line 13: 4014940 Aborted                 (core dumped) python -u -W ignore /home/psh/protein-frame-flow/experiments/train_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/fm_tri_aanb_2.log

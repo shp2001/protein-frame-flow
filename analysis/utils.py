@@ -103,7 +103,7 @@ def get_cdr_and_neighbors(
         anchor_residues = anchor_residues
 
     cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if original_diffuse_mask[i]==1]
-    cdr_residues = torch.tensor(cdr_residues)
+    cdr_residues = torch.tensor(cdr_residues, device=device)
 
     # make pairwise all atom contact map (gt)
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
@@ -135,12 +135,12 @@ def get_cdr_and_neighbors(
     edge_mask = mask_i * mask_j  # (B, L, L, 105)
 
     # find gt neighbors
-    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(float('inf'), device=device), gt_aa_distance_map) # (B, L, L, 105)
+    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), gt_aa_distance_map) # (B, L, L, 105)
     gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale_factor[0]), dim=-1)  # (N_cdr, N)
     gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
 
     # find pred neighbors
-    pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(float('inf'), device=device), pred_aa_distance_map) # (B, L, L, 105)
+    pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), pred_aa_distance_map) # (B, L, L, 105)
     pred_neighbor_list = []
     for b in range(pred_aa_distance_map.shape[0]):
         neighbor_mask = (pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b])  # (N_cdr, N)
