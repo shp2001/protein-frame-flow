@@ -1,0 +1,21 @@
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
+
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type      | Params
+------------------------------------
+0 | model | FlowModel | 9.4 M 
+------------------------------------
+9.4 M     Trainable params
+0         Non-trainable params
+9.4 M     Total params
+37.443    Total estimated model params size (MB)
+slurmstepd-gpu01: error: *** JOB 784117 ON gpu01 CANCELLED AT 2025-05-02T14:43:22 ***

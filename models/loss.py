@@ -866,7 +866,10 @@ def local_distance_loss(
         scale_factor,
         distance_threshold=5
     )
-    print("gt_distance_map.shape:", renamed_atom14_gt_positions.shape)
+    print("atom14_pred_positions.shape", atom14_pred_positions.shape)
+    print("original_diffuse_mask.shape", original_diffuse_mask.shape)
+    print("renamed_atom14_gt_positions.shape:", renamed_atom14_gt_positions.shape)
+    print("renamed_atom14_gt_exists.shape:", renamed_atom14_gt_exists.shape)
     print("cdr_residues:", cdr_residues)
     print("cdr_residues.max():", cdr_residues.max(), "cdr_residues.min():", cdr_residues.min())
 

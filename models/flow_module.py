@@ -187,7 +187,6 @@ class FlowModule(LightningModule):
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
 
-        alt_naming_is_better = renamed_dict['alt_naming_is_better'].clone()
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
