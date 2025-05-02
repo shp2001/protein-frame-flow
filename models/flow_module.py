@@ -124,7 +124,7 @@ class FlowModule(LightningModule):
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
         num_batch, num_res = loss_mask.shape
-        print(noisy_batch['raw_path'])
+
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
@@ -187,6 +187,7 @@ class FlowModule(LightningModule):
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
 
+        alt_naming_is_better = renamed_dict['alt_naming_is_better'].clone()
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
@@ -286,7 +287,7 @@ class FlowModule(LightningModule):
 
         if training_cfg.aux_loss_use_local_dist_mat_loss:
             pred_atom_14 = pred_atom_14_list[-1]
-            local_dist_mat_loss, neighbor_indices_list, cdr_residues = local_distance_loss(
+            local_dist_mat_loss, neighbor_indices, cdr_residues = local_distance_loss(
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
                 renamed_atom14_gt_positions, # scaled 
@@ -302,7 +303,7 @@ class FlowModule(LightningModule):
                 pred_cb_distogram=pred_cb_distogram, # non-scaled 
                 gt_pseudo_beta=noisy_batch['pseudo_beta'],
                 res_mask=noisy_batch['res_mask'],
-                neighbor_indices_list=neighbor_indices_list,
+                neighbor_indices=neighbor_indices,
                 cdr_residues=cdr_residues
             )
             # distogram_loss = distogram_loss * scale_factor.squeeze()
@@ -313,7 +314,7 @@ class FlowModule(LightningModule):
                 pred_aa_contact_map=pred_aa_contact_map,
                 renamed_atom14_gt_positions=renamed_dict['renamed_atom14_gt_positions'],
                 renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
-                neighbor_indices_list=neighbor_indices_list,
+                neighbor_indices=neighbor_indices,
                 cdr_residues=cdr_residues
             )
             # contact_map_loss = contact_map_loss * scale_factor.squeeze()
@@ -462,7 +463,7 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        cdr_residues, neighbor_indices_list = au.get_cdr_and_neighbors(
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             torch.tensor(pred_positions, device=batch['aatype'].device),
             batch['atom14_gt_positions'],
             batch['atom14_gt_exists'],
@@ -490,7 +491,6 @@ class FlowModule(LightningModule):
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
             b_factors = prmsd[i].cpu().numpy()
-            neighbor_indices = neighbor_indices_list[i]
             if (b_factors==0).all():
                 b_factor_alt = diffuse_mask.cpu().numpy()
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
@@ -771,7 +771,7 @@ class FlowModule(LightningModule):
         pred_positions = np.stack(pred_positions_37)
         prmsds = du.to_numpy(prmsd)
 
-        cdr_residues, neighbor_indices_list = au.get_cdr_and_neighbors(
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             torch.tensor(pred_positions, device=batch['aatype'].device),
             batch['atom14_gt_positions'],
             batch['atom14_gt_exists'],
@@ -794,7 +794,7 @@ class FlowModule(LightningModule):
             pred_position = pred_positions[i]
             prmsd = prmsds[i]
             bb_traj = bb_trajs[i]
-            neighbor_indices = neighbor_indices_list[i]
+
             os.makedirs(sample_dir, exist_ok=True)
             if 'aatype' in batch:
                 aatype = du.to_numpy(batch['aatype'].long())[0]

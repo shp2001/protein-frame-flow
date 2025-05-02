@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 0
+    num_workers: 6
     prefetch_factor: 10
 
   masking_scheduler: 
@@ -22,8 +22,8 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 80
-    max_num_res_squared: 120_000
+    max_batch_size: 1
+    max_num_res_squared: 0
 
   # Cropping 
   ab_threshold: 40

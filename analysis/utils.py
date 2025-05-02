@@ -137,22 +137,20 @@ def get_cdr_and_neighbors(
     # find gt neighbors
     gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), gt_aa_distance_map) # (B, L, L, 105)
     gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale_factor[0]), dim=-1)  # (N_cdr, N)
-    gt_neighbor = torch.unique(torch.nonzero(gt_neighbor_mask)[:, -1])  # (N_nb,)
-    print(f'gt_neighbor: {gt_neighbor}')
+    gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
 
     # find pred neighbors
     pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), pred_aa_distance_map) # (B, L, L, 105)
-    print(f'pred_aa_distance_map: {pred_aa_distance_map.shape}')
     pred_neighbor_list = []
     for b in range(pred_aa_distance_map.shape[0]):
         neighbor_mask = torch.any((pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b]), dim=-1)  # (N_cdr, N)
         pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
-        pred_neighbor_list.append(torch.unique(pred_neighbor_indices))
-        print(f"pred_neighbor_indices_{b}: {torch.unique(pred_neighbor_indices)}")
+        pred_neighbor_list.append(pred_neighbor_indices)
+    
+    pred_neighbor = torch.cat(pred_neighbor_list)
 
-    neighbor_indices = []
-    for pred_neighbor in pred_neighbor_list:
-        neighbor_indices.append(torch.unique(torch.cat([pred_neighbor, gt_neighbor])))
+
+    neighbor_indices = torch.unique(torch.cat([pred_neighbor, gt_neighbor]))
         
     return cdr_residues, neighbor_indices
 
