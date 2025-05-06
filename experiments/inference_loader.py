@@ -290,11 +290,11 @@ def collate_fn(batch):
         cropped_feat = {}
 
         cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
-                                                    cdr_mask=feat['diffuse_mask'],
-                                                    nan_mask=feat['res_mask'],
-                                                    max_len=450,
-                                                    seq_list=feat['chain_seq_list'],
-                                                    )
+                                                cdr_mask=feat['diffuse_mask'],
+                                                nan_mask=feat['res_mask'],
+                                                max_len=300,
+                                                seq_list=feat['chain_seq_list'],
+                                                )
         # del feat['masked_chain']
         # del feat['first_chain_len']
 
@@ -325,8 +325,8 @@ def collate_fn(batch):
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
         cropped_feat['sample_id'] = feat['sample_id']
+        
         del cropped_feat['chain_seq_list']
-        cropped_feat['original_diffuse_mask'] = cropped_feat['diffuse_mask']
 
         cropped_batch.append(cropped_feat)
         
@@ -337,4 +337,11 @@ def collate_fn(batch):
         cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
     cropped_batch['raw_path'] = feat['raw_path']
+    cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
+    cropped_batch['original_residx_atom37_to_atom14'] = feat['residx_atom37_to_atom14']
+    cropped_batch['original_atom37_atom_exists'] = feat['atom37_atom_exists']
+    cropped_batch['original_aatype'] = feat['aatype']
+    cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
+    cropped_batch['original_aatype'] = feat['aatype']
+    cropped_batch['original_chain_idx'] = feat['chain_idx']
     return cropped_batch

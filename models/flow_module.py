@@ -763,63 +763,64 @@ class FlowModule(LightningModule):
         )
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         pred_positions_37 = []
-        pred_positions = du.to_numpy(pred_positions)
+
+        pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
+        gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
+
         for i in range(pred_positions.shape[0]):
-            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch)
-            pred_positions_37.append(pred_position_37)
-        
+            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
+            gt_batch = {
+                'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
+                'atom37_atom_exists': batch['original_atom37_atom_exists']
+            }
+            gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
+            gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
+            pred_positions_37.append(gt_position_37)
+
+            
         pred_positions = np.stack(pred_positions_37)
         prmsds = du.to_numpy(prmsd)
 
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            torch.tensor(pred_positions, device=batch['aatype'].device),
-            batch['atom14_gt_positions'],
-            batch['atom14_gt_exists'],
-            batch['original_diffuse_mask'][0],
-            batch['mode'],
-            scale_factor=torch.ones(b),
-            distance_threshold=5
-        )
+        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+        #     batch['aatype'],
+        #     torch.tensor(pred_positions, device=batch['aatype'].device),
+        #     batch['original_diffuse_mask'][0],
+        #     batch['diffuse_mask'][0],
+        #     batch['pseudo_beta']
+        # )
 
-        # calculate cb contact map (B, N, 14, 3)
-        gt_cb_distance_map = torch.linalg.norm(
-        batch['atom14_gt_positions'][:, :, None, 4] - batch['atom14_gt_positions'][:, None, :, 4], dim=-1) # (B, N, N)
-        gt_cb_contact_map = (gt_cb_distance_map < 10)
+        # # calculate cb contact map (B, N, 14, 3)
+        # gt_cb_distance_map = torch.linalg.norm(
+        # batch['atom14_gt_positions'][:, :, None, 4] - batch['atom14_gt_positions'][:, None, :, 4], dim=-1) # (B, N, N)
+        # gt_cb_contact_map = (gt_cb_distance_map < 10)
 
-        cb_mask = batch['atom14_gt_exists'][:, :, None, 4] * batch['atom14_gt_exists'][:, None, :, 4]
-        gt_cb_contact_map = gt_cb_contact_map * cb_mask
+        # cb_mask = batch['atom14_gt_exists'][:, :, None, 4] * batch['atom14_gt_exists'][:, None, :, 4]
+        # gt_cb_contact_map = gt_cb_contact_map * cb_mask
 
         for i in range(num_batch):
             sample_dir = sample_dirs[i]
             pred_position = pred_positions[i]
             prmsd = prmsds[i]
             bb_traj = bb_trajs[i]
-
             os.makedirs(sample_dir, exist_ok=True)
-            if 'aatype' in batch:
-                aatype = du.to_numpy(batch['aatype'].long())[0]
-            else:
-                aatype = np.zeros(sample_length, dtype=int)
+            aatype = du.to_numpy(batch['original_aatype'].long())
+            chain_idx = du.to_numpy(batch['original_chain_idx'].long())
 
-            if 'chain_idx' in batch:
-                chain_idx = du.to_numpy(batch['chain_idx'].long())[0]
-            else:
-                chain_idx = None
             _ = eu.save_traj(
-                sample=pred_position,
-                bb_prot_traj=bb_traj,
+                sample=pred_position, # (L, 37, 3)
+                bb_prot_traj=bb_traj, 
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                b_factors=prmsd,
-                diffuse_mask=diffuse_mask[i].cpu().numpy(),
+                b_factors=None,  # 위의 prmsd 집어넣기 
+                diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
-                save_traj_bool=self._interpolant_cfg.save_traj
+                save_traj_bool=False
             )
 
-            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_pred',
-                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_gt',
-                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_pred',
+            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_gt',
+            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))

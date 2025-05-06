@@ -2,11 +2,11 @@ wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use 
 wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.19.10 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250502_152240-3ic7ppec
+wandb: Run data is saved locally in ./wandb/run-20250505_012456-tgvi4c0k
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run fm_tri_aa_nb_sample_x2
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/3ic7ppec
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/tgvi4c0k
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -17,6 +17,7 @@ distributed_backend=nccl
 All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
+Restoring states from the checkpoint path at /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2/2025-05-02_15-00-55/last.ckpt
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
@@ -27,4 +28,4 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 0         Non-trainable params
 9.4 M     Total params
 37.443    Total estimated model params size (MB)
-slurmstepd-gpu03: error: *** JOB 784129 ON gpu03 CANCELLED AT 2025-05-02T15:33:08 ***
+Restored all states from the checkpoint at /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2/2025-05-02_15-00-55/last.ckpt
