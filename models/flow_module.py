@@ -439,7 +439,6 @@ class FlowModule(LightningModule):
         self.interpolant.set_device(res_mask.device)
         num_batch, num_res = res_mask.shape
         diffuse_mask = batch['diffuse_mask']
-        csv_idx = batch['csv_idx']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
         atom37_traj, clean_atom37_traj, pred_positions, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
@@ -463,15 +462,15 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            torch.tensor(pred_positions, device=batch['aatype'].device),
-            batch['atom14_gt_positions'],
-            batch['atom14_gt_exists'],
-            batch['original_diffuse_mask'][0],
-            batch['mode'],
-            scale_factor=torch.ones(b),
-            distance_threshold=5
-        )
+        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+        #     torch.tensor(pred_positions, device=batch['aatype'].device),
+        #     batch['atom14_gt_positions'],
+        #     batch['atom14_gt_exists'],
+        #     batch['original_diffuse_mask'][0],
+        #     batch['mode'],
+        #     scale_factor=torch.ones(b),
+        #     distance_threshold=5
+        # )
 
         # calculate cb contact map (B, N, 14, 3)
         gt_cb_distance_map = torch.linalg.norm(
@@ -510,12 +509,12 @@ class FlowModule(LightningModule):
             
             # print(f'contact_map: {contact_map[i].shape}')
             # print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
-            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_pred',
-                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_gt',
-                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_pred',
+            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_gt',
+            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
 
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(

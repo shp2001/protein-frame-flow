@@ -294,6 +294,7 @@ def collate_fn(batch):
                                                 nan_mask=feat['res_mask'],
                                                 max_len=300,
                                                 seq_list=feat['chain_seq_list'],
+                                                crop_ab=True
                                                 )
         # del feat['masked_chain']
         # del feat['first_chain_len']

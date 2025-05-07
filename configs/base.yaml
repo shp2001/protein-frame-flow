@@ -26,10 +26,11 @@ data:
     max_num_res_squared: 0
 
   # Cropping 
+  crop_ab: False
   ab_threshold: 40
   general_threshold: 40
-  ab_max_num_res: 300
-  general_max_num_res: 300
+  ab_max_num_res: 450 
+  general_max_num_res: 450
 
 interpolant:
   min_t: 1e-2
@@ -68,7 +69,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2/2025-05-02_15-00-55/last.ckpt
+  warm_start: null
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -110,7 +111,7 @@ experiment:
     aux_loss_t_pass: 0.2 
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_aa_nb_sample_x2
+    name: fm_tri_aa_nb_sample_x2_crop450
     project: se3-fm
   optimizer:
     warmup_steps: 0

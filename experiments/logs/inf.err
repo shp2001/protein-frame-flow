@@ -1,18 +1,11 @@
-Error executing job with overrides: []
-Traceback (most recent call last):
-  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 108, in run
-    sampler = EvalRunner(cfg)
-  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 56, in __init__
-    self._flow_module = FlowModule.load_from_checkpoint(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/module.py", line 1537, in load_from_checkpoint
-    loaded = _load_from_checkpoint(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/saving.py", line 91, in _load_from_checkpoint
-    model = _load_state(cls, checkpoint, strict=strict, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/saving.py", line 157, in _load_state
-    keys = obj.load_state_dict(checkpoint["state_dict"], strict=strict)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2041, in load_state_dict
-    raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
-RuntimeError: Error(s) in loading state_dict for FlowModule:
-	Missing key(s) in state_dict: "model.trunk.distogram_head_0.linear.weight", "model.trunk.distogram_head_0.linear.bias", "model.trunk.distogram_head_1.linear.weight", "model.trunk.distogram_head_1.linear.bias", "model.trunk.aa_contact_head_2.linear.weight", "model.trunk.aa_contact_head_2.linear.bias". 
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 1 processes
+----------------------------------------------------------------------------------------------------
 
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]

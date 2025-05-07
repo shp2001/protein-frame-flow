@@ -49,7 +49,7 @@ class ProteinData(LightningDataModule):
 
         return new_mask
 
-    def create_collate_fn(self, ab_max_len, general_max_len, mask_schedule):
+    def create_collate_fn(self, ab_max_len, general_max_len, mask_schedule, crop_ab):
         def collate_fn(batch):
             cropped_batch = []
             # masking_ratio = self.trainer.datamodule.masking_ratio if hasattr(self, 'trainer') else self.masking_ratio
@@ -67,6 +67,7 @@ class ProteinData(LightningDataModule):
                                                     nan_mask=feat['res_mask'],
                                                     max_len=ab_max_len,
                                                     seq_list=feat['chain_seq_list'],
+                                                    crop_ab=crop_ab,
                                                     mode=mode
                                                     )
                 if mode == 'nanobody':
@@ -75,6 +76,7 @@ class ProteinData(LightningDataModule):
                                                     nan_mask=feat['res_mask'],
                                                     max_len=ab_max_len,
                                                     seq_list=feat['chain_seq_list'],
+                                                    crop_ab=crop_ab,
                                                     mode=mode
                                                     )   
                 if mode == 'general':
@@ -150,7 +152,9 @@ class ProteinData(LightningDataModule):
             prefetch_factor=None if num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=False,
             persistent_workers=True if num_workers > 0 else False,
-            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=self.data_cfg.general_max_num_res, mask_schedule=self.data_cfg.masking_scheduler.mask_schedule)
+            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=self.data_cfg.general_max_num_res, 
+                                              mask_schedule=self.data_cfg.masking_scheduler.mask_schedule,
+                                              crop_ab=self.data_cfg.crop_ab)
         )
 
     def val_dataloader(self):
@@ -160,7 +164,8 @@ class ProteinData(LightningDataModule):
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
-            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=None, mask_schedule=False)
+            collate_fn=self.create_collate_fn(ab_max_len=self.data_cfg.ab_max_num_res, general_max_len=None, mask_schedule=False,
+                                              crop_ab=self.data_cfg.crop_ab)
         )
 
     def predict_dataloader(self):

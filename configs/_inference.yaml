@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_10.0_scale/2025-04-09_19-20-07/epoch=139-step=158480.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2/2025-05-05_01-24-51/epoch=165-step=238874.ckpt
 
   use_gpu: True
   num_gpus: 2
@@ -75,7 +75,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/data/valid/meta/metadata_short.csv
+    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
     samples_per_target: 100
