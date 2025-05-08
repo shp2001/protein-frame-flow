@@ -173,6 +173,7 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
     chain_index = prot.chain_index.squeeze().astype(int)
 
   b_factors = prot.b_factors
+  print(f'b_factors: {b_factors.shape}')
   if np.any(aatype > residue_constants.restype_num):
     raise ValueError('Invalid aatypes.')
 

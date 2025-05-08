@@ -16,7 +16,7 @@ import json
 from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 
-from data.motif_index import load_loop_file
+from data.motif_index import load_loop_file, crop_antigen, crop_general_protein
 
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
@@ -92,12 +92,9 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
-
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
-        # 'rotmats_1': rotmats_1,
-        # 'trans_1': trans_1,
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'res_idx': res_idx,
@@ -109,7 +106,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chi_angles_sin_cos': chain_feats['chi_angles_sin_cos'],
         'chi_mask': chain_feats['chi_mask'],
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
-        'atom14_gt_positions': chain_feats['atom14_gt_positions'],
+        'atom14_gt_positions': chain_feats['atom14_gt_positions'], # (L, 14, 3)
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
         'residx_atom14_to_atom37': chain_feats['residx_atom14_to_atom37'],
         'atom37_atom_exists': chain_feats['atom37_atom_exists'],
@@ -153,6 +150,7 @@ class BaseDataset(Dataset):
         self._is_training = is_training
         self._dataset_cfg = dataset_cfg
         self.task = task
+        self.current_epoch = None
 
         if is_training:
             self.raw_csv = pd.read_csv(self.dataset_cfg.train_csv_path)
@@ -180,6 +178,9 @@ class BaseDataset(Dataset):
     def _filter_metadata(self, raw_csv: pd.DataFrame) -> pd.DataFrame:
         pass
 
+    def set_current_epoch(self, epoch):
+        self.current_epoch = epoch
+
     def _create_split(self, data_csv):
         # Training or validation specific logic.
         if self.is_training:
@@ -192,7 +193,7 @@ class BaseDataset(Dataset):
                 f'Validation: {len(self.csv)} examples')
         self.csv['index'] = list(range(len(self.csv)))
 
-    def process_csv_row(self, csv_row):
+    def process_csv_row(self, csv_row, idx):
         path = csv_row['processed_path']
         raw_path = csv_row['raw_path']
         seq_len = csv_row['seq_len']
@@ -216,8 +217,7 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
-
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=self.current_epoch + idx)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
         
@@ -273,7 +273,7 @@ class BaseDataset(Dataset):
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row = self.csv.iloc[row_idx]
-        chain_feats = self.process_csv_row(csv_row)
+        chain_feats = self.process_csv_row(csv_row, row_idx)
         feats = chain_feats.copy()
         if self._dataset_cfg.add_plddt_mask:
             _add_plddt_mask(feats, self._dataset_cfg.min_plddt_threshold)
@@ -306,12 +306,48 @@ class BaseDataset(Dataset):
             feats['atom14_alt_gt_positions'] = feats['atom14_alt_gt_positions'] - motif_com[None, None, :] 
             feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] = feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
 
+            # create res_idx for cropping 
+            mode = feats['mode']
+            
+            if mode not in ['ab', 'nanobody', 'general']:
+                raise ValueError('Mode should be one of [ab, nanobody, general]')
+
+            if mode == 'ab':
+                feats['res_idx'] = crop_antigen(feats['trans_1'],
+                                                cdr_mask=feats['diffuse_mask'],
+                                                nan_mask=feats['res_mask'],
+                                                max_len=self.dataset_cfg.ab_max_num_res,
+                                                seq_list=feats['chain_seq_list'],
+                                                crop_ab=self.dataset_cfg.crop_ab,
+                                                mode=mode
+                                                )
+            if mode == 'nanobody':
+                feats['res_idx'] = crop_antigen(feats['trans_1'],
+                                                cdr_mask=feats['diffuse_mask'],
+                                                nan_mask=feats['res_mask'],
+                                                max_len=self.dataset_cfg.ab_max_num_res,
+                                                seq_list=feats['chain_seq_list'],
+                                                crop_ab=self.dataset_cfg.crop_ab,
+                                                mode=mode
+                                                )   
+            if mode == 'general':
+                feats['res_idx'] = crop_general_protein(feats['trans_1'],
+                                loop_mask=feats['diffuse_mask'],
+                                nan_mask=feats['res_mask'],
+                                max_len=self.dataset_cfg.general_max_num_res,
+                                masked_chain=feats['masked_chain'],
+                                first_chain_len=feats['first_chain_len'],
+                                seq_list=feats['chain_seq_list']
+                                )
+
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['diffuse_mask'] = feats['diffuse_mask'].int()
         
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
+
+        print(f"{feats['raw_path']}: {len(feats['res_idx'])}")
         return feats
 
 
@@ -342,7 +378,7 @@ class PdbDataset(BaseDataset):
         self._dataset_cfg = dataset_cfg
         self.task = task
         self._rng = np.random.default_rng(seed=self._dataset_cfg.seed)
-
+        self.current_epoch = 0
         # Process clusters
         if is_training:
             self.raw_csv = pd.read_csv(self.dataset_cfg.train_csv_path)
@@ -369,6 +405,9 @@ class PdbDataset(BaseDataset):
         self._all_clusters = dict(
             enumerate(self.csv['cluster'].unique().tolist()))
         self._num_clusters = len(self._all_clusters)
+
+    def set_current_epoch(self, epoch):
+        self.current_epoch = epoch
 
     def _filter_metadata(self, raw_csv):
         """Filter metadata."""

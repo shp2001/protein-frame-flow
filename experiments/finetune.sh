@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH -J fm_tri_plddt_ft
+#SBATCH -J fm_tri_rollout
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
 #SBATCH -c 12
-#SBATCH -w gpu01
+#SBATCH -w gpu05
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
 

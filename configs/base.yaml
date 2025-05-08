@@ -22,16 +22,11 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 1
-    max_num_res_squared: 0
-
-  # Cropping 
-  crop_ab: False
-  ab_threshold: 40
-  general_threshold: 40
-  ab_max_num_res: 450 
-  general_max_num_res: 450
-
+    max_batch_size: 80
+    max_num_res_squared: 185_000
+    ab_max_num_res: ${pdb_dataset.ab_max_num_res}
+    general_max_num_res: ${pdb_dataset.general_max_num_res}
+    
 interpolant:
   min_t: 1e-2
 
@@ -63,7 +58,41 @@ interpolant:
   self_condition: ${model.edge_features.self_condition}
   save_traj: True 
   scaling_nm_ang: ${model.scaling_nm_ang}
+  use_prmsd: ${model.prmsd.use_prmsd}
 
+mini_rollout:
+  min_t: 1e-2
+
+  twisting:
+    use: False
+
+  rots:
+    corrupt: True
+    sample_schedule: exp
+    exp_rate: 10
+
+  trans:
+    corrupt: True
+    batch_ot: True
+    sample_schedule: linear
+    sample_temp: 1.0
+    vpsde_bmin: 0.1
+    vpsde_bmax: 20.0
+    potential: null
+    potential_t_scaling: False
+    rog:
+      weight: 10.0
+      cutoff: 5.0
+
+  sampling:
+    num_timesteps: 10
+    do_sde: False
+
+  use_prmsd: ${model.prmsd.use_prmsd}
+  self_condition: ${model.edge_features.self_condition}
+  save_traj: True 
+  scaling_nm_ang: ${model.scaling_nm_ang}
+  
 experiment:
   add_modules: False
   debug: False
@@ -111,7 +140,7 @@ experiment:
     aux_loss_t_pass: 0.2 
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_aa_nb_sample_x2_crop450
+    name: fm_tri_aa_nb_sample_x2_diff_crop
     project: se3-fm
   optimizer:
     warmup_steps: 0

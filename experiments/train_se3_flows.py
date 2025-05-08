@@ -22,7 +22,9 @@ class MaskingRatioCallback(Callback):
     # @rank_zero_only
     def on_train_epoch_start(self, trainer, pl_module):
         datamodule = trainer.datamodule
-        datamodule.current_epoch = trainer.current_epoch
+        datamodule._train_dataset.set_current_epoch(trainer.current_epoch)
+        datamodule._train_dataset.current_epoch = trainer.current_epoch
+        datamodule.set_current_epoch(trainer.current_epoch)
         datamodule.masking_ratio = min(
             1.0, 
             datamodule.data_cfg.masking_scheduler.init_rate + 

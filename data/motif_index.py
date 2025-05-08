@@ -99,7 +99,7 @@ def get_cdr_range_dict(chothia_pdb_file, heavy_only=False, light_only=False, off
 
     return cdr_range_dict
 
-def load_loop_file(loop_file):
+def load_loop_file(loop_file, seed):
     """Gets the index of a given CDR loop"""
 
     with open(loop_file, 'r') as file:
@@ -109,6 +109,7 @@ def load_loop_file(loop_file):
     masked_chain = contact_idx_dict['masked_chain']
     first_chain_length = contact_idx_dict['chain_A_len']
 
+    random.seed(seed)
     loop_indices = random.choice(loop_indices) # [start, end]
 
     return int(loop_indices[0]), int(loop_indices[1]), masked_chain, first_chain_length
@@ -214,13 +215,11 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, mode='
 ######################## crop_general_protein ########################
 
 def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list):  
-    first_chain_len = int(first_chain_len)
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)
-
     residue_indices = None
     
-    if len([i for i in range(L) if nan_mask[i]==1]) <= max_len:
+    if torch.sum(nan_mask) <= max_len:
         residue_indices = [i for i in range(L) if nan_mask[i]==1]
 
     else:
@@ -229,16 +228,16 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, fi
         start = anchor[0] ; end = anchor[1]
         
         distance_vectors = []
-        loop_indices = [i for i in range(start+1, end)]
+        loop_indices = [i for i in range(start+1, end) if nan_mask[i] == 1]
         for i in anchor:
             distance_vectors.append(distance_map[i])
 
         distance_vectors = torch.stack(distance_vectors)
         distance_vector, _ = torch.min(distance_vectors, dim=0)
-        values, indices = torch.topk(distance_vector, max_len, largest=False)
+        values, indices = torch.topk(distance_vector, max_len - len(loop_indices), largest=False)
 
         residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
-
+        residue_indices = [i for i in residue_indices if nan_mask[i] == 1]
     return residue_indices
 
 ######################## relpos ########################

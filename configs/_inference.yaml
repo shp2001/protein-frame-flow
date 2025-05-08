@@ -15,12 +15,12 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2/2025-05-05_01-24-51/epoch=165-step=238874.ckpt
-
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2_crop300_rollout/2025-05-07_15-51-01/last.ckpt
   use_gpu: True
   num_gpus: 2
 
   interpolant:
+    use_prmsd: True
     min_t: 1e-2
     rots:
       corrupt: True

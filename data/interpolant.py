@@ -197,6 +197,7 @@ class Interpolant:
             num_res,
             model,
             aatype,
+            confidence_model=None,
             num_timesteps=None,
             trans_potential=None,
             trans_0=None,
@@ -376,10 +377,18 @@ class Interpolant:
             model_out = model(batch)
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
-        prmsd = model_out['all_atom_preds']['prmsd']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
         contact_map = model_out['pair_outputs'][-1]
-        
+
+        input_for_confidence = model_out['input_for_confidence']
+
+        if self._cfg.use_prmsd and confidence_model != None:
+            prmsd = confidence_model(input_for_confidence, res_mask)
+            prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
+        else:
+            prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1])
+            prmsd_final = prmsd
+
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
         )
@@ -389,12 +398,12 @@ class Interpolant:
         # Convert trajectories to atom37.
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
-        if not (prmsd == 0).all():
-            prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
-            print(f'prmsd_final_val : {torch.max(prmsd_final)}')
-        else:
-            prmsd_final = prmsd 
-        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, contact_map, pred_trans_1, pred_rotmats_1
+        # if not (prmsd == 0).all():
+        #     prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
+        #     print(f'prmsd_final_val : {torch.max(prmsd_final)}')
+        # else:
+        #     prmsd_final = prmsd 
+        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

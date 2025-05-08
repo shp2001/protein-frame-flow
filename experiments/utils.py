@@ -232,7 +232,7 @@ def save_traj(
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
 
     # Use b-factors to specify which residues are diffused.
-    if b_factors == None:
+    if all(b_factors==0) == True:
         b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
     
     else:

@@ -64,7 +64,7 @@ model:
     use_original_sm: true
 
   prmsd:
-    use_prmsd: False
+    use_prmsd: false
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
     c_hidden: 16

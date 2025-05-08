@@ -20,7 +20,6 @@ class FlowModel(nn.Module):
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._angle_conf = model_conf.angle
         self._distogram_conf = model_conf.distogram_head
-        self._prmsd_conf = model_conf.prmsd
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
         self.node_feature_net = NodeFeatureNet(model_conf.node_features)
@@ -75,28 +74,6 @@ class FlowModel(nn.Module):
                 self._angle_conf.epsilon,
                 self._angle_conf.use_original_sm
             )
-        
-        self.prmsd = nn.ModuleDict()
-        if self._prmsd_conf.use_prmsd:
-            self.prmsd_node_transform = ipa_pytorch.Linear(self._prmsd_conf.c_s, self._prmsd_conf.c_s)
-            
-            self.prmsd_edge_transform = ipa_pytorch.Linear(
-                    self._prmsd_conf.c_z,
-                    self._prmsd_conf.c_z
-                )
-
-            for b in range(self._prmsd_conf.num_blocks):
-                self.prmsd[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
-                self.prmsd[f'ipa_ln_{b}'] = nn.LayerNorm(self._prmsd_conf.c_s)
-                
-                if b < self._prmsd_conf.num_blocks - 1:
-                    self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
-                        c=self._prmsd_conf.c_s)
-                else:
-                    self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.pRMSDTransition(
-                        c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
-                    )
-
             
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
@@ -212,40 +189,69 @@ class FlowModel(nn.Module):
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()
 
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
-
-        if self._prmsd_conf.use_prmsd:
-
-            prmsd_node = self.prmsd_node_transform(init_node_embed) 
-            prmsd_edge = self.prmsd_edge_transform(init_edge_embed)
-
-            rots = curr_rigids.get_rots().get_rot_mats().detach()
-            trans = curr_rigids.get_trans().detach()
-            prmsd_rigids = du.create_rigid(rots, trans)
-
-            for b in range(self._prmsd_conf.num_blocks):
-                prmsd_ipa_embed = self.prmsd[f'ipa_{b}'](
-                    prmsd_node,
-                    prmsd_edge,
-                    prmsd_rigids,
-                    node_mask
-                )
-                # prmsd_ipa_embed *= node_mask[..., None]
-                prmsd_node = self.prmsd[f'ipa_ln_{b}'](prmsd_node + prmsd_ipa_embed)
-                
-                if b < self._prmsd_conf.num_blocks - 1:
-                    prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
-                    prmsd_node = prmsd_node * node_mask[..., None]
-                else:
-                    prmsd_node = self.prmsd[f'prmsd_transition_{b}'](prmsd_node)
-
-            # print(f'prmsd_before_relu: {prmsd_node}')
-            all_atom_outputs["prmsd"] = prmsd_node
-        else:
-            all_atom_outputs['prmsd'] = torch.zeros(node_embed.shape[0], node_embed.shape[1])
-
+        input_for_confidence = {
+            'node_embed': node_embed,
+            'edge_embed': edge_embed,
+            'curr_rigids': curr_rigids
+        }
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
             'all_atom_preds': all_atom_outputs,
+            'input_for_confidence': input_for_confidence,
             'pair_outputs': pair_outputs # b-1개의 pair 기반 output (b-2개는 beta carbon distogram, 마지막은 all atom contact map)
         }
+    
+
+class ConfidenceModel(nn.Module):
+    def __init__(self, model_conf):
+        super(ConfidenceModel, self).__init__()
+        self._model_conf = model_conf
+        self._prmsd_conf = model_conf.prmsd
+
+        self.prmsd = nn.ModuleDict()
+  
+        self.prmsd_node_transform = ipa_pytorch.Linear(self._prmsd_conf.c_s, self._prmsd_conf.c_s)
+        self.prmsd_edge_transform = ipa_pytorch.Linear(
+                self._prmsd_conf.c_z,
+                self._prmsd_conf.c_z
+            )
+
+        for b in range(self._prmsd_conf.num_blocks):
+            self.prmsd[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
+            self.prmsd[f'ipa_ln_{b}'] = nn.LayerNorm(self._prmsd_conf.c_s)
+            
+            if b < self._prmsd_conf.num_blocks - 1:
+                self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
+                    c=self._prmsd_conf.c_s)
+            else:
+                self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.pRMSDTransition(
+                    c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
+                )
+    
+    def forward(self, input_feats, node_mask): 
+    # input feats is a dictionary which includes node_embed, edge_embed, curr_rigids, node_mask
+    
+        node_embed = input_feats['node_embed']
+        edge_embed = input_feats['edge_embed']
+        curr_rigids = input_feats['curr_rigids']
+        prmsd_node = self.prmsd_node_transform(node_embed) 
+        prmsd_edge = self.prmsd_edge_transform(edge_embed)
+
+        for b in range(self._prmsd_conf.num_blocks):
+            prmsd_ipa_embed = self.prmsd[f'ipa_{b}'](
+                prmsd_node,
+                prmsd_edge,
+                curr_rigids,
+                node_mask
+            )
+            # prmsd_ipa_embed *= node_mask[..., None]
+            prmsd_node = self.prmsd[f'ipa_ln_{b}'](prmsd_node + prmsd_ipa_embed)
+            
+            if b < self._prmsd_conf.num_blocks - 1:
+                prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
+                prmsd_node = prmsd_node * node_mask[..., None]
+            else:
+                prmsd_node = self.prmsd[f'prmsd_transition_{b}'](prmsd_node)
+
+        return prmsd_node 

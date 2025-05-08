@@ -13,7 +13,7 @@ import torch.distributed as dist
 from pytorch_lightning import LightningModule
 from analysis import metrics 
 from analysis import utils as au
-from models.flow_model import FlowModel
+from models.flow_model import FlowModel, ConfidenceModel
 from models import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
@@ -36,9 +36,12 @@ class FlowModule(LightningModule):
 
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model)
-
+        self.confidence_model = None
+        if cfg.model.prmsd.use_prmsd:
+            self.confidence_model = ConfidenceModel(cfg.model)
         # Set-up interpolant
         self.interpolant = Interpolant(cfg.interpolant)
+        self.mini_rollout = Interpolant(cfg.mini_rollout)
 
         self.validation_epoch_metrics = []
         self.validation_epoch_samples = []
@@ -107,6 +110,7 @@ class FlowModule(LightningModule):
     #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
     #     else:
     #         print("✅ 모든 파라미터가 사용되었습니다.")
+
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
         self.log(
@@ -169,7 +173,7 @@ class FlowModule(LightningModule):
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
         pred_rigids = model_output['all_atom_preds']['rigids'].clone()
         pred_sidechain_frames = model_output['all_atom_preds']['sidechain_frames'].clone()
-        pred_rmsd = model_output['all_atom_preds']['prmsd'].clone()
+
         pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.ipa.num_blocks-2] # (O, B, L, L) <- contact prob
         pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
 
@@ -254,32 +258,6 @@ class FlowModule(LightningModule):
 
         final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
 
-        # Pairwise distance loss
-        dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        if training_cfg.aux_loss_use_pair_loss:
-            pred_atom_14 = pred_atom_14_list[-1]
-            pred_bb_atoms = pred_atom_14[:, :, :3]
-            gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
-            gt_pair_dists = torch.linalg.norm(
-                gt_flat_atoms[:, :, None, :] - gt_flat_atoms[:, None, :, :], dim=-1)
-            pred_flat_atoms = pred_bb_atoms.reshape([num_batch, num_res*3, 3])
-            pred_pair_dists = torch.linalg.norm(
-                pred_flat_atoms[:, :, None, :] - pred_flat_atoms[:, None, :, :], dim=-1)
-
-            flat_loss_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
-            flat_loss_mask = flat_loss_mask.reshape([num_batch, num_res*3])
-            flat_res_mask = torch.tile(loss_mask[:, :, None], (1, 1, 3))
-            flat_res_mask = flat_res_mask.reshape([num_batch, num_res*3])
-
-            gt_pair_dists = gt_pair_dists * flat_loss_mask[..., None]
-            pred_pair_dists = pred_pair_dists * flat_loss_mask[..., None]
-            pair_dist_mask = flat_loss_mask[..., None] * flat_res_mask[:, None, :]
-
-            dist_mat_loss = torch.sum(
-                (gt_pair_dists - pred_pair_dists)**2 * pair_dist_mask,
-                dim=(1, 2))
-            dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1, 2)) + 1)
-
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         scale_factor = training_cfg.bb_atom_scale / (1 - torch.min(
@@ -327,41 +305,56 @@ class FlowModule(LightningModule):
                                                             noisy_batch['res_idx'],
                                                             noisy_batch['residx_atom14_to_atom37'])
 
-        # backbone fape loss 
-        bb_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        if training_cfg.aux_loss_use_fape_bb_loss:
-            bb_fape_loss = backbone_fape_loss(
-                backbone_rigid_tensor=backbone_rigid_tensor,
-                backbone_rigid_mask=noisy_batch['backbone_rigid_mask'],
-                traj=pred_rigids,
-                cdr_mask=noisy_batch['diffuse_mask'],
-                use_clamped_fape=False,
-                # clamp_distance=10,
-                # loss_unit_distance=10,
-                # intercdr_distance=30
-            )
+        # # backbone fape loss 
+        # bb_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        # if training_cfg.aux_loss_use_fape_bb_loss:
+        #     bb_fape_loss = backbone_fape_loss(
+        #         backbone_rigid_tensor=backbone_rigid_tensor,
+        #         backbone_rigid_mask=noisy_batch['backbone_rigid_mask'],
+        #         traj=pred_rigids,
+        #         cdr_mask=noisy_batch['diffuse_mask'],
+        #         use_clamped_fape=False,
+        #         # clamp_distance=10,
+        #         # loss_unit_distance=10,
+        #         # intercdr_distance=30
+        #     )
 
-        # sidechain fape loss (final layer만 계산)
-        sc_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        if training_cfg.aux_loss_use_fape_sc_loss:
-            sc_fape_loss = sidechain_fape_loss(
-                sidechain_frames=pred_sidechain_frames,
-                sidechain_atom_pos=pred_atom_14_list,
-                rigidgroups_gt_frames=rigidgroups_gt_frames,
-                rigidgroups_alt_gt_frames=rigidgroups_alt_gt_frames,
-                rigidgroups_gt_exists=noisy_batch['rigidgroups_gt_exists'],
-                renamed_atom14_gt_positions=renamed_atom14_gt_positions,
-                renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
-                alt_naming_is_better=renamed_dict['alt_naming_is_better'],
-                cdr_mask=noisy_batch['diffuse_mask'],
-                use_clamped_fape=False
-            )
+        # # sidechain fape loss (final layer만 계산)
+        # sc_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        # if training_cfg.aux_loss_use_fape_sc_loss:
+        #     sc_fape_loss = sidechain_fape_loss(
+        #         sidechain_frames=pred_sidechain_frames,
+        #         sidechain_atom_pos=pred_atom_14_list,
+        #         rigidgroups_gt_frames=rigidgroups_gt_frames,
+        #         rigidgroups_alt_gt_frames=rigidgroups_alt_gt_frames,
+        #         rigidgroups_gt_exists=noisy_batch['rigidgroups_gt_exists'],
+        #         renamed_atom14_gt_positions=renamed_atom14_gt_positions,
+        #         renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
+        #         alt_naming_is_better=renamed_dict['alt_naming_is_better'],
+        #         cdr_mask=noisy_batch['diffuse_mask'],
+        #         use_clamped_fape=False
+        #     )
 
-        # calculate prmsd 
-        plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        # calculate prmsd (perform mini rollout with 10 timesteps)
+        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         if training_cfg.aux_loss_use_prmsd_loss:
-            plddt_loss = compute_prmsd_loss(logits=pred_rmsd,
-                                    all_atom_pred_pos= model_output['all_atom_preds']['positions'][-1], # predicted structure (b, l, 14, 3)
+            self.mini_rollout.set_device(loss_mask.device)
+            _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _ = self.mini_rollout.sample(
+                num_batch,
+                num_res,
+                self.model,
+                confidence_model=self.confidence_model,
+                aatype=noisy_batch['aatype'],
+                trans_1=noisy_batch['trans_1'],
+                rotmats_1=noisy_batch['rotmats_1'],
+                diffuse_mask=noisy_batch['diffuse_mask'],
+                chain_idx=noisy_batch['chain_idx'],
+                res_idx=noisy_batch['res_idx'],
+                pair_init=noisy_batch['pair_init']
+            )
+
+            prmsd_loss = compute_prmsd_loss(logits=mini_prmsd,
+                                    all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
                                     cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
@@ -375,12 +368,10 @@ class FlowModule(LightningModule):
             bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
-            + dist_mat_loss * training_cfg.aux_loss_use_pair_loss * training_cfg.aux_loss_pair_loss_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
-            + bb_fape_loss * training_cfg.aux_loss_use_fape_bb_loss * training_cfg.aux_loss_fape_bb_loss_weight 
-            + sc_fape_loss * training_cfg.aux_loss_use_fape_sc_loss * training_cfg.aux_loss_fape_sc_loss_weight 
-            + plddt_loss * training_cfg.aux_loss_use_prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
+            # + bb_fape_loss * training_cfg.aux_loss_use_fape_bb_loss * training_cfg.aux_loss_fape_bb_loss_weight 
+            # + sc_fape_loss * training_cfg.aux_loss_use_fape_sc_loss * training_cfg.aux_loss_fape_sc_loss_weight 
             + distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
             + contact_map_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_contact_map_weight
         )
@@ -401,10 +392,9 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
         )
     
-        se3_vf_loss += auxiliary_loss + violation_loss
+        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         if torch.any(torch.isnan(se3_vf_loss)):
             raise ValueError('NaN loss encountered')
-
         print({
             "r3_t": r3_t,
             "trans_loss": trans_loss,
@@ -414,7 +404,8 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
             'distogram_loss': distogram_loss,
-            'contact_map_loss': contact_map_loss
+            'contact_map_loss': contact_map_loss,
+            'prmsd_loss': prmsd_loss
         })
 
         return {
@@ -425,10 +416,9 @@ class FlowModule(LightningModule):
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
-            'dist_mat_loss': dist_mat_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'plddt_loss': plddt_loss,
+            'prmsd_loss': prmsd_loss,
             'distogram_loss': distogram_loss,
             'contact_map_loss': contact_map_loss
         }
@@ -441,11 +431,12 @@ class FlowModule(LightningModule):
         diffuse_mask = batch['diffuse_mask']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
-        atom37_traj, clean_atom37_traj, pred_positions, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
+        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
             aatype=batch['aatype'],
+            confidence_model=self.confidence_model,
             trans_1=batch['trans_1'],
             rotmats_1=batch['rotmats_1'],
             diffuse_mask=diffuse_mask,
@@ -462,15 +453,15 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        #     torch.tensor(pred_positions, device=batch['aatype'].device),
-        #     batch['atom14_gt_positions'],
-        #     batch['atom14_gt_exists'],
-        #     batch['original_diffuse_mask'][0],
-        #     batch['mode'],
-        #     scale_factor=torch.ones(b),
-        #     distance_threshold=5
-        # )
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+            torch.tensor(pred_positions, device=batch['aatype'].device),
+            batch['atom14_gt_positions'],
+            batch['atom14_gt_exists'],
+            batch['original_diffuse_mask'][0],
+            batch['mode'],
+            scale_factor=torch.ones(b),
+            distance_threshold=5
+        )
 
         # calculate cb contact map (B, N, 14, 3)
         gt_cb_distance_map = torch.linalg.norm(
@@ -489,7 +480,7 @@ class FlowModule(LightningModule):
 
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
-            b_factors = prmsd[i].cpu().numpy()
+            b_factors = prmsd_final[i].cpu().numpy()
             if (b_factors==0).all():
                 b_factor_alt = diffuse_mask.cpu().numpy()
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
@@ -509,12 +500,12 @@ class FlowModule(LightningModule):
             
             # print(f'contact_map: {contact_map[i].shape}')
             # print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
-            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_pred',
-            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_gt',
-            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_pred',
+                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_gt',
+                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
 
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
@@ -708,8 +699,12 @@ class FlowModule(LightningModule):
     
 
     def configure_optimizers(self):
+        if self.confidence_model != None:
+            parameters = list(self.model.parameters()) + list(self.confidence_model.parameters())
+        else:
+            parameters = self.model.parameters()
         optimizer = torch.optim.AdamW(
-            self.model.parameters(), self._exp_cfg.optimizer.max_lr
+            parameters, self._exp_cfg.optimizer.max_lr
         )
         scheduler = self.get_cosine_scheduler_w_warmup(
             optimizer,
@@ -754,8 +749,9 @@ class FlowModule(LightningModule):
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
         # Sample batch
-        atom37_traj, model_traj, pred_positions, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = interpolant.sample(
+        atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = interpolant.sample(
             num_batch, sample_length, self.model,
+            confidence_model=self.confidence_model,
             aatype=batch['aatype'],
             trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
             pair_init=batch['pair_init']
@@ -776,25 +772,12 @@ class FlowModule(LightningModule):
             gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
             pred_positions_37.append(gt_position_37)
 
-            
+
         pred_positions = np.stack(pred_positions_37)
-        prmsds = du.to_numpy(prmsd)
 
-        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        #     batch['aatype'],
-        #     torch.tensor(pred_positions, device=batch['aatype'].device),
-        #     batch['original_diffuse_mask'][0],
-        #     batch['diffuse_mask'][0],
-        #     batch['pseudo_beta']
-        # )
-
-        # # calculate cb contact map (B, N, 14, 3)
-        # gt_cb_distance_map = torch.linalg.norm(
-        # batch['atom14_gt_positions'][:, :, None, 4] - batch['atom14_gt_positions'][:, None, :, 4], dim=-1) # (B, N, N)
-        # gt_cb_contact_map = (gt_cb_distance_map < 10)
-
-        # cb_mask = batch['atom14_gt_exists'][:, :, None, 4] * batch['atom14_gt_exists'][:, None, :, 4]
-        # gt_cb_contact_map = gt_cb_contact_map * cb_mask
+        total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=prmsd_final.device)
+        total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
+        prmsds = du.to_numpy(total_prmsd)
 
         for i in range(num_batch):
             sample_dir = sample_dirs[i]
@@ -809,17 +792,10 @@ class FlowModule(LightningModule):
                 sample=pred_position, # (L, 37, 3)
                 bb_prot_traj=bb_traj, 
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                b_factors=None,  # 위의 prmsd 집어넣기 
+                b_factors=prmsd,  # 위의 prmsd 집어넣기 
                 diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
                 save_traj_bool=False
             )
-
-            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_pred',
-            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_gt',
-            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))

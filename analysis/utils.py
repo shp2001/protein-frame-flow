@@ -117,13 +117,13 @@ def get_cdr_and_neighbors(
     atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
     gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
 
-    # make pairwise all atom contact map (pred)
-    atom_i = atom14_pred_positions[:, :, i_idx]  # (B, L, 105, 3)
-    atom_j = atom14_pred_positions[:, :, j_idx]  # (B, L, 105, 3)
+    # # make pairwise all atom contact map (pred)
+    # pred_atom_i = atom14_pred_positions[:, :, i_idx]  # (B, L, 105, 3)
+    # pred_atom_j = atom14_pred_positions[:, :, j_idx]  # (B, L, 105, 3)
 
-    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
-    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
-    pred_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
+    # pred_atom_i = pred_atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
+    # pred_atom_j = pred_atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
+    # pred_aa_distance_map = torch.norm(pred_atom_i - pred_atom_j, dim=-1)  # (B, L, L, 105)
 
     # make pairwise all atom contact map mask 
     exists_i = atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
@@ -139,18 +139,17 @@ def get_cdr_and_neighbors(
     gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale_factor[0]), dim=-1)  # (N_cdr, N)
     gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
 
-    # find pred neighbors
-    pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), pred_aa_distance_map) # (B, L, L, 105)
-    pred_neighbor_list = []
-    for b in range(pred_aa_distance_map.shape[0]):
-        neighbor_mask = torch.any((pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b]), dim=-1)  # (N_cdr, N)
-        pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
-        pred_neighbor_list.append(pred_neighbor_indices)
+    # # find pred neighbors
+    # pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), pred_aa_distance_map) # (B, L, L, 105)
+    # pred_neighbor_list = []
+    # for b in range(pred_aa_distance_map.shape[0]):
+    #     neighbor_mask = torch.any((pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b]), dim=-1)  # (N_cdr, N)
+    #     pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
+
+    #     pred_neighbor_list.append(pred_neighbor_indices)
     
-    pred_neighbor = torch.cat(pred_neighbor_list)
-
-
-    neighbor_indices = torch.unique(torch.cat([pred_neighbor, gt_neighbor]))
+    # pred_neighbor = torch.cat(pred_neighbor_list)
+    neighbor_indices = torch.unique(gt_neighbor)
         
     return cdr_residues, neighbor_indices
 
