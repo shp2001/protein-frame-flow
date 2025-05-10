@@ -386,7 +386,7 @@ class Interpolant:
             prmsd = confidence_model(input_for_confidence, res_mask)
             prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
         else:
-            prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1])
+            prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
             prmsd_final = prmsd
 
         clean_traj.append(

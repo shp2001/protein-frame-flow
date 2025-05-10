@@ -775,7 +775,7 @@ class FlowModule(LightningModule):
 
         pred_positions = np.stack(pred_positions_37)
 
-        total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=prmsd_final.device)
+        total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
         total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
         prmsds = du.to_numpy(total_prmsd)
 
