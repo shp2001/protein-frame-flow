@@ -96,9 +96,9 @@ mini_rollout:
 experiment:
   add_modules: False
   debug: False
-  seed: 123
+  seed: 43
   num_devices: 1
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2_diff_crop/2025-05-11_01-47-16/last.ckpt
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -150,7 +150,7 @@ experiment:
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
-    max_epochs: 200
+    max_epochs: 140
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False

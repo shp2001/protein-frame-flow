@@ -111,6 +111,7 @@ class Experiment:
             enable_progress_bar=True,
             enable_model_summary=True,
             devices=self._train_device_ids,
+            gradient_clip_val=1.0
         )
         trainer.fit(
             model=self._module,

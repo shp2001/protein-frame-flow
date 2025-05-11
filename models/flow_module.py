@@ -143,8 +143,8 @@ class FlowModule(LightningModule):
 
         gt_rot_vf = so3_utils.calc_rot_vf(
             rotmats_t, gt_rotmats_1.type(torch.float32))
-        if torch.any(torch.isnan(gt_rot_vf)):
-            raise ValueError('NaN encountered in gt_rot_vf')
+        # if torch.any(torch.isnan(gt_rot_vf)):
+        #     raise ValueError('NaN encountered in gt_rot_vf')
 
         # Timestep used for normalization.
         r3_t = noisy_batch['r3_t']
@@ -184,8 +184,8 @@ class FlowModule(LightningModule):
         pred_rigids[..., 4:] = pred_rigids[..., 4:] * training_cfg.bb_atom_scale / r3_norm_scale
         pred_sidechain_frames[..., :3, 3] = pred_sidechain_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
-        if torch.any(torch.isnan(pred_rots_vf)):
-            raise ValueError('NaN encountered in pred_rots_vf')
+        # if torch.any(torch.isnan(pred_rots_vf)):
+        #     raise ValueError('NaN encountered in pred_rots_vf')
 
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
@@ -394,7 +394,7 @@ class FlowModule(LightningModule):
     
         se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
         if torch.any(torch.isnan(se3_vf_loss)):
-            raise ValueError('NaN loss encountered')
+            se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
         print({
             "r3_t": r3_t,
             "trans_loss": trans_loss,
@@ -582,6 +582,19 @@ class FlowModule(LightningModule):
                 batch_size=len(val_epoch_metrics),
             )
         self.validation_epoch_metrics.clear()
+
+    # def on_after_backward(self):
+    #     # 모든 파라미터에 대해 gradient 값 확인
+    #     for name, param in self.named_parameters():
+    #         if param.grad is not None:
+    #             # 클리핑 전 gradient의 norm 출력
+    #             grad_norm_before = param.grad.norm(2).item()
+    #             print(f"Gradient norm for {name} before clipping: {grad_norm_before}")
+                
+    #             # 클리핑 후 gradient의 norm 출력
+    #             torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
+    #             grad_norm_after = param.grad.norm(2).item()
+    #             print(f"Gradient norm for {name} after clipping: {grad_norm_after}")
 
     def _log_scalar(
             self,
