@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 6
+    num_workers: 4
     prefetch_factor: 10
 
   masking_scheduler: 
@@ -96,7 +96,7 @@ mini_rollout:
 experiment:
   add_modules: False
   debug: False
-  seed: 43
+  seed: 123
   num_devices: 1
   warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_tri_aa_nb_sample_x2_diff_crop/2025-05-11_01-47-16/last.ckpt
   warm_start_cfg_override: True
