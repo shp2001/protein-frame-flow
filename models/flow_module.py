@@ -309,6 +309,14 @@ class FlowModule(LightningModule):
                                                             noisy_batch['residx_atom14_to_atom37'],
                                                             interface_mask=interface_mask)
 
+        within_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
+        if training_cfg.aux_loss_use_within_clash_loss:
+            within_clash_loss = compute_within_clash_loss(
+                                                        model_output['all_atom_preds']['positions'][-1],
+                                                        noisy_batch['atom14_gt_exists'],
+                                                        interface_mask,
+                                                        noisy_batch['aatype'])   
+
         # # backbone fape loss 
         # bb_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         # if training_cfg.aux_loss_use_fape_bb_loss:
@@ -383,6 +391,7 @@ class FlowModule(LightningModule):
         # calculate violation loss
         violation_loss = (
             all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
+            + within_clash_loss * training_cfg.aux_loss_use_within_clash_loss * training_cfg.aux_loss_within_clash_loss_weight
         )
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -400,18 +409,19 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
-        # print({
-        #     "r3_t": r3_t,
-        #     "trans_loss": trans_loss,
-        #     "bb_atom_loss": bb_atom_loss,
-        #     'sc_atom_loss': sc_atom_loss,
-        #     'chi_loss': chi_loss,
-        #     'all_atom_clash_loss': all_atom_clash_loss,
-        #     'local_dist_mat_loss': local_dist_mat_loss,
-        #     'distogram_loss': distogram_loss,
-        #     'contact_map_loss': contact_map_loss,
-        #     'prmsd_loss': prmsd_loss
-        # })
+        print({
+            "r3_t": r3_t,
+            "trans_loss": trans_loss,
+            "bb_atom_loss": bb_atom_loss,
+            'sc_atom_loss': sc_atom_loss,
+            'chi_loss': chi_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'within_clash_loss': within_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss,
+            'distogram_loss': distogram_loss,
+            'contact_map_loss': contact_map_loss,
+            'prmsd_loss': prmsd_loss
+        })
 
         return {
             "trans_loss": trans_loss,
@@ -422,6 +432,7 @@ class FlowModule(LightningModule):
             'sc_atom_loss': sc_atom_loss,
             'chi_loss': chi_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
+            'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
             'prmsd_loss': prmsd_loss,
             'distogram_loss': distogram_loss,

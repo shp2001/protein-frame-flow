@@ -874,7 +874,7 @@ def compute_within_clash_loss(
         atom14_dists_upper_bound,
     ) # ([B, N, 14])
 
-    mean_loss = torch.sum(within_residue_clashes)
+    mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))
     if interface_mask is not None:
         # interface_mask: (B, L) → (B, L, 1) → (B, L, 14)
         interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
@@ -887,7 +887,8 @@ def compute_within_clash_loss(
         # 최종 loss에 더함 (필요시 가중치 사용 가능)
         mean_loss = mean_loss + interface_loss
 
-    return within_residue_clashes
+    return mean_loss
+
 def local_distance_loss(
     atom14_pred_positions, # (B, N, 14, 3)
     renamed_atom14_gt_exists, # (B, N, 14)
