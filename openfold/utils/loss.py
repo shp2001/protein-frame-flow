@@ -290,6 +290,7 @@ def supervised_chi_loss(
     chi_angles_sin_cos: torch.Tensor,
     chi_weight: float,
     angle_norm_weight: float,
+    cdr_mask: torch.Tensor,
     eps=1e-6,
     **kwargs,
 ) -> torch.Tensor:
@@ -346,6 +347,14 @@ def supervised_chi_loss(
 
     loss = chi_weight * sq_chi_loss
 
+    ## cdr_mask for sq_chi_error
+    cdr_chi_mask = cdr_mask.unsqueeze(-1) * chi_mask
+    cdr_chi_loss = masked_mean(
+        cdr_chi_mask[..., None, :, :], sq_chi_error, dim=(-1,-2,-3)
+        )
+    loss += chi_weight * cdr_chi_loss
+
+    # anlge norm loss
     angle_norm = torch.sqrt(
         torch.sum(unnormalized_angles_sin_cos ** 2, dim=-1) + eps
     )

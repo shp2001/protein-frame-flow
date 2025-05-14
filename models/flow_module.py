@@ -187,6 +187,7 @@ class FlowModule(LightningModule):
         # if torch.any(torch.isnan(pred_rots_vf)):
         #     raise ValueError('NaN encountered in pred_rots_vf')
 
+        print(f'trans_diff: {pred_trans_1 - gt_trans_1}')
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])

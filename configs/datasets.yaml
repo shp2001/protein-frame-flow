@@ -10,7 +10,7 @@ shared:
   max_motif_percent: 1
 
   # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
-  mode: nanobody
+  mode: ab
   loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
   
   # masking scheduling 

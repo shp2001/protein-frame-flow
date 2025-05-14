@@ -122,7 +122,7 @@ def get_ab_metrics(pdb_file_1, pdb_file_2, output_file):
     except RuntimeError as e:
         print(f"Error creating AntibodyInfo: {e}")
         return False
-
+    
     # CDR 백본 RMSD 계산
     results = rosetta.protocols.antibody.cdr_backbone_rmsds(
         pose_1,

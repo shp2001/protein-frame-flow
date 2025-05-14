@@ -239,6 +239,7 @@ def supervised_chi_loss(
     Returns:
         [*] loss tensor
     """
+
     pred_angles = angles_sin_cos[..., 3:, :] # (O, B, L, 4, 2)
     residue_type_one_hot = torch.nn.functional.one_hot(
         aatype,
@@ -251,13 +252,12 @@ def supervised_chi_loss(
     )
 
     true_chi = chi_angles_sin_cos[None]  # (1, B, L, 4, 2)
-
     shifted_mask = (1 - 2 * chi_pi_periodic).unsqueeze(-1)
     true_chi_shifted = shifted_mask * true_chi
     sq_chi_error = torch.sum((true_chi - pred_angles) ** 2, dim=-1)
     sq_chi_error_shifted = torch.sum((true_chi_shifted - pred_angles) ** 2, dim=-1)
     sq_chi_error = torch.minimum(sq_chi_error, sq_chi_error_shifted)  # (O, B, L, 4)
-
+    
     # The ol' switcheroo
     sq_chi_error = sq_chi_error.permute(
         *range(len(sq_chi_error.shape))[1:-2], 0, -2, -1
@@ -265,6 +265,14 @@ def supervised_chi_loss(
 
     sq_chi_loss = masked_mean(chi_mask[..., None, :, :], sq_chi_error, dim=(-1, -2, -3))
     loss = chi_weight * sq_chi_loss
+    print(f'sq_chi_loss: {sq_chi_loss}')
+    
+    ## cdr_mask for sq_chi_error
+    cdr_chi_mask = cdr_mask.unsqueeze(-1) * chi_mask
+    cdr_chi_loss = masked_mean(
+        cdr_chi_mask[..., None, :, :], sq_chi_error, dim=(-1,-2,-3)
+        )
+    loss += chi_weight * cdr_chi_loss
 
     ## cdr_mask for sq_chi_loss
     # (B, n) -> (B, n, 7) or (B, n, 4)
@@ -279,15 +287,8 @@ def supervised_chi_loss(
         seq_mask[..., None, :, None], norm_error, dim=(-1, -2, -3)
     )
 
-    ## cdr_mask for angle_norm_loss
-    angle_cdr_mask = cdr_mask
-    angle_cdr_mask = angle_cdr_mask * seq_mask
-    angle_norm_loss += masked_mean(
-        angle_cdr_mask[..., None, :, None], norm_error, dim=(-1, -2, -3)
-    )
-
     loss = loss + angle_norm_weight * angle_norm_loss
-
+    print(f'angle_norm_loss: {angle_norm_loss}')
     # # Average over the batch dimension
     # loss = torch.mean(loss)
 
