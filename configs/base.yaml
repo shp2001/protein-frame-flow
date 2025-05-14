@@ -126,21 +126,20 @@ experiment:
 
     aux_loss_chi_loss_weight: 1.0 # 0.7 ~ 0.9
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0
-    aux_loss_sc_atom_loss_weight: 0.5 # 0.7 ~ 1.5
-    aux_loss_pair_loss_weight: 0.2 
+    aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_all_atom_clash_loss_weight: 1000 # 5e-5 ~ 1e-4
-    aux_loss_local_dist_mat_loss_weight: 4.0 # 1.0 ~ 2.0
+    aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0
     aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
     aux_loss_distogram_weight: 0.1 # 5.0 ~ 6.0
-    aux_loss_contact_map_weight: 2.0 # 0.5 ~ 0.8
+    aux_loss_contact_map_weight: 1.0 # 0.5 ~ 0.8
     # fape loss
     aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
     aux_loss_fape_sc_loss_weight: 2.0 # 0.3 ~ 0.7
     aux_loss_t_pass: 0.2 
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_aa_nb_sample_x2_diff_crop
+    name: fm_tri_nb_loss_chi_modif
     project: se3-fm
   optimizer:
     warmup_steps: 0
