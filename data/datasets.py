@@ -347,7 +347,6 @@ class BaseDataset(Dataset):
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
 
-        print(f"{feats['raw_path']}: {len(feats['res_idx'])}")
         return feats
 
 

@@ -187,7 +187,6 @@ class FlowModule(LightningModule):
         # if torch.any(torch.isnan(pred_rots_vf)):
         #     raise ValueError('NaN encountered in pred_rots_vf')
 
-        print(f'trans_diff: {pred_trans_1 - gt_trans_1}')
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
@@ -243,7 +242,7 @@ class FlowModule(LightningModule):
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
         interface_mask = noisy_batch['diffuse_mask']
         interface_mask[:, neighbor_indices] = 1
-        print(f'interface_mask: {interface_mask}')
+
         if training_cfg.aux_loss_use_sc_atom_loss:
             sc_atom_loss = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
                                     renamed_atom14_gt_positions,
@@ -400,18 +399,18 @@ class FlowModule(LightningModule):
         if torch.any(torch.isnan(se3_vf_loss)):
             se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
-        print({
-            "r3_t": r3_t,
-            "trans_loss": trans_loss,
-            "bb_atom_loss": bb_atom_loss,
-            'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
-            'all_atom_clash_loss': all_atom_clash_loss,
-            'local_dist_mat_loss': local_dist_mat_loss,
-            'distogram_loss': distogram_loss,
-            'contact_map_loss': contact_map_loss,
-            'prmsd_loss': prmsd_loss
-        })
+        # print({
+        #     "r3_t": r3_t,
+        #     "trans_loss": trans_loss,
+        #     "bb_atom_loss": bb_atom_loss,
+        #     'sc_atom_loss': sc_atom_loss,
+        #     'chi_loss': chi_loss,
+        #     'all_atom_clash_loss': all_atom_clash_loss,
+        #     'local_dist_mat_loss': local_dist_mat_loss,
+        #     'distogram_loss': distogram_loss,
+        #     'contact_map_loss': contact_map_loss,
+        #     'prmsd_loss': prmsd_loss
+        # })
 
         return {
             "trans_loss": trans_loss,
