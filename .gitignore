@@ -15,6 +15,7 @@ outputs/
 processed_scope/
 processed_pdb/
 weights/
+**/*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
