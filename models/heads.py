@@ -224,3 +224,41 @@ class AngleResnet(nn.Module):
         s = s / norm_denom
 
         return unnormalized_s, s
+
+class AllAtomModule(nn.Module):
+    """All-atom update resnet module."""
+
+    def __init__(self, d_single, d_hidden, n_block, atom_num):
+        super().__init__()
+        self.relu = nn.ReLU()
+        self.linear_in = ipa_pytorch.Linear(d_single, d_hidden)
+        self.linear_initial = ipa_pytorch.Linear(d_single, d_hidden)
+
+        self.blocks = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.ReLU(),
+                    ipa_pytorch.Linear(d_hidden, d_hidden, init="relu"),
+                    nn.ReLU(),
+                    ipa_pytorch.Linear(d_hidden, d_hidden, init="final"),
+                )
+                for _ in range(n_block)
+            ]
+        )
+        self.linear_proj = ipa_pytorch.Linear(d_hidden, atom_num * 3)
+
+    def forward(
+        self,
+        single: torch.Tensor,  # (..., L, d_single)
+        init_single: torch.Tensor,  # (..., L, d_single)
+    ) -> torch.Tensor:  # (..., L, atom_num, 3)
+        single = self.linear_in(self.relu(single))
+        init_single = self.linear_in(self.relu(init_single))
+        single = single + init_single
+
+        for block in self.blocks:
+            single = single + block(single)
+        single = self.linear_proj(self.relu(single))
+
+        local_atom_pos = single.view(single.shape[:-1] + (-1, 3))
+        return local_atom_pos

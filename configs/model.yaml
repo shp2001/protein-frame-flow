@@ -63,6 +63,12 @@ model:
     epsilon: 1.0e-07
     use_original_sm: true
 
+  all_atom:
+    n_blcok: 2
+    d_single: 256
+    d_hidden: 128
+    atom_num: 14
+    
   prmsd:
     use_prmsd: false
     c_s: ${model.node_embed_size}

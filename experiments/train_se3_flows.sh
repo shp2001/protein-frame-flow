@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_tri_nb_loss_chi_modif
+#SBATCH -J fm_tri_nb_loss_wo_chi
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
