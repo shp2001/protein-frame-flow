@@ -18,7 +18,6 @@ from typing import Tuple, Any, Sequence, Callable, Optional
 import numpy as np
 import torch
 
-
 def rot_matmul(
     a: torch.Tensor, 
     b: torch.Tensor
@@ -1466,3 +1465,24 @@ class Rigid:
                 A version of the transformation on GPU
         """
         return Rigid(self._rots.cuda(), self._trans.cuda())
+
+
+def local_to_global(
+    rigid: Rigid,  # (..., L)
+    local_atom_pos: torch.Tensor,  # (..., L, N, 3)
+) -> torch.Tensor:  # (..., L, N, 3)
+    """Transform local atoms to global with rigids transformation.
+
+    Parameters
+    ----------
+    rigid: Rigid, (..., L)
+        Global transformation rigid.
+    local_atom_pos: torch.Tensor, (..., L, N, 3)
+        Local atom coordinates.
+
+    Returns
+    -------
+    global_atom_pos: torch.Tensor, (..., L, N, 3)
+        Tensor of transformed global atoms position.
+    """
+    return rigid[..., None].apply(local_atom_pos)

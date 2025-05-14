@@ -821,7 +821,8 @@ def compute_all_atom_clash_loss(
         atom14_pred_positions,
         atom14_atom_exists,
         residue_index,
-        residx_atom14_to_atom37):
+        residx_atom14_to_atom37,
+        interface_mask):
 
     atomtype_radius = [
         residue_constants.van_der_waals_radius[name[0]]
@@ -837,6 +838,7 @@ def compute_all_atom_clash_loss(
         atom14_atom_exists=atom14_atom_exists,
         atom14_atom_radius=atom14_atom_radius,
         residue_index=residue_index,
+        interface_mask=interface_mask
     )
 
     # between residue clashes = {

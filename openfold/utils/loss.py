@@ -882,6 +882,7 @@ def between_residue_clash_loss(
     atom14_atom_exists: torch.Tensor,
     atom14_atom_radius: torch.Tensor,
     residue_index: torch.Tensor,
+    interface_mask: torch.Tensor,
     overlap_tolerance_soft=1.5,
     overlap_tolerance_hard=1.5,
     eps=1e-10,
@@ -940,6 +941,8 @@ def between_residue_clash_loss(
         residue_index[..., :, None, None, None]
         < residue_index[..., None, :, None, None]
     )
+
+    # create the mask for valid distances 
 
     # Backbone C--N bond between subsequent residues is no clash.
     c_one_hot = torch.nn.functional.one_hot(
@@ -1003,6 +1006,20 @@ def between_residue_clash_loss(
     per_atom_loss_sum = torch.sum(dists_to_low_error, dim=(-4, -2)) + torch.sum(
         dists_to_low_error, axis=(-3, -1)
     )
+
+    if interface_mask is not None:
+        # cdr_mask: (B, L) → (B, L, 1) → (B, L, 14)
+        interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
+        
+        # CDR 영역의 loss만 추출
+        per_atom_interface_loss = per_atom_loss_sum * interface_mask_exp  # (B, L, 14)
+
+        # 평균을 위해 존재하는 CDR atom 수 계산
+        interface_exists = atom14_atom_exists * interface_mask_exp  # (B, L, 14)
+        interface_loss = torch.sum(per_atom_interface_loss, dim=(1, 2)) / (1e-6 + torch.sum(interface_exists, dim=(1, 2)))
+
+        # 최종 loss에 더함 (필요시 가중치 사용 가능)
+        mean_loss = mean_loss + interface_loss
 
     # Compute the hard clash mask.
     # shape (N, N, 14, 14)

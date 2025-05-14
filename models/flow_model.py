@@ -6,11 +6,11 @@ from models.node_feature_net import NodeFeatureNet
 from models.edge_feature_net import EdgeFeatureNet
 from models import ipa_pytorch
 from data import utils as du
-from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
+from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 from models.heads import AAContactHead, DistogramHead, AngleResnet
-    
+
 class FlowModel(nn.Module):
 
     def __init__(self, model_conf):
@@ -169,17 +169,12 @@ class FlowModel(nn.Module):
             if all_atom_contact_map != None:
                 pair_outputs.append(all_atom_contact_map)
                 
-            unnormalized_angles, angles = self.angle_resnet(node_embed, init_node_embed)
+            curr_rigids = self.rigids_nm_to_ang(curr_rigids)
+            local_atom_pos_pred = self.allatom_module(node_embed, init_node_embed)
+            pred_xyz = local_to_global(curr_rigids, local_atom_pos_pred)
 
-            backb_to_global = self.rigids_nm_to_ang(curr_rigids)
-            all_frames_to_global = all_atom.torsion_angles_to_frames(backb_to_global, angles, aatype)
-            pred_xyz = all_atom.frames_to_atom14_pos(all_frames_to_global, aatype)
             all_atom_preds = {
-                "unnormalized_angles": unnormalized_angles,
-                "angles": angles,
-                "positions": pred_xyz,
-                "rigids": backb_to_global.to_tensor_7(),
-                "sidechain_frames": all_frames_to_global.to_tensor_4x4(),
+                "positions": pred_xyz
             }
 
             all_atom_outputs.append(all_atom_preds)

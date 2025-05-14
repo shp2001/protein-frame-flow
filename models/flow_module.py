@@ -306,7 +306,8 @@ class FlowModule(LightningModule):
                                                             model_output['all_atom_preds']['positions'][-1],
                                                             noisy_batch['atom14_gt_exists'],
                                                             noisy_batch['res_idx'],
-                                                            noisy_batch['residx_atom14_to_atom37'])
+                                                            noisy_batch['residx_atom14_to_atom37'],
+                                                            interface_mask=interface_mask)
 
         # # backbone fape loss 
         # bb_fape_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
