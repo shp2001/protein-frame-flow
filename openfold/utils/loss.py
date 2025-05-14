@@ -1010,12 +1010,10 @@ def between_residue_clash_loss(
     if interface_mask is not None:
         # cdr_mask: (B, L) → (B, L, 1) → (B, L, 14)
         interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
-        
-        # CDR 영역의 loss만 추출
-        per_atom_interface_loss = per_atom_loss_sum * interface_mask_exp  # (B, L, 14)
 
         # 평균을 위해 존재하는 CDR atom 수 계산
         interface_exists = atom14_atom_exists * interface_mask_exp  # (B, L, 14)
+        per_atom_interface_loss = per_atom_loss_sum * interface_exists  # (B, L, 14)
         interface_loss = torch.sum(per_atom_interface_loss, dim=(1, 2)) / (1e-6 + torch.sum(interface_exists, dim=(1, 2)))
 
         # 최종 loss에 더함 (필요시 가중치 사용 가능)

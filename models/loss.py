@@ -2,7 +2,7 @@ import torch
 from typing import Optional, Dict
 
 from data import residue_constants
-from openfold.utils.loss import between_residue_clash_loss
+from openfold.utils.loss import between_residue_clash_loss, within_residue_violations
 from openfold.data.data_transforms import pseudo_beta_fn
 from openfold.utils.rigid_utils import Rigid, Rotation
 from openfold.utils.tensor_utils import permute_final_dims
@@ -842,12 +842,52 @@ def compute_all_atom_clash_loss(
     )
 
     # between residue clashes = {
-    # "mean_loss": mean_loss,  # shape ()
-    # "per_atom_loss_sum": per_atom_loss_sum,  # shape (N, 14)
-    # "per_atom_clash_mask": per_atom_clash_mask,  # shape (N, 14) }
+    # "mean_loss": mean_loss,  # shape (B)
+    # "per_atom_loss_sum": per_atom_loss_sum,  # shape (B, N, 14)
+    # "per_atom_clash_mask": per_atom_clash_mask,  # shape (B, N, 14) }
 
     return between_residue_clashes['mean_loss']
 
+def compute_within_clash_loss(       
+        atom14_pred_positions,
+        atom14_atom_exists,
+        interface_mask,
+        aatype,
+        clash_overlap_tolerance=1.5,
+        violation_tolerance_factor=12.0):
+
+    restype_atom14_bounds = residue_constants.make_atom14_dists_bounds(
+        overlap_tolerance=clash_overlap_tolerance,
+        bond_length_tolerance_factor=violation_tolerance_factor,
+    )
+    atom14_dists_lower_bound = atom14_pred_positions.new_tensor(
+        restype_atom14_bounds["lower_bound"]
+    )[aatype]
+    atom14_dists_upper_bound = atom14_pred_positions.new_tensor(
+        restype_atom14_bounds["upper_bound"]
+    )[aatype]
+    
+    within_residue_clashes = within_residue_violations(
+        atom14_pred_positions,
+        atom14_atom_exists,
+        atom14_dists_lower_bound,
+        atom14_dists_upper_bound,
+    ) # ([B, N, 14])
+
+    mean_loss = torch.sum(within_residue_clashes)
+    if interface_mask is not None:
+        # interface_mask: (B, L) → (B, L, 1) → (B, L, 14)
+        interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
+
+        # 평균을 위해 존재하는 CDR atom 수 계산
+        interface_exists = atom14_atom_exists * interface_mask_exp  # (B, L, 14)
+        per_atom_interface_loss = within_residue_clashes * interface_exists  # (B, L, 14)
+        interface_loss = torch.sum(per_atom_interface_loss, dim=(1, 2)) / (1e-6 + torch.sum(interface_exists, dim=(1, 2)))
+
+        # 최종 loss에 더함 (필요시 가중치 사용 가능)
+        mean_loss = mean_loss + interface_loss
+
+    return within_residue_clashes
 def local_distance_loss(
     atom14_pred_positions, # (B, N, 14, 3)
     renamed_atom14_gt_exists, # (B, N, 14)
