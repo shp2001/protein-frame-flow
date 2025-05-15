@@ -168,11 +168,7 @@ class FlowModule(LightningModule):
         model_output = self.model(noisy_batch)
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
-        pred_angles_list = model_output['all_atom_preds']['angles'].clone()
-        pred_unnormalized_angles_list = model_output['all_atom_preds']['unnormalized_angles'].clone()
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
-        pred_rigids = model_output['all_atom_preds']['rigids'].clone()
-        pred_sidechain_frames = model_output['all_atom_preds']['sidechain_frames'].clone()
 
         pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.ipa.num_blocks-2] # (O, B, L, L) <- contact prob
         pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
@@ -181,8 +177,6 @@ class FlowModule(LightningModule):
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
         pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
 
-        pred_rigids[..., 4:] = pred_rigids[..., 4:] * training_cfg.bb_atom_scale / r3_norm_scale
-        pred_sidechain_frames[..., :3, 3] = pred_sidechain_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
         # if torch.any(torch.isnan(pred_rots_vf)):
         #     raise ValueError('NaN encountered in pred_rots_vf')
@@ -251,20 +245,6 @@ class FlowModule(LightningModule):
                                     mode='sc',
                                     compute_non_cdr=True
                                     )    
-
-        # torsion angle loss 
-        chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        if training_cfg.aux_loss_use_chi_loss:
-            chi_loss = supervised_chi_loss(pred_angles_list,
-                                        pred_unnormalized_angles_list,
-                                        noisy_batch['aatype'],
-                                        noisy_batch['res_mask'],
-                                        noisy_batch['chi_mask'],
-                                        gt_chi_angle,
-                                        chi_weight=0.5,
-                                        angle_norm_weight=0.02,
-                                        cdr_mask=interface_mask
-                                        )
 
         # final layer backbone rmsd loss
         final_bb_rmsd = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
@@ -379,7 +359,6 @@ class FlowModule(LightningModule):
         auxiliary_loss = (
             bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
-            + chi_loss * training_cfg.aux_loss_use_chi_loss * training_cfg.aux_loss_chi_loss_weight 
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
             # + bb_fape_loss * training_cfg.aux_loss_use_fape_bb_loss * training_cfg.aux_loss_fape_bb_loss_weight 
@@ -414,7 +393,6 @@ class FlowModule(LightningModule):
             "trans_loss": trans_loss,
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
@@ -430,7 +408,6 @@ class FlowModule(LightningModule):
             "se3_vf_loss": se3_vf_loss,
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
-            'chi_loss': chi_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,

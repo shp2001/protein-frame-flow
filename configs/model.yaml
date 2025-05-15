@@ -64,7 +64,7 @@ model:
     use_original_sm: true
 
   all_atom:
-    n_blcok: 2
+    n_blocks: 2
     d_single: 256
     d_hidden: 128
     atom_num: 14

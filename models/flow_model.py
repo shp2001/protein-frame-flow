@@ -9,7 +9,7 @@ from data import utils as du
 from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-from models.heads import AAContactHead, DistogramHead, AngleResnet
+from models.heads import AAContactHead, DistogramHead, AllAtomModule
 
 class FlowModel(nn.Module):
 
@@ -18,7 +18,7 @@ class FlowModel(nn.Module):
         self._model_conf = model_conf
         self._ipa_conf = model_conf.ipa
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
-        self._angle_conf = model_conf.angle
+        self._all_atom_conf = model_conf.all_atom
         self._distogram_conf = model_conf.distogram_head
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
@@ -66,13 +66,11 @@ class FlowModel(nn.Module):
                     )
 
 
-        self.angle_resnet = AngleResnet(
-                self._ipa_conf.c_s,
-                self._angle_conf.c_resnet,
-                self._angle_conf.no_resnet_blocks,
-                self._angle_conf.no_angles,
-                self._angle_conf.epsilon,
-                self._angle_conf.use_original_sm
+        self.allatom_module = AllAtomModule(
+                self._all_atom_conf.d_single,
+                self._all_atom_conf.d_hidden,
+                self._all_atom_conf.n_blocks,
+                self._all_atom_conf.atom_num,
             )
             
     def forward(self, input_feats):
@@ -172,18 +170,18 @@ class FlowModel(nn.Module):
             curr_rigids = self.rigids_nm_to_ang(curr_rigids)
             local_atom_pos_pred = self.allatom_module(node_embed, init_node_embed)
             pred_xyz = local_to_global(curr_rigids, local_atom_pos_pred)
-
+            print(f'pred_xyz: {pred_xyz}')
             all_atom_preds = {
                 "positions": pred_xyz
             }
-
+            
             all_atom_outputs.append(all_atom_preds)
 
-        curr_rigids = self.rigids_nm_to_ang(curr_rigids)
         pred_trans = curr_rigids.get_trans()
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()
 
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
+
         input_for_confidence = {
             'node_embed': node_embed,
             'edge_embed': edge_embed,
