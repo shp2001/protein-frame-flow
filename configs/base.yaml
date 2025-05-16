@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 4
+    num_workers: 6
     prefetch_factor: 10
 
   masking_scheduler: 
@@ -125,16 +125,16 @@ experiment:
     aux_loss_use_fape_bb_loss: False
     aux_loss_use_fape_sc_loss: False
 
-    aux_loss_chi_loss_weight: 1.0 # 0.7 ~ 0.9
-    aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0
-    aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5
+    aux_loss_chi_loss_weight: 0.3 # 1.2 -> 0.7 ~ 0.8 
+    aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
+    aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
-    aux_loss_all_atom_clash_loss_weight: 1.0 # 5e-5 ~ 1e-4
-    aux_loss_within_clash_loss_weight: 1.0
-    aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0
+    aux_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.01
+    aux_loss_within_clash_loss_weight: 0.1 # 1.5 ~ 3.0
+    aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
-    aux_loss_distogram_weight: 0.1 # 5.0 ~ 6.0
-    aux_loss_contact_map_weight: 1.0 # 0.5 ~ 0.8
+    aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
+    aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
     
     # fape loss
     aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4

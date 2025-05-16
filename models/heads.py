@@ -253,7 +253,7 @@ class AllAtomModule(nn.Module):
         init_single: torch.Tensor,  # (..., L, d_single)
     ) -> torch.Tensor:  # (..., L, atom_num, 3)
         single = self.linear_in(self.relu(single))
-        init_single = self.linear_in(self.relu(init_single))
+        init_single = self.linear_initial(self.relu(init_single))
         single = single + init_single
 
         for block in self.blocks:

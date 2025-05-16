@@ -872,7 +872,7 @@ def compute_within_clash_loss(
         atom14_atom_exists,
         atom14_dists_lower_bound,
         atom14_dists_upper_bound,
-    ) # ([B, N, 14])
+    )['per_atom_loss_sum'] # ([B, N, 14])
 
     mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))
     if interface_mask is not None:

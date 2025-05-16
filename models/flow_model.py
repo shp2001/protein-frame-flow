@@ -167,21 +167,19 @@ class FlowModel(nn.Module):
             if all_atom_contact_map != None:
                 pair_outputs.append(all_atom_contact_map)
                 
-            curr_rigids = self.rigids_nm_to_ang(curr_rigids)
+            backb_to_global = self.rigids_nm_to_ang(curr_rigids)
             local_atom_pos_pred = self.allatom_module(node_embed, init_node_embed)
-            pred_xyz = local_to_global(curr_rigids, local_atom_pos_pred)
-            print(f'pred_xyz: {pred_xyz}')
+            pred_xyz = local_to_global(backb_to_global, local_atom_pos_pred)
             all_atom_preds = {
                 "positions": pred_xyz
             }
             
             all_atom_outputs.append(all_atom_preds)
-
+        curr_rigids = self.rigids_nm_to_ang(curr_rigids)
         pred_trans = curr_rigids.get_trans()
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()
 
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
-
         input_for_confidence = {
             'node_embed': node_embed,
             'edge_embed': edge_embed,
