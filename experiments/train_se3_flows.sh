@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_tri_nb_loss_dir_aa
+#SBATCH -J fm_tri_chi
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=48g
@@ -9,4 +9,4 @@
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/train_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/dir_aa.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/train_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/chi.log
