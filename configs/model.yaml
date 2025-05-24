@@ -19,7 +19,7 @@ model:
     relpos_k: 64
     relpos_dim: 73
     feat_dim: 64
-    num_bins: 22
+    num_bins: 48
     self_condition: True
     embed_chain: False
     embed_diffuse_mask: True
