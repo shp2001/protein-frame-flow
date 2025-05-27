@@ -6,11 +6,10 @@ from models.node_feature_net import NodeFeatureNet
 from models.edge_feature_net import EdgeFeatureNet
 from models import ipa_pytorch
 from data import utils as du
-from data import all_atom
 from openfold.utils.tensor_utils import dict_multimap
-
+from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-from models.heads import AAContactHead, DistogramHead, AngleResnet
+from models.heads import AAContactHead, DistogramHead, AllAtomModule
 
 class FlowModel(nn.Module):
 
@@ -20,7 +19,6 @@ class FlowModel(nn.Module):
         self._ipa_conf = model_conf.ipa
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._all_atom_conf = model_conf.all_atom
-        self._angle_conf = model_conf.angle
         self._distogram_conf = model_conf.distogram_head
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
@@ -30,12 +28,6 @@ class FlowModel(nn.Module):
         # Attention trunk
         self.trunk = nn.ModuleDict()
         for b in range(self._ipa_conf.num_blocks):
-            self.trunk[f'layernorm_single_re_{b}'] = nn.LayerNorm(model_conf.node_embed_size)
-            self.trunk[f'linear_single_re_{b}'] = ipa_pytorch.Linear(in_dim=model_conf.node_embed_size, out_dim=model_conf.node_embed_size, bias=False)
-
-            self.trunk[f'layernorm_pair_re_{b}'] = nn.LayerNorm(model_conf.edge_embed_size)
-            self.trunk[f'linear_pair_re_{b}'] = ipa_pytorch.Linear(in_dim=model_conf.edge_embed_size, out_dim=model_conf.edge_embed_size, bias=False)
-
             self.trunk[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._ipa_conf)
             self.trunk[f'ipa_ln_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
             tfmr_in = self._ipa_conf.c_s
@@ -55,14 +47,6 @@ class FlowModel(nn.Module):
                 c=self._ipa_conf.c_s)
             self.trunk[f'bb_update_{b}'] = ipa_pytorch.BackboneUpdate(
                 self._ipa_conf.c_s, use_rot_updates=True)
-            self.trunk[f'angle_resnet_{b}'] = AngleResnet(
-                self._ipa_conf.c_s,
-                self._angle_conf.c_resnet,
-                self._angle_conf.no_resnet_blocks,
-                self._angle_conf.no_angles,
-                self._angle_conf.epsilon,
-                self._angle_conf.use_original_sm
-            )
 
             # 0, 1, 2
             if b < self._ipa_conf.num_blocks-1:
@@ -80,6 +64,14 @@ class FlowModel(nn.Module):
                         edge_embed_in=edge_in,
                         edge_embed_out=self._model_conf.edge_embed_size,
                     )
+
+
+            self.trunk[f"allatom_module_{b}"] = AllAtomModule(
+                    self._all_atom_conf.d_single,
+                    self._all_atom_conf.d_hidden,
+                    self._all_atom_conf.n_blocks,
+                    self._all_atom_conf.atom_num,
+                )
             
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
@@ -90,9 +82,10 @@ class FlowModel(nn.Module):
         rotmats_t = input_feats['rotmats_t']
         pair_init = input_feats['pair_init']
         aatype = input_feats['aatype']
+        ref_feature_dict = input_feats['ref_feature_dict']
 
         # Initialize node and edge embeddings
-        init_node_embed = self.node_feature_net(
+        node_embed = self.node_feature_net(
             r3_t,
             node_mask,
             diffuse_mask,
@@ -109,14 +102,15 @@ class FlowModel(nn.Module):
         else:
             rotmats_sc = input_feats['rotmats_sc']
 
-        init_edge_embed = self.edge_feature_net(
+        edge_embed = self.edge_feature_net(
             trans_t,
             trans_sc,
             rotmats_t,
             rotmats_sc,
             edge_mask,
             diffuse_mask,
-            pair_init
+            pair_init,
+            ref_feature_dict
         )
 
         # Initialize rigids
@@ -128,19 +122,14 @@ class FlowModel(nn.Module):
 
 
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
-        node_embed = init_node_embed * node_mask[..., None]
-        edge_embed = init_edge_embed * edge_mask[..., None]
-
-        node_rec = torch.zeros_like(node_embed, device=node_embed.device)
-        edge_rec = torch.zeros_like(edge_embed, device=edge_embed.device)
+        node_embed = node_embed * node_mask[..., None]
+        edge_embed = edge_embed * edge_mask[..., None]
 
         for b in range(self._ipa_conf.num_blocks):
-            node_embed = node_embed + self.trunk[f'linear_single_re_{b}'](self.trunk[f'layernorm_single_re_{b}'](node_rec))
-            edge_embed = edge_embed + self.trunk[f'linear_pair_re_{b}'](self.trunk[f'layernorm_pair_re_{b}'](edge_rec))
-
             cb_distogram = None
             all_atom_contact_map = None 
 
+            init_node_embed = node_embed
             ipa_embed = self.trunk[f'ipa_{b}'](
                 node_embed,
                 edge_embed,
@@ -180,23 +169,15 @@ class FlowModel(nn.Module):
 
             if all_atom_contact_map != None:
                 pair_outputs.append(all_atom_contact_map)
-            
-            unnormalized_angles, angles = self.trunk[f"angle_resnet_{b}"](node_embed, init_node_embed)
+                
             backb_to_global = self.rigids_nm_to_ang(curr_rigids)
-            all_frames_to_global = all_atom.torsion_angles_to_frames(backb_to_global, angles, aatype)
-            pred_xyz = all_atom.frames_to_atom14_pos(all_frames_to_global, aatype)
-
+            local_atom_pos_pred = self.trunk[f"allatom_module_{b}"](node_embed, init_node_embed)
+            pred_xyz = local_to_global(backb_to_global, local_atom_pos_pred)
             all_atom_preds = {
-                "unnormalized_angles": unnormalized_angles,
-                "angles": angles,
                 "positions": pred_xyz
             }
             
             all_atom_outputs.append(all_atom_preds)
-
-            node_rec = node_embed
-            edge_rec = edge_embed
-
         curr_rigids = self.rigids_nm_to_ang(curr_rigids)
         pred_trans = curr_rigids.get_trans()
         pred_rotmats = curr_rigids.get_rots().get_rot_mats()

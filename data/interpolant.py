@@ -197,6 +197,7 @@ class Interpolant:
             num_res,
             model,
             aatype,
+            ref_feature_dict,
             confidence_model=None,
             num_timesteps=None,
             trans_potential=None,
@@ -237,6 +238,7 @@ class Interpolant:
             'diffuse_mask': diffuse_mask,
             'res_idx': res_idx,
             'pair_init': pair_init,
+            'ref_feature_dict': ref_feature_dict
         }
 
         motif_scaffolding = False

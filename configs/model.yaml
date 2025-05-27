@@ -16,11 +16,13 @@ model:
     single_bias_transition_n: 2
     c_s: ${model.node_embed_size}
     c_p: ${model.edge_embed_size}
+    ref_pos_dim: 16
     relpos_k: 64
     relpos_dim: 73
     feat_dim: 64
-    num_bins: 48
+    num_bins: 32
     self_condition: True
+    embed_ref_pos: True
     embed_chain: False
     embed_diffuse_mask: True
     embed_unit_vector: True

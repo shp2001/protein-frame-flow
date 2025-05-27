@@ -1,0 +1,125 @@
+import torch
+import numpy as np 
+
+from data import residue_constants, all_atom
+import data.utils as du
+from openfold.utils.rigid_utils import local_to_global
+
+@staticmethod
+def atom_name_chars_encoded(atom_names: list[str]) -> torch.Tensor:
+    """
+    Ref: AlphaFold3 SI Table 5 "ref_atom_name_chars"
+    One-hot encoding of the unique atom names in the reference conformer.
+    Each character is encoded as ord(c) − 32, and names are padded to length 4.
+
+    Args:
+        atom_name_list (List[str]): A list of atom names.
+
+    Returns:
+        torch.Tensor:  A Tensor of character encoded atom names
+    """
+    onehot_dict = {}
+    for index, key in enumerate(range(64)):
+        onehot = [0] * 64
+        onehot[index] = 1
+        onehot_dict[key] = onehot
+    # [N_atom, 4, 64]
+    mol_encode = []
+    for atom_name in atom_names:
+        # [4, 64]
+        atom_encode = []
+        for name_str in atom_name.ljust(4):
+            atom_encode.append(onehot_dict[ord(name_str) - 32])
+        mol_encode.append(atom_encode)
+
+    return mol_encode
+
+def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
+    """
+    input
+    aatype: (B, N)
+    atom14_mask: (B, N)
+    res_indices: (B, N)
+
+    return 
+    ref_space_uid: list[tuple] (N, 2)    (chain_id, residue_index)
+    ref_element: list (N, 5)
+    ref_charge: list (N)
+    ref_atom_name_chars: list (N, 4, 64)
+    """
+    B = aatype_batch.shape[0]
+
+    ref_space_uid = []
+    atom_to_token_idx = [] # residue number를 고려하지 않고 res idx 상에서 몇 번째인지 
+    ref_pos = []
+
+    aatype = aatype_batch[0]
+    atom14_mask = atom_14_mask_batch[0]
+    res_indices = res_indices_batch[0]
+
+    for i, restype_int in enumerate(aatype):
+        restype1 = residue_constants.restypes_with_x[restype_int]
+        restype3 = residue_constants.restype_1to3.get(restype1, "UNK")
+        
+        if restype3 == "UNK":
+            continue
+
+        atom_names = residue_constants.restype_name_to_atom14_names[restype3]
+        atom_coords = residue_constants.rigid_group_atom_positions[restype3]
+
+        res_idx = res_indices[i]
+    
+        for j, atom_name in enumerate(atom_names):
+            if atom_name != '' and atom14_mask[i, j]==1:
+                ref_space_uid.append(res_idx)
+
+                # atom_to_token_idx
+                atom_to_token_idx.append(i)
+                
+                # ref_pos
+                ref_pos.append(atom_coords[j][-1])
+
+    ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1).long()
+    atom_to_token_idx = torch.tensor(atom_to_token_idx).unsqueeze(0).repeat(B,1)
+    ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
+
+    return ref_space_uid, atom_to_token_idx, ref_pos
+
+def init_ref_pos(aatype, atom14_mask, noisy_trans, noisy_rotmats):
+    """
+    input
+    aatype: (B, N)
+    atom14_mask: (B, N, 14)
+    noisy_trans: (B, N, 3)
+    noisy_rots: (B, N, 3)
+
+    return 
+    ref_pos: tensor([B, N_atom, 3])
+    """
+    B, N = aatype.shape
+    noisy_rigids = du.create_rigid(noisy_rotmats, noisy_trans)
+
+    ideal_pos = torch.tensor(residue_constants.restype_atom14_rigid_group_positions, device=aatype.device) # (21, 14, 3)
+    pos = ideal_pos[aatype] # (B, N, 14, 3)
+    pred_xyz = local_to_global(noisy_rigids, pos) # (B, N, 14, 3)
+
+    mask = atom14_mask.bool()  # (B, N, 14)
+    ref_pos = pred_xyz[mask]   # (B * N_atom_per_batch, 3)
+    ref_pos = ref_pos.view(B, -1, 3)
+
+    return ref_pos    
+    
+
+def atom14_flat(pred_xyz, atom14_mask):
+    """
+    Input:
+        pred_xyz: [B, N, 14, 3]
+        atom14_mask: [B, N, 14]
+    Output:
+        ref_pos: [B, N_atom, 3]
+    """
+    B = pred_xyz.shape[0]
+    valid_mask = atom14_mask.bool()  # [N, 14]
+    ref_pos = pred_xyz[valid_mask]
+    ref_pos = ref_pos.view(B, -1, 3)
+    return ref_pos

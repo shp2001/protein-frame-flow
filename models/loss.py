@@ -853,8 +853,8 @@ def compute_within_clash_loss(
         atom14_atom_exists,
         interface_mask,
         aatype,
-        clash_overlap_tolerance=1.5,
-        violation_tolerance_factor=12.0):
+        clash_overlap_tolerance=0.5,
+        violation_tolerance_factor=2.0):
 
     restype_atom14_bounds = residue_constants.make_atom14_dists_bounds(
         overlap_tolerance=clash_overlap_tolerance,
@@ -888,6 +888,85 @@ def compute_within_clash_loss(
         mean_loss = mean_loss + interface_loss
 
     return mean_loss
+
+def compute_bond_angle_loss(
+    atom14_pred_positions: torch.Tensor,   # (B, L, 14, 3)
+    atom14_atom_exists: torch.Tensor,      # (B, L, 14)
+    interface_mask: Optional[torch.Tensor],# (B, L)
+    aatype: torch.Tensor,                  # (B, L)
+    angle_tolerance_degree: float = 2.0,
+    angle_stddev_factor: float = 5.0
+) -> torch.Tensor:
+    
+    device = atom14_pred_positions.device
+    B, L, _, _ = atom14_pred_positions.shape
+    
+    # 기준값들 불러오기 (21,14,14,14)
+    angle_bounds = residue_constants.make_atom14_angles_bounds(
+        angle_tolerance_degree=angle_tolerance_degree,
+        angle_stddev_factor=angle_stddev_factor
+    )
+    lower_bound = torch.tensor(angle_bounds['lower_bound'], device=device)
+    upper_bound = torch.tensor(angle_bounds['upper_bound'], device=device)
+    stddev = torch.tensor(angle_bounds['stddev'], device=device)
+
+    # AATYPE 기준으로 Bound 선택: (B, L, 14, 14, 14)
+    ref_angle = ((lower_bound + upper_bound) / 2)[aatype]  # 중심값
+    std_angle = stddev[aatype] + 1e-6                      # (B, L, 14, 14, 14)
+
+    # 각도 계산을 위한 인덱스
+    idx = torch.arange(14, device=device)
+    idx_a, idx_b, idx_c = torch.meshgrid(idx, idx, idx, indexing='ij')  # shape: (14, 14, 14)
+
+    # shape: (14, 14, 14, 1)
+    idx_a = idx_a.unsqueeze(-1)
+    idx_b = idx_b.unsqueeze(-1)
+    idx_c = idx_c.unsqueeze(-1)
+
+    # 좌표 추출: (B, L, 14, 14, 14, 3)
+    pos_a = atom14_pred_positions[:, :, idx_a[..., 0]]
+    pos_b = atom14_pred_positions[:, :, idx_b[..., 0]]
+    pos_c = atom14_pred_positions[:, :, idx_c[..., 0]]
+
+    v1 = pos_a - pos_b
+    v2 = pos_c - pos_b
+
+    # 각도 계산
+    v1_norm = torch.norm(v1, dim=-1)
+    v2_norm = torch.norm(v2, dim=-1)
+    dot = (v1 * v2).sum(-1)
+    cosine = dot / (v1_norm * v2_norm + 1e-8)
+    angle = torch.acos(cosine.clamp(-1.0, 1.0))  # (B, L, 14, 14, 14)
+    print("pred_angle_scale", torch.mean(angle))
+    print("ref_angle_scale", torch.mean(ref_angle))
+
+    # 존재 여부 마스크
+    exists_triplet = (upper_bound[aatype] > 0) # (B, L, 14, 14, 14)
+    
+    # std 마스크
+    valid_std = std_angle > 0  # (B, L, 14, 14, 14)
+    valid_mask = exists_triplet & valid_std  # shape 일치 보장
+
+    # z-score로 loss 계산
+    angle_diff = angle - ref_angle
+    angle_z = angle_diff / std_angle
+    angle_loss = (angle_z ** 2) * valid_mask.float()
+
+    loss_per_batch = angle_loss.sum(dim=(1, 2, 3, 4)) / (valid_mask.float().sum(dim=(1, 2, 3, 4)) + 1e-6)  # (B,)
+
+    # interface loss
+    if interface_mask is not None:
+        interface_mask_exp = interface_mask[:, :, None, None, None]  # (B, L, 1, 1, 1)
+        interface_valid = valid_mask & interface_mask_exp  # (B, L, 14, 14, 14)
+
+        interface_loss = (angle_z ** 2) * interface_valid.float()
+        loss_interface = interface_loss.sum(dim=(1, 2, 3, 4)) / (interface_valid.float().sum(dim=(1, 2, 3, 4)) + 1e-6)
+
+        print(f"non_cdr_angle: {loss_per_batch}")
+        print(f"cdr_loss: {loss_interface}")
+        loss_per_batch = loss_per_batch + loss_interface
+
+    return loss_per_batch  # (B,)
 
 def local_distance_loss(
     atom14_pred_positions, # (B, N, 14, 3)

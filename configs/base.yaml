@@ -95,7 +95,7 @@ mini_rollout:
   
 experiment:
   add_modules: False
-  debug: False
+  debug: True
   seed: 123
   num_devices: 1
   warm_start: null
@@ -112,12 +112,13 @@ experiment:
 
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False
-    aux_loss_use_chi_loss: True
+    aux_loss_use_chi_loss: False
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
     aux_loss_use_prmsd_loss: ${model.prmsd.use_prmsd}
     aux_loss_use_all_atom_clash_loss: True
-    aux_loss_use_within_clash_loss: False
+    aux_loss_use_within_clash_loss: True
+    aux_loss_use_bond_angle_loss: False
     aux_loss_use_local_dist_mat_loss: True 
     aux_loss_use_local_pair_feat_loss: True
 
@@ -131,6 +132,7 @@ experiment:
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.01
     aux_loss_within_clash_loss_weight: 0.1 # 1.5 ~ 3.0
+    aux_loss_bond_angle_weight: 0.00001 # ?????????
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
     aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
@@ -142,7 +144,7 @@ experiment:
     aux_loss_t_pass: 0.2 
     viol_loss_t_pass: 0.5
   wandb:
-    name: fm_tri_chi
+    name: fm_aa_ref_pos_angle
     project: se3-fm
   optimizer:
     warmup_steps: 0

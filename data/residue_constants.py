@@ -896,3 +896,47 @@ def make_atom14_dists_bounds(overlap_tolerance=1.5,
           'upper_bound': restype_atom14_bond_upper_bound,  # shape (21,14,14)
           'stddev': restype_atom14_bond_stddev,  # shape (21,14,14)
          }
+
+def make_atom14_angles_bounds(angle_tolerance_degree=10.0,
+                              angle_stddev_factor=5.0):
+    """Bond angle의 하한, 상한, 표준편차를 계산합니다."""
+
+    angle_tolerance = np.deg2rad(angle_tolerance_degree)
+
+    restype_atom14_angle_lower_bound = np.zeros([21, 14, 14, 14], np.float32)
+    restype_atom14_angle_upper_bound = np.zeros([21, 14, 14, 14], np.float32)
+    restype_atom14_angle_stddev = np.zeros([21, 14, 14, 14], np.float32)
+
+    residue_bonds, _, residue_bond_angles = load_stereo_chemical_props()
+
+    for restype, restype_letter in enumerate(restypes):
+        resname = restype_1to3[restype_letter]
+        atom_list = restype_name_to_atom14_names[resname]
+
+        if resname not in residue_bond_angles:
+            continue
+
+        for ba in residue_bond_angles[resname]:
+            try:
+                a1_idx = atom_list.index(ba.atom1_name)
+                a2_idx = atom_list.index(ba.atom2_name)
+                a3_idx = atom_list.index(ba.atom3name)
+            except ValueError:
+                # Atom이 atom14 리스트에 없을 경우 생략
+                continue
+
+            stddev = ba.stddev
+            angle = ba.angle_rad
+
+            lower = angle - angle_tolerance - angle_stddev_factor * stddev
+            upper = angle + angle_tolerance + angle_stddev_factor * stddev
+
+            restype_atom14_angle_lower_bound[restype, a1_idx, a2_idx, a3_idx] = lower
+            restype_atom14_angle_upper_bound[restype, a1_idx, a2_idx, a3_idx] = upper
+            restype_atom14_angle_stddev[restype, a1_idx, a2_idx, a3_idx] = stddev
+
+    return {
+        'lower_bound': restype_atom14_angle_lower_bound,  # (21,14,14,14)
+        'upper_bound': restype_atom14_angle_upper_bound,
+        'stddev': restype_atom14_angle_stddev,
+    }

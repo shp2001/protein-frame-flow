@@ -3,6 +3,7 @@ from torch import nn
 
 from models.utils import calc_distogram, calc_unit_vector
 from data.utils import create_rigid
+from Protenix.protenix.model.modules.transformer import RefPosEmbedder
 
 class EdgeFeatureNet(nn.Module):
 
@@ -12,13 +13,16 @@ class EdgeFeatureNet(nn.Module):
 
         self.c_s = self._cfg.c_s
         self.c_z = self._cfg.c_p
+        self.ref_pos_dim = self._cfg.ref_pos_dim
         self.feat_dim = self._cfg.feat_dim
         self.relpos_dim = self._cfg.relpos_dim
 
         self.linear_relpos = nn.Linear(self.relpos_dim, self.feat_dim)
 
         # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
-        total_edge_feats = self.feat_dim 
+        total_edge_feats = self.feat_dim
+        if self._cfg.ref_pos_dim: 
+            total_edge_feats += self._cfg.ref_pos_dim
         if self._cfg.embed_chain:
             total_edge_feats += 1
         if self._cfg.embed_diffuse_mask:
@@ -27,6 +31,8 @@ class EdgeFeatureNet(nn.Module):
             total_edge_feats += self._cfg.num_bins * 2
         if self._cfg.embed_unit_vector:
             total_edge_feats += 3 * 2
+        
+        self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
 
         self.edge_embedder = nn.Sequential(
             nn.Linear(total_edge_feats, self.c_z),
@@ -43,7 +49,8 @@ class EdgeFeatureNet(nn.Module):
     def forward(self, 
                 trans_t, trans_sc, 
                 rotmats_t, rotmats_sc, 
-                p_mask, diffuse_mask, pair_init):
+                p_mask, diffuse_mask, pair_init,
+                input_feature_dict):
         """
         trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
                                 If not, it is cdr_masked (cdr masked to the closeast residues) value 
@@ -52,7 +59,9 @@ class EdgeFeatureNet(nn.Module):
         relpos_feats = self.embed_relpos(pair_init)
         all_edge_feats = [relpos_feats]
 
-
+        if self._cfg.embed_ref_pos:
+            ref_pos = self.ref_pos_embedder(input_feature_dict)
+            all_edge_feats.append(ref_pos)
         if self._cfg.embed_diffuse_mask:
             diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
             all_edge_feats.append(diff_feat[..., None])

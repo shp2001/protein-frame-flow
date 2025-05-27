@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import embed_relpos
+from data import featurizer
 from itertools import accumulate
 import bisect
 
@@ -99,15 +100,7 @@ class ProteinData(LightningDataModule):
             del cropped_feat['chain_seq_list']
 
             cropped_batch.append(cropped_feat)
-            
-        # all_same = all(x == res_idxs[0] for x in res_idxs)
-        # all_same_trans = all(torch.equal(x, trans_1s[0]) for x in trans_1s)
 
-        # if not all_same_trans:
-        #     raise ValueError(f'{raw_paths} \n {feat["raw_path"]}: {trans_1s}')
-        
-        # if not all_same:
-        #     raise ValueError(f'{feat["raw_path"]}: {res_idxs}')
         
         cropped_batch = {key: [d[key] for d in cropped_batch] for key in cropped_batch[0].keys()}   
 
@@ -118,6 +111,12 @@ class ProteinData(LightningDataModule):
         cropped_batch['raw_path'] = feat['raw_path']
         cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
 
+        ref_space_uid, atom_to_token_idx, ref_pos = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
+        cropped_batch['ref_feature_dict'] = {
+            'ref_space_uid': ref_space_uid,
+            'atom_to_token_idx': atom_to_token_idx,
+            'ref_pos': ref_pos
+            }
         # masking scheduling 
         # if mask_schedule:
         #     cropped_batch['diffuse_mask'] = self.apply_probabilistic_mask(cropped_batch['diffuse_mask'], self.masking_ratio)
