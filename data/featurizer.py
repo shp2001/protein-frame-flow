@@ -28,7 +28,7 @@ def atom_name_chars_encoded(atom_names: list[str]) -> torch.Tensor:
     for atom_name in atom_names:
         # [4, 64]
         atom_encode = []
-        for name_str in atom_name.ljust(4):
+        for name_str in atom_name.ljust(3):
             atom_encode.append(onehot_dict[ord(name_str) - 32])
         mol_encode.append(atom_encode)
 
@@ -49,7 +49,10 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     """
     B = aatype_batch.shape[0]
 
+    atom_list = []
     ref_space_uid = []
+    ref_element = []
+    ref_charge = []
     atom_to_token_idx = [] # residue number를 고려하지 않고 res idx 상에서 몇 번째인지 
     ref_pos = []
 
@@ -72,18 +75,36 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         for j, atom_name in enumerate(atom_names):
             if atom_name != '' and atom14_mask[i, j]==1:
                 ref_space_uid.append(res_idx)
+                
+                atom_list.append(atom_name)
+                element = residue_constants.atom_type_to_element[atom_name]
+                element_one_hot = residue_constants.element_onehot[element] # numpy array
+                
+                # ref_element
+                ref_element.append(element_one_hot)
+
+                # ref_charge
+                charge = residue_constants.atom_type_to_charge[atom_name]
+                ref_charge.append(charge)
 
                 # atom_to_token_idx
                 atom_to_token_idx.append(i)
-                
+
                 # ref_pos
                 ref_pos.append(atom_coords[j][-1])
+    
+    ref_atom_name_chars = atom_name_chars_encoded(atom_list)
 
-    ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1).long()
+    ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1)
+    ref_element = torch.tensor(ref_element).unsqueeze(0).repeat(B,1,1)
+    ref_charge = torch.tensor(ref_charge).unsqueeze(0).repeat(B,1) 
+    ref_atom_name_chars = torch.tensor(ref_atom_name_chars).unsqueeze(0).repeat(B,1,1,1) 
     atom_to_token_idx = torch.tensor(atom_to_token_idx).unsqueeze(0).repeat(B,1)
+
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
 
-    return ref_space_uid, atom_to_token_idx, ref_pos
+    return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos
+
 
 def init_ref_pos(aatype, atom14_mask, noisy_trans, noisy_rotmats):
     """

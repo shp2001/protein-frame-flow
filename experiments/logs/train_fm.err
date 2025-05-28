@@ -1,3 +1,12 @@
+wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.19.11 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.8
+wandb: Run data is saved locally in ./wandb/run-20250527_180003-ii2zobhb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run fm_hybrid
+wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/ii2zobhb
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -12,10 +21,10 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
 ------------------------------------
-0 | model | FlowModel | 9.5 M 
+0 | model | FlowModel | 12.7 M
 ------------------------------------
-9.5 M     Trainable params
+12.7 M    Trainable params
 0         Non-trainable params
-9.5 M     Total params
-38.065    Total estimated model params size (MB)
-slurmstepd-gpu03: error: *** JOB 787139 ON gpu03 CANCELLED AT 2025-05-27T16:05:58 ***
+12.7 M    Total params
+50.697    Total estimated model params size (MB)
+wandb: ERROR Error while calling W&B API: context deadline exceeded (<Response [500]>)

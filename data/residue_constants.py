@@ -25,6 +25,95 @@ import tree
 
 # Internal import (35fd).
 
+# element 
+element = ['C', 'N', 'O', 'S', 'UNK']
+element_onehot = {'C': [1,0,0,0,0], 
+                  'N': [0,1,0,0,0], 
+                  'O': [0,0,1,0,0], 
+                  'S': [0,0,0,1,0],
+                  'UNK': [0,0,0,0,1]}
+
+atom_type_to_element = {
+    'N':   'N',
+    'CA':  'C',
+    'C':   'C',
+    'CB':  'C',
+    'O':   'O',
+    'CG':  'C',
+    'CG1': 'C',
+    'CG2': 'C',
+    'OG':  'O',
+    'OG1': 'O',
+    'SG':  'S',
+    'CD':  'C',
+    'CD1': 'C',
+    'CD2': 'C',
+    'ND1': 'N',
+    'ND2': 'N',
+    'OD1': 'O',
+    'OD2': 'O',
+    'SD':  'S',
+    'CE':  'C',
+    'CE1': 'C',
+    'CE2': 'C',
+    'CE3': 'C',
+    'NE':  'N',
+    'NE1': 'N',
+    'NE2': 'N',
+    'OE1': 'O',
+    'OE2': 'O',
+    'CH2': 'C',
+    'NH1': 'N',
+    'NH2': 'N',
+    'OH':  'O',
+    'CZ':  'C',
+    'CZ2': 'C',
+    'CZ3': 'C',
+    'NZ':  'N',
+    'OXT': 'O',
+    'UNK': 'UNK'
+}
+
+# atom charge 
+atom_type_to_charge = {
+    'N': 0,
+    'CA': 0,
+    'C': 0,
+    'CB': 0,
+    'O': 0,
+    'CG': 0,
+    'CG1': 0,
+    'CG2': 0,
+    'OG': 0,
+    'OG1': 0,
+    'SG': 0,
+    'CD': 0,
+    'CD1': 0,
+    'CD2': 0,
+    'ND1': 0,   # His 
+    'ND2': 0,   # Asn, His 
+    'OD1': -1,  # Asp
+    'OD2': -1,  # Asp
+    'SD': 0,
+    'CE': 0,
+    'CE1': 0,
+    'CE2': 0,
+    'CE3': 0,
+    'NE': +1,   # Arg
+    'NE1': 0,   # Trp
+    'NE2': 0,   # Gln, His 
+    'OE1': -1,  # Glu
+    'OE2': -1,  # Glu
+    'CH2': 0,
+    'NH1': +1,  # Arg
+    'NH2': +1,  # Arg
+    'OH': 0,    # Tyr
+    'CZ': 0,
+    'CZ2': 0,
+    'CZ3': 0,
+    'NZ': +1,   # Lys
+    'OXT': -1,  
+}
 
 # Distance from one CA to next CA [trans configuration: omega = 180].
 ca_ca = 3.80209737096

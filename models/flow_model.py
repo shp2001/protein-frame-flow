@@ -10,12 +10,14 @@ from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 from models.heads import AAContactHead, DistogramHead, AllAtomModule
+from Protenix.protenix.model.modules import transformer
 
 class FlowModel(nn.Module):
 
     def __init__(self, model_conf):
         super(FlowModel, self).__init__()
         self._model_conf = model_conf
+        self._aa_enc_conf = model_conf.aa_enc
         self._ipa_conf = model_conf.ipa
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._all_atom_conf = model_conf.all_atom
@@ -27,9 +29,14 @@ class FlowModel(nn.Module):
 
         # Attention trunk
         self.trunk = nn.ModuleDict()
-        for b in range(self._ipa_conf.num_blocks):
+        for b in range(self._model_conf.num_blocks):
+            self.trunk[f"atom_attention_encoder_{b}"] = transformer.AtomAttentionEncoder(self._aa_enc_conf)
             self.trunk[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._ipa_conf)
-            self.trunk[f'ipa_ln_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
+            self.trunk[f'fuse_ln_aa_enc_{b}'] = nn.LayerNorm(self._aa_enc_conf.c_token)
+            self.trunk[f'fuse_ln_ipa_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
+            self.trunk[f"fuse_linear_{b}"] = ipa_pytorch.Linear(in_dim=self._ipa_conf.c_s + self._aa_enc_conf.c_token,
+                                                                out_dim=self._ipa_conf.c_s)
+            # self.trunk[f'ipa_ln_{b}'] = nn.LayerNorm(self._ipa_conf.c_s)
             tfmr_in = self._ipa_conf.c_s
             tfmr_layer = torch.nn.TransformerEncoderLayer(
                 d_model=tfmr_in,
@@ -49,10 +56,10 @@ class FlowModel(nn.Module):
                 self._ipa_conf.c_s, use_rot_updates=True)
 
             # 0, 1, 2
-            if b < self._ipa_conf.num_blocks-1:
+            if b < self._model_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
                     self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-                    if b != self._ipa_conf.num_blocks-2:
+                    if b != self._model_conf.num_blocks-2:
                         self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
                                                                           self._distogram_conf)
                     else:
@@ -72,7 +79,38 @@ class FlowModel(nn.Module):
                     self._all_atom_conf.n_blocks,
                     self._all_atom_conf.atom_num,
                 )
-            
+        
+        self.init_parameters(self._model_conf.initialization)
+
+    def init_parameters(self, initialization: dict):
+        """
+        Initializes the parameters of the diffusion module according to the provided initialization configuration.
+
+        Args:
+            initialization (dict): A dictionary containing initialization settings.
+        """
+
+        for b in range(self._model_conf.num_blocks):
+            self.trunk[f"atom_attention_encoder_{b}"].linear_init(
+                zero_init_atom_encoder_residual_linear=initialization.get(
+                    "zero_init_atom_encoder_residual_linear", False
+                ),
+                he_normal_init_atom_encoder_small_mlp=initialization.get(
+                    "he_normal_init_atom_encoder_small_mlp", False
+                ),
+                he_normal_init_atom_encoder_output=initialization.get(
+                    "he_normal_init_atom_encoder_output", False
+                ),
+            )
+
+            if initialization.get("glorot_init_self_attention", False):
+                for (
+                    block
+                ) in (
+                    self.trunk[f"atom_attention_encoder_{b}"].atom_transformer.diffusion_transformer.blocks
+                ):
+                    block.attention_pair_bias.glorot_init()        
+
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
@@ -125,18 +163,33 @@ class FlowModel(nn.Module):
         node_embed = node_embed * node_mask[..., None]
         edge_embed = edge_embed * edge_mask[..., None]
 
-        for b in range(self._ipa_conf.num_blocks):
+        for b in range(self._model_conf.num_blocks):
             cb_distogram = None
             all_atom_contact_map = None 
 
             init_node_embed = node_embed
+            # atom embed 
+            a_token, q_skip, c_skip, p_skip = self.trunk[f"atom_attention_encoder_{b}"](
+                input_feature_dict=ref_feature_dict,
+                s=node_embed,
+                z=edge_embed
+            ) # [B, N_sample, N_token, c_token]
+            a_token = a_token * node_mask[..., None]
+
+            # residue embed 
             ipa_embed = self.trunk[f'ipa_{b}'](
                 node_embed,
                 edge_embed,
                 curr_rigids,
                 node_mask)
             ipa_embed = ipa_embed * node_mask[..., None]
-            node_embed = self.trunk[f'ipa_ln_{b}'](node_embed + ipa_embed)
+            
+            ipa_embed = self.trunk[f'fuse_ln_aa_enc_{b}'](ipa_embed + node_embed)
+            a_token = self.trunk[f'fuse_ln_ipa_{b}'](a_token)
+
+            node_embed = torch.cat([ipa_embed, a_token], dim=-1)
+            node_embed = self.trunk[f'fuse_linear_{b}'](node_embed)
+
             seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](
                 node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
             node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
@@ -146,7 +199,7 @@ class FlowModel(nn.Module):
                 node_embed * node_mask[..., None])
             curr_rigids = curr_rigids.compose_q_update_vec(
                 rigid_update, (node_mask * diffuse_mask)[..., None])
-            if b < self._ipa_conf.num_blocks-1:
+            if b < self._model_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed, curr_rigids, edge_mask
@@ -158,7 +211,7 @@ class FlowModel(nn.Module):
                         node_embed, edge_embed)
                     edge_embed = edge_embed * edge_mask[..., None]
 
-                if b < self._ipa_conf.num_blocks-2:
+                if b < self._model_conf.num_blocks-2:
                     cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
                 
                 else:
@@ -188,6 +241,7 @@ class FlowModel(nn.Module):
             'edge_embed': edge_embed,
             'curr_rigids': curr_rigids
         }
+
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,

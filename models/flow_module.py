@@ -172,7 +172,7 @@ class FlowModule(LightningModule):
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
         # pred_angles_list = model_output['all_atom_preds']['angles'].clone()
         # pred_unnormalized_angles_list = model_output['all_atom_preds']['unnormalized_angles'].clone()
-        pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.ipa.num_blocks-2] # (O, B, L, L) <- contact prob
+        pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.num_blocks-2] # (O, B, L, L) <- contact prob
         pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
 
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
@@ -425,7 +425,7 @@ class FlowModule(LightningModule):
         #     'contact_map_loss': contact_map_loss,
         #     'prmsd_loss': prmsd_loss
         # })
-        print("bond_angle_loss", bond_angle_loss)
+
         return {
             "trans_loss": trans_loss,
             "auxiliary_loss": auxiliary_loss,
@@ -472,15 +472,15 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        #     torch.tensor(pred_positions, device=batch['aatype'].device),
-        #     batch['atom14_gt_positions'],
-        #     batch['atom14_gt_exists'],
-        #     batch['original_diffuse_mask'][0],
-        #     batch['mode'],
-        #     scale_factor=torch.ones(b),
-        #     distance_threshold=5
-        # )
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+            torch.tensor(pred_positions, device=batch['aatype'].device),
+            batch['atom14_gt_positions'],
+            batch['atom14_gt_exists'],
+            batch['original_diffuse_mask'][0],
+            batch['mode'],
+            scale_factor=torch.ones(b),
+            distance_threshold=5
+        )
 
         # calculate cb contact map (B, N, 14, 3)
         gt_cb_distance_map = torch.linalg.norm(
@@ -519,12 +519,12 @@ class FlowModule(LightningModule):
             
             # print(f'contact_map: {contact_map[i].shape}')
             # print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
-            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_pred',
-            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_gt',
-            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_pred',
+                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_gt',
+                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
 
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
@@ -789,6 +789,17 @@ class FlowModule(LightningModule):
             trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
             pair_init=batch['pair_init']
         )
+
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+            torch.tensor(pred_positions, device=batch['aatype'].device),
+            batch['atom14_gt_positions'],
+            batch['atom14_gt_exists'],
+            batch['original_diffuse_mask'][0],
+            batch['mode'],
+            scale_factor=torch.ones(b),
+            distance_threshold=5
+        )
+        
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         pred_positions_37 = []
 
@@ -821,6 +832,13 @@ class FlowModule(LightningModule):
             aatype = du.to_numpy(batch['original_aatype'].long())
             chain_idx = du.to_numpy(batch['original_chain_idx'].long())
 
+            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_pred',
+                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+                                     title=pdb_id.split('_')[0] + '_gt',
+                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+                                     
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
                 bb_prot_traj=bb_traj, 

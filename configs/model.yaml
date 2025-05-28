@@ -1,6 +1,7 @@
 model:
   node_embed_size: 256
   edge_embed_size: 128
+  num_blocks: 4
   symmetric: False
   scaling_nm_ang: False 
   
@@ -27,6 +28,20 @@ model:
     embed_diffuse_mask: True
     embed_unit_vector: True
     embed_distogram: True
+
+  aa_enc:
+    c_token: ${model.node_embed_size}
+    has_s_z: True
+    c_atom: 128
+    c_atompair: 16
+    c_s: ${model.node_embed_size}
+    c_z: 128
+    n_blocks: 2
+    n_heads: 4
+    n_queries: 32
+    n_keys: 128
+    blocks_per_ckpt: 2
+
   ipa:
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
@@ -36,7 +51,6 @@ model:
     no_v_points: 12
     seq_tfmr_num_heads: 4
     seq_tfmr_num_layers: 2
-    num_blocks: 4
 
   local_triangle_attention_new:
     enable: True # true
@@ -83,3 +97,14 @@ model:
     seq_tfmr_num_layers: 2
     num_blocks: 2
     num_bins: 50
+
+  initialization:
+    zero_init_condition_transition: False
+    zero_init_atom_encoder_residual_linear: False
+    he_normal_init_atom_encoder_small_mlp: False
+    he_normal_init_atom_encoder_output: False
+    glorot_init_self_attention: False
+    zero_init_adaln: True
+    zero_init_residual_condition_transition: False
+    zero_init_dit_output: True
+    zero_init_atom_decoder_linear: False
