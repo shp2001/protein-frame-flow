@@ -790,15 +790,15 @@ class FlowModule(LightningModule):
             pair_init=batch['pair_init']
         )
 
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            torch.tensor(pred_positions, device=batch['aatype'].device),
-            batch['atom14_gt_positions'],
-            batch['atom14_gt_exists'],
-            batch['original_diffuse_mask'][0],
-            batch['mode'],
-            scale_factor=torch.ones(b),
-            distance_threshold=5
-        )
+        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+        #     torch.tensor(pred_positions, device=batch['aatype'].device),
+        #     batch['atom14_gt_positions'],
+        #     batch['atom14_gt_exists'],
+        #     batch['original_diffuse_mask'][0],
+        #     batch['mode'],
+        #     scale_factor=torch.ones(b),
+        #     distance_threshold=5
+        # )
         
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         pred_positions_37 = []
@@ -832,12 +832,12 @@ class FlowModule(LightningModule):
             aatype = du.to_numpy(batch['original_aatype'].long())
             chain_idx = du.to_numpy(batch['original_chain_idx'].long())
 
-            au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_pred',
-                                     output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-                                     title=pdb_id.split('_')[0] + '_gt',
-                                     output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_pred',
+            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_gt',
+            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
                                      
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J fm_tri_loc
+#SBATCH -J fm_hybrid_inf_105
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
 #SBATCH --mem=30g

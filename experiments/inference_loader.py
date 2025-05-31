@@ -21,6 +21,8 @@ from data.motif_index import embed_relpos, crop_antigen
 
 from itertools import accumulate
 import bisect
+
+from data import featurizer
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
 #         df,
@@ -345,4 +347,14 @@ def collate_fn(batch):
     cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
     cropped_batch['original_aatype'] = feat['aatype']
     cropped_batch['original_chain_idx'] = feat['chain_idx']
+
+    ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
+    cropped_batch['ref_feature_dict'] = {
+        'ref_space_uid': ref_space_uid,
+        'ref_element': ref_element,
+        'ref_charge': ref_charge,
+        'ref_atom_name_chars': ref_atom_name_chars,
+        'atom_to_token_idx': atom_to_token_idx,
+        'ref_pos': ref_pos,
+        }
     return cropped_batch
