@@ -198,7 +198,6 @@ class Interpolant:
             model,
             aatype,
             ref_feature_dict,
-            confidence_model=None,
             num_timesteps=None,
             trans_potential=None,
             trans_0=None,
@@ -384,12 +383,9 @@ class Interpolant:
 
         input_for_confidence = model_out['input_for_confidence']
 
-        if self._cfg.use_prmsd and confidence_model != None:
-            prmsd = confidence_model(input_for_confidence, res_mask)
-            prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
-        else:
-            prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
-            prmsd_final = prmsd
+
+        prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
+        prmsd_final = prmsd
 
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
@@ -405,7 +401,7 @@ class Interpolant:
         #     print(f'prmsd_final_val : {torch.max(prmsd_final)}')
         # else:
         #     prmsd_final = prmsd 
-        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1
+        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence
 
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

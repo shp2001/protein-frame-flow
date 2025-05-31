@@ -354,20 +354,22 @@ class FlowModule(LightningModule):
         prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_prmsd_loss:
             self.mini_rollout.set_device(loss_mask.device)
-            _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _ = self.mini_rollout.sample(
-                num_batch,
-                num_res,
-                self.model,
-                confidence_model=self.confidence_model,
-                aatype=noisy_batch['aatype'],
-                trans_1=noisy_batch['trans_1'],
-                rotmats_1=noisy_batch['rotmats_1'],
-                diffuse_mask=noisy_batch['diffuse_mask'],
-                chain_idx=noisy_batch['chain_idx'],
-                res_idx=noisy_batch['res_idx'],
-                pair_init=noisy_batch['pair_init']
-            )
+            with torch.no_grad():
+                _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _, input_for_confidence = self.mini_rollout.sample(
+                    num_batch,
+                    num_res,
+                    self.model,
+                    confidence_model=self.confidence_model,
+                    aatype=noisy_batch['aatype'],
+                    trans_1=noisy_batch['trans_1'],
+                    rotmats_1=noisy_batch['rotmats_1'],
+                    diffuse_mask=noisy_batch['diffuse_mask'],
+                    chain_idx=noisy_batch['chain_idx'],
+                    res_idx=noisy_batch['res_idx'],
+                    pair_init=noisy_batch['pair_init']
+                )
 
+            mini_prmsd = self.confidence_model(input_for_confidence)
             prmsd_loss = compute_prmsd_loss(logits=mini_prmsd,
                                     all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
@@ -449,7 +451,7 @@ class FlowModule(LightningModule):
         diffuse_mask = batch['diffuse_mask']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
-        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = self.interpolant.sample(
+        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
@@ -781,7 +783,7 @@ class FlowModule(LightningModule):
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
         # Sample batch
-        atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1 = interpolant.sample(
+        atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
             num_batch, sample_length, self.model,
             confidence_model=self.confidence_model,
             aatype=batch['aatype'],
