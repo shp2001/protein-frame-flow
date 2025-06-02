@@ -64,6 +64,11 @@ for epoch in range(num_epochs):
     total_loss = 0
     total_batch = 0
     sampler.run_sampling()
+    train_path = pass
+    train_dataset = ConfidencePTDataset(train_path)
+    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    
+    for i, batch in enumerate(train_loader):
         total_batch += 1
         # Dict 내부 텐서 GPU로
         batch = {
