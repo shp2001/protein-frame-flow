@@ -49,6 +49,7 @@ class FlowModule(LightningModule):
 
         self._checkpoint_dir = None
         self._inference_dir = None
+        self.save_file = True
 
     @property
     def checkpoint_dir(self):
@@ -359,7 +360,6 @@ class FlowModule(LightningModule):
                     num_batch,
                     num_res,
                     self.model,
-                    confidence_model=self.confidence_model,
                     aatype=noisy_batch['aatype'],
                     trans_1=noisy_batch['trans_1'],
                     rotmats_1=noisy_batch['rotmats_1'],
@@ -457,7 +457,6 @@ class FlowModule(LightningModule):
             self.model,
             aatype=batch['aatype'],
             ref_feature_dict=batch['ref_feature_dict'],
-            confidence_model=self.confidence_model,
             trans_1=batch['trans_1'],
             rotmats_1=batch['rotmats_1'],
             diffuse_mask=diffuse_mask,
@@ -783,72 +782,108 @@ class FlowModule(LightningModule):
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
         # Sample batch
-        atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
-            num_batch, sample_length, self.model,
-            confidence_model=self.confidence_model,
-            aatype=batch['aatype'],
-            ref_feature_dict=batch['ref_feature_dict'],
-            trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
-            pair_init=batch['pair_init']
-        )
-
-        # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        #     torch.tensor(pred_positions, device=batch['aatype'].device),
-        #     batch['atom14_gt_positions'],
-        #     batch['atom14_gt_exists'],
-        #     batch['original_diffuse_mask'][0],
-        #     batch['mode'],
-        #     scale_factor=torch.ones(b),
-        #     distance_threshold=5
-        # )
-        
-        bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
-        pred_positions_37 = []
-
-        pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
-        gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
-
-        for i in range(pred_positions.shape[0]):
-            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
-            gt_batch = {
-                'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
-                'atom37_atom_exists': batch['original_atom37_atom_exists']
-            }
-            gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
-            gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
-            pred_positions_37.append(gt_position_37)
-
-
-        pred_positions = np.stack(pred_positions_37)
-
-        total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
-        total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
-        prmsds = du.to_numpy(total_prmsd)
-
-        for i in range(num_batch):
-            sample_dir = sample_dirs[i]
-            pred_position = pred_positions[i]
-            prmsd = prmsds[i]
-            bb_traj = bb_trajs[i]
-            os.makedirs(sample_dir, exist_ok=True)
-            aatype = du.to_numpy(batch['original_aatype'].long())
-            chain_idx = du.to_numpy(batch['original_chain_idx'].long())
-
-            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_pred',
-            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-            #                          title=pdb_id.split('_')[0] + '_gt',
-            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
-                                     
-            _ = eu.save_traj(
-                sample=pred_position, # (L, 37, 3)
-                bb_prot_traj=bb_traj, 
-                x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                b_factors=prmsd,  # 위의 prmsd 집어넣기 
-                diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
-                output_dir=sample_dir,
-                aatype=aatype,
-                chain_index=chain_idx,
-                save_traj_bool=False
+        if self.save_file:
+            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
+                num_batch, sample_length, self.model,
+                aatype=batch['aatype'],
+                ref_feature_dict=batch['ref_feature_dict'],
+                trans_1=trans_1, 
+                rotmats_1=rotmats_1, 
+                diffuse_mask=diffuse_mask,
+                pair_init=batch['pair_init']
             )
+
+            # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+            #     torch.tensor(pred_positions, device=batch['aatype'].device),
+            #     batch['atom14_gt_positions'],
+            #     batch['atom14_gt_exists'],
+            #     batch['original_diffuse_mask'][0],
+            #     batch['mode'],
+            #     scale_factor=torch.ones(b),
+            #     distance_threshold=5
+            # )
+            
+            bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
+            pred_positions_37 = []
+
+            pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
+            gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
+
+            for i in range(pred_positions.shape[0]):
+                pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
+                gt_batch = {
+                    'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
+                    'atom37_atom_exists': batch['original_atom37_atom_exists']
+                }
+                gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
+                gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
+                pred_positions_37.append(gt_position_37)
+
+
+            pred_positions = np.stack(pred_positions_37)
+
+            total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
+            total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
+            prmsds = du.to_numpy(total_prmsd)
+
+            for i in range(num_batch):
+                sample_dir = sample_dirs[i]
+                pred_position = pred_positions[i]
+                prmsd = prmsds[i]
+                bb_traj = bb_trajs[i]
+                os.makedirs(sample_dir, exist_ok=True)
+                aatype = du.to_numpy(batch['original_aatype'].long())
+                chain_idx = du.to_numpy(batch['original_chain_idx'].long())
+
+                # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+                #                          title=pdb_id.split('_')[0] + '_pred',
+                #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+                # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+                #                          title=pdb_id.split('_')[0] + '_gt',
+                #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            
+                _ = eu.save_traj(
+                    sample=pred_position, # (L, 37, 3)
+                    bb_prot_traj=bb_traj, 
+                    x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
+                    b_factors=prmsd,  # 위의 prmsd 집어넣기 
+                    diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
+                    output_dir=sample_dir,
+                    aatype=aatype,
+                    chain_index=chain_idx,
+                    save_traj_bool=False
+                )
+
+        else:
+            sample_files = [os.path.join(
+                '/home/psh/protein-frame-flow/train_conf', f'{pdb_id}_sample_{sample_id}.pt')
+                for sample_id in sample_ids]
+            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
+                num_batch, sample_length, self.model,
+                aatype=batch['aatype'],
+                ref_feature_dict=batch['ref_feature_dict'],
+                trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
+                pair_init=batch['pair_init'],
+                save_all_repr=True,
+                atom14_gt_positions=batch['atom14_gt_positions'],
+                atom14_gt_exists=batch['atom14_gt_exists']
+            )
+            def extract_i(all_input_for_confidence, i):
+                out = {}
+
+                for key, value in all_input_for_confidence.items():
+                    if key == "input_for_confidence":
+                        # 내부 딕셔너리 처리
+                        sub_dict = {}
+                        for subkey, subval in value.items():
+                            sub_dict[subkey] = subval[i]
+                        out[key] = sub_dict
+                    else:
+                        out[key] = value[i]
+
+                return out
+            
+            for i in range(num_batch):
+                sample_file = sample_files[i]
+                input_for_confidence = extract_i(input_for_confidence, i)
+                eu.save_conf_repr(input_for_confidence, sample_file)

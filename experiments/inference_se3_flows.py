@@ -77,7 +77,7 @@ class EvalRunner:
         log.info(f'Saving results to {output_dir}')
         return output_dir
 
-    def run_sampling(self):
+    def run_sampling(self, save_file=True):
         devices = GPUtil.getAvailable(
             order='memory', limit = 8)[:self._infer_cfg.num_gpus]
         log.info(f"Using devices: {devices}")
@@ -96,6 +96,7 @@ class EvalRunner:
             strategy="ddp",
             devices=devices,
         )
+        self._flow_module.save_file = save_file
         trainer.predict(self._flow_module, dataloaders=dataloader)
 
 

@@ -192,6 +192,8 @@ def dataset_creation(dataset_class, cfg, task):
 def get_available_device(num_device):
     return GPUtil.getAvailable(order='memory', limit = 8)[:num_device]
 
+def save_conf_repr(input_for_confidence, output_path):
+    torch.save(input_for_confidence, output_path)
 
 def save_traj(
         sample: np.ndarray,
