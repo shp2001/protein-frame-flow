@@ -209,6 +209,9 @@ class Interpolant:
             res_idx=None,
             pair_init=None,
             verbose=False,
+            save_all_repr=True,
+            atom14_gt_positions=None,
+            atom14_gt_exists=None
         ):
         res_mask = torch.ones(num_batch, num_res, device=self._device)
 
@@ -401,8 +404,17 @@ class Interpolant:
         #     print(f'prmsd_final_val : {torch.max(prmsd_final)}')
         # else:
         #     prmsd_final = prmsd 
-        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence
-
+        if not save_all_repr:
+            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence
+        else:
+            all_input_for_confidence = {
+                "atom14_gt_positions": atom14_gt_positions,
+                "atom14_gt_exists": atom14_gt_exists,
+                "diffuse_mask": diffuse_mask,
+                "pred_positions": model_out['all_atom_preds']['positions'],
+                "input_for_confidence": input_for_confidence
+            }
+            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, all_input_for_confidence
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif
         motif_mask = motif_mask.clone()

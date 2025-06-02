@@ -769,20 +769,18 @@ class FlowModule(LightningModule):
             true_bb_pos = all_atom.atom37_from_trans_rot(trans_1, rotmats_1, 1 - diffuse_mask)
             true_bb_pos = true_bb_pos[..., :3, :].reshape(-1, 3).cpu().numpy()
             _, sample_length, _ = trans_1.shape
-            sample_dirs = [os.path.join(
-                self.inference_dir, pdb_id, f'sample_{sample_id}')
-                for sample_id in sample_ids]
+
         else: # unconditional
             sample_length = batch['num_res'].item()
             true_bb_pos = None
-            sample_dirs = [os.path.join(
-                self.inference_dir, f'length_{sample_length}', f'{pdb_id}')
-                for sample_id in sample_ids]
             trans_1 = rotmats_1 = diffuse_mask = None
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
         # Sample batch
         if self.save_file:
+            sample_dirs = [os.path.join(
+                self.inference_dir, pdb_id, f'sample_{sample_id}')
+                for sample_id in sample_ids]
             atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
                 num_batch, sample_length, self.model,
                 aatype=batch['aatype'],

@@ -84,7 +84,7 @@ class EvalRunner:
         log.info(f'Evaluating {self._infer_cfg.task}')
         if self._infer_cfg.task == 'unconditional':
             eval_dataset = eu.LengthDataset(self._samples_cfg)
-        elif self._infer_cfg.task == 'scaffolding':
+        elif self._infer_cfg.task == 'inpainting':
             eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
         else:
             raise ValueError(f'Unknown task {self._infer_cfg.task}')

@@ -16,6 +16,8 @@ processed_scope/
 processed_pdb/
 weights/
 **/*.pkl
+**/*.pt
+**/*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
