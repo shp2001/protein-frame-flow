@@ -180,7 +180,7 @@ class BaseDataset(Dataset):
 
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
-
+        print(f"curr_epoch", self.current_epoch)
     def _create_split(self, data_csv):
         # Training or validation specific logic.
         if self.is_training:

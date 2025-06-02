@@ -198,7 +198,7 @@ class BaseDataset(Dataset):
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
 
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=None)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
 

@@ -95,7 +95,7 @@ model:
     no_v_points: 12
     seq_tfmr_num_heads: 4
     seq_tfmr_num_layers: 2
-    num_blocks: 2
+    num_blocks: 3
     num_bins: 50
 
   initialization:

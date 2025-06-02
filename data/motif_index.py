@@ -99,7 +99,7 @@ def get_cdr_range_dict(chothia_pdb_file, heavy_only=False, light_only=False, off
 
     return cdr_range_dict
 
-def load_loop_file(loop_file, seed):
+def load_loop_file(loop_file, seed=None):
     """Gets the index of a given CDR loop"""
 
     with open(loop_file, 'r') as file:
@@ -108,8 +108,9 @@ def load_loop_file(loop_file, seed):
     loop_indices = contact_idx_dict['loop_list']
     masked_chain = contact_idx_dict['masked_chain']
     first_chain_length = contact_idx_dict['chain_A_len']
-
-    random.seed(seed)
+    
+    if seed != None:
+        random.seed(seed)
     loop_indices = random.choice(loop_indices) # [start, end]
 
     return int(loop_indices[0]), int(loop_indices[1]), masked_chain, first_chain_length
