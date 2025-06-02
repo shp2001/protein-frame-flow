@@ -12,6 +12,18 @@ import os
 import wandb  # wandb 추가
 
 from experiments.inference_se3_flows import EvalRunner
+import shutil 
+
+def clear_directory(path):
+    for filename in os.listdir(path):
+        file_path = os.path.join(path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.remove(file_path)  # 파일 또는 심볼릭 링크 제거
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)  # 디렉토리 전체 제거
+        except Exception as e:
+            print(f"삭제 실패: {file_path} - {e}")
 
 wandb.init(project='confidence_model_training', 
            name="IPA_plddt",
@@ -23,7 +35,10 @@ wandb.init(project='confidence_model_training',
 })
 config = wandb.config
 inf_cfg = '/home/psh/protein-frame-flow/configs/_inference.yaml'
-sampler = EvalRunner(OmegaConf(inf_cfg))
+inf_cfg = OmegaConf.load(inf_cfg)
+inf_cfg.inference.samples.csv_path = '/home/psh/data/train/merged_metadata_wt_nano.csv'
+inf_cfg.inference.samples.samples_per_target = 1
+sampler = EvalRunner(inf_cfg)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -53,8 +68,8 @@ class ConfidencePTDataset(Dataset):
         
         return data
 
-val_path = pass
-val_dataset = ConfidencePTDataset(val_path)
+val_dir = pass # sampler로 미리 만들어놓기 
+val_dataset = ConfidencePTDataset(val_dir)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 
 num_epochs = 150
@@ -64,8 +79,8 @@ for epoch in range(num_epochs):
     total_loss = 0
     total_batch = 0
     sampler.run_sampling()
-    train_path = pass
-    train_dataset = ConfidencePTDataset(train_path)
+    train_dir = '/home/psh/protein-frame-flow/train_conf' # sampler로 계속 업데이트트
+    train_dataset = ConfidencePTDataset(train_dir)
     train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
     
     for i, batch in enumerate(train_loader):
@@ -104,39 +119,40 @@ for epoch in range(num_epochs):
     total_loss = total_loss / total_batch
     print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss:.4f}")
     wandb.log({"epoch": epoch + 1, "train_loss": total_loss})
+    clear_directory(train_dir)
     # (선택) validation loop
 
-    # model.eval()
-    # val_loss = 0
-    # val_loss = 0
-    # total_batch = 0
-    # with torch.no_grad():
-    #     for i, batch in enumerate(val_loader):
-    #         total_batch += 
-    #         # Dict 내부 텐서 GPU로
-    #         batch = {
-    #             k: v.to(device) if isinstance(v, torch.Tensor) else v
-    #             for k, v in batch.items()
-    #         }
+    model.eval()
+    val_loss = 0
+    val_loss = 0
+    total_batch = 0
+    with torch.no_grad():
+        for i, batch in enumerate(val_loader):
+            total_batch += 
+            # Dict 내부 텐서 GPU로
+            batch = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in batch.items()
+            }
 
-    #         batch['input_for_confidence']['curr_rigids'] = du.create_rigid(batch['input_for_confidence']['curr_rotmats'],
-    #                                                                     batch['input_for_confidence']['curr_trans'])
-    #         input_for_confidence = batch['input_for_confidence']
-    #         input_for_confidence = {
-    #             k: v.to(device) if isinstance(v, torch.Tensor) else v
-    #             for k, v in input_for_confidence.items()
-    #         }
+            batch['input_for_confidence']['curr_rigids'] = du.create_rigid(batch['input_for_confidence']['curr_rotmats'],
+                                                                        batch['input_for_confidence']['curr_trans'])
+            input_for_confidence = batch['input_for_confidence']
+            input_for_confidence = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in input_for_confidence.items()
+            }
 
-    #         node_mask = torch.ones_like(batch['diffuse_mask'], device=device)
-    #         output = model(input_for_confidence, node_mask)
+            node_mask = torch.ones_like(batch['diffuse_mask'], device=device)
+            output = model(input_for_confidence, node_mask)
 
-    #         # output shape = (L, num_bins) or (L,), match with target
-    #         loss = compute_prmsd_loss(logits=output,
-    #                                 all_atom_pred_pos=batch["pred_positions"].squeeze(0), # predicted structure (b, l, 14, 3)
-    #                                 all_atom_positions=batch["atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-    #                                 all_atom_mask=batch["atom14_gt_exists"],
-    #                                 cdr_mask=batch['diffuse_mask']) # (b, l)
-    #         val_loss += loss.item()
-    # print(f"  Validation Loss: {val_loss:.4f}")
+            # output shape = (L, num_bins) or (L,), match with target
+            loss = compute_prmsd_loss(logits=output,
+                                    all_atom_pred_pos=batch["pred_positions"].squeeze(0), # predicted structure (b, l, 14, 3)
+                                    all_atom_positions=batch["atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
+                                    all_atom_mask=batch["atom14_gt_exists"],
+                                    cdr_mask=batch['diffuse_mask']) # (b, l)
+            val_loss += loss.item()
+    print(f"  Validation Loss: {val_loss:.4f}")
 
-    # wandb.log({"epoch": epoch + 1, "val_loss": val_loss})
+    wandb.log({"epoch": epoch + 1, "val_loss": val_loss})

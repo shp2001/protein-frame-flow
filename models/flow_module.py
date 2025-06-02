@@ -855,6 +855,9 @@ class FlowModule(LightningModule):
                 )
 
         else:
+            if not os.path.exists('/home/psh/protein-frame-flow/train_conf'):
+                os.makedirs('/home/psh/protein-frame-flow/train_conf', exist_ok=True)
+
             sample_files = [os.path.join(
                 '/home/psh/protein-frame-flow/train_conf', f'{pdb_id}_sample_{sample_id}.pt')
                 for sample_id in sample_ids]
