@@ -54,7 +54,7 @@ def sample_csv(
     # 클러스터에서 하나씩 샘플링한 pdb_name 수집
     random.seed(random_state + epoch)
     selected_pdbs = [random.choice(pdbs) for pdbs in cluster_dict.values() if pdbs]
-    cluster_df = df[df['pdb_name'].isin(selected_pdbs)]
+    cluster_df = df[df['pdb_name'].isin(selected_pdbs) & (df['mode'] == 'ab')]
 
     # # general mode인 데이터 중 샘플링
     # general_df = df[df['mode'] == 'general']
@@ -127,6 +127,7 @@ for epoch in range(num_epochs):
     model.train()
 
     # sampling the trainset 
+
     csv_path = '/home/psh/data/train/merged_metadata_wt_nano.csv'
     sampled_csv_path = '/home/psh/protein-frame-flow/train_conf/metadata.csv'
     sample_csv(
@@ -144,10 +145,11 @@ for epoch in range(num_epochs):
     inf_cfg.inference.samples.samples_per_target = 1
     inf_cfg.inference.seed = epoch
     sampler = EvalRunner(inf_cfg)
+    sampler.run_sampling(save_file=False)
 
     total_loss = 0
     total_batch = 0
-    sampler.run_sampling(save_file=False)
+    
     train_dir = '/home/psh/protein-frame-flow/train_conf' # sampler로 계속 업데이트트
     train_dataset = ConfidencePTDataset(train_dir)
     train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -217,7 +219,7 @@ for epoch in range(num_epochs):
             output = model(input_for_confidence, node_mask)
 
             # output shape = (L, num_bins) or (L,), match with target
-            loss = compute_prmsd_loss(logits=output,
+            loss = lddt_loss(logits=output,
                                     all_atom_pred_pos=batch["pred_positions"].squeeze(0), # predicted structure (b, l, 14, 3)
                                     all_atom_positions=batch["atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=batch["atom14_gt_exists"],

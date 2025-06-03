@@ -2,11 +2,11 @@ wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use 
 wandb: wandb version 0.19.11 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in /home/psh/protein-frame-flow/wandb/run-20250602_220825-v3fszdn6
+wandb: Run data is saved locally in /home/psh/protein-frame-flow/wandb/run-20250603_123223-ofwjeowk
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run IPA_plddt_fm_hybrid_only_ab
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/confidence_model_training
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/confidence_model_training/runs/v3fszdn6
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/confidence_model_training/runs/ofwjeowk
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
