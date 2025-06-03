@@ -209,7 +209,7 @@ class Interpolant:
             res_idx=None,
             pair_init=None,
             verbose=False,
-            save_all_repr=True,
+            save_all_repr=False,
             atom14_gt_positions=None,
             atom14_gt_exists=None
         ):
@@ -385,8 +385,6 @@ class Interpolant:
         contact_map = model_out['pair_outputs'][-1]
 
         input_for_confidence = model_out['input_for_confidence']
-
-
         prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
         prmsd_final = prmsd
 

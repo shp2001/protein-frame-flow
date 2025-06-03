@@ -279,7 +279,6 @@ class ConfidenceModel(nn.Module):
     
     def forward(self, input_feats, node_mask): 
     # input feats is a dictionary which includes node_embed, edge_embed, curr_rigids, node_mask
-    
         node_embed = input_feats['node_embed']
         edge_embed = input_feats['edge_embed']
         curr_rigids = input_feats['curr_rigids']

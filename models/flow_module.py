@@ -369,7 +369,7 @@ class FlowModule(LightningModule):
                     pair_init=noisy_batch['pair_init']
                 )
 
-            mini_prmsd = self.confidence_model(input_for_confidence)
+            mini_prmsd = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
             prmsd_loss = compute_prmsd_loss(logits=mini_prmsd,
                                     all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
@@ -778,6 +778,7 @@ class FlowModule(LightningModule):
 
         # Sample batch
         if self.save_file:
+            print("save_file", self.save_file)
             sample_dirs = [os.path.join(
                 self.inference_dir, pdb_id, f'sample_{sample_id}')
                 for sample_id in sample_ids]
@@ -791,6 +792,10 @@ class FlowModule(LightningModule):
                 pair_init=batch['pair_init']
             )
 
+            if self.confidence_model != None:
+                prmsd = self.confidence_model(input_for_confidence, batch['res_mask'])
+                prmsd_final = compute_plddt(prmsd, cdr_mask=batch['diffuse_mask'])
+                print("prmsd_final", prmsd_final[0])
             # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             #     torch.tensor(pred_positions, device=batch['aatype'].device),
             #     batch['atom14_gt_positions'],
