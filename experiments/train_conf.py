@@ -89,7 +89,7 @@ config = wandb.config
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-checkpoint_dir = os.path.join('/home/psh/protein-frame-flow/ckpt/confidence', proj_name)
+checkpoint_dir = os.path.join('/home/psh/protein-frame-flow/ckpt/confidence/fm_hybrid_final', proj_name)
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 model_conf_path = '/home/psh/protein-frame-flow/configs/model.yaml'
@@ -183,6 +183,7 @@ for epoch in range(num_epochs):
         print(f"Epoch {epoch+1}/{num_epochs} Step {i}, train loss: {loss.item()}")
         optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         total_loss += loss.item()

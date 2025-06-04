@@ -807,14 +807,18 @@ def lddt_loss(
     lddt_ca_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
     # if len(torch.nonzero(cdr_mask[0])) > 20:
     #     print(f'lddt_ca_one_hot: {torch.nonzero(lddt_ca_one_hot[0])}')
-    errors = softmax_cross_entropy(logits, lddt_ca_one_hot)
+    errors = softmax_cross_entropy(logits, lddt_ca_one_hot) # (..., L)
     all_atom_mask = all_atom_mask.squeeze(-1)
 
-    all_atom_mask = all_atom_mask * cdr_mask
-    loss = torch.sum(errors * all_atom_mask, dim=-1) / (
+    all_atom_cdr_mask = all_atom_mask * cdr_mask # (..., L)
+    total_loss = torch.sum(errors * all_atom_mask, dim=-1) / (
         eps + torch.sum(all_atom_mask, dim=-1)
     )
+    cdr_loss = torch.sum(errors * all_atom_cdr_mask, dim=-1) / (
+        eps + torch.sum(all_atom_cdr_mask, dim=-1)
+    )
 
+    loss = cdr_loss + total_loss
     return loss
 
 def compute_all_atom_clash_loss(
