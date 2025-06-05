@@ -794,6 +794,7 @@ def lddt_loss(
     ca_pos = residue_constants.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
+    print("positions_diff", all_atom_pred_pos[0] - all_atom_positions[0])
     all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
 
     score = lddt(

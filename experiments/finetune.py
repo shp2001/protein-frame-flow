@@ -58,13 +58,13 @@ class Experiment:
         }
 
         # 기존 가중치 로드 (strict=False로 새로운 모듈 무시)
-        missing_keys, unexpected_keys = self._module.model.load_state_dict(flow_state_dict, strict=False)
-        print(f'missing_keys')
+        missing_keys, unexpected_keys = self._module.model.load_state_dict(flow_state_dict)
+
         log.info(f"Loaded warm-start checkpoint from {self._exp_cfg.warm_start}")
-        if missing_keys:
-            log.info(f"Missing keys (likely new modules): {missing_keys}")
-        if unexpected_keys:
-            log.info(f"Unexpected keys: {unexpected_keys}")
+
+        log.info(f"Missing keys (likely new modules): {missing_keys}")
+
+        log.info(f"Unexpected keys: {unexpected_keys}")
 
     #     # 새로운 모듈의 가중치 초기화
     #     self._initialize_new_modules()

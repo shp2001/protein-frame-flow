@@ -355,22 +355,24 @@ class FlowModule(LightningModule):
         prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_prmsd_loss:
             self.mini_rollout.set_device(loss_mask.device)
-            with torch.no_grad():
-                _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _, input_for_confidence = self.mini_rollout.sample(
-                    num_batch,
-                    num_res,
-                    self.model,
-                    aatype=noisy_batch['aatype'],
-                    trans_1=noisy_batch['trans_1'],
-                    rotmats_1=noisy_batch['rotmats_1'],
-                    diffuse_mask=noisy_batch['diffuse_mask'],
-                    chain_idx=noisy_batch['chain_idx'],
-                    res_idx=noisy_batch['res_idx'],
-                    pair_init=noisy_batch['pair_init']
-                )
+
+            _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _, input_for_confidence = self.mini_rollout.sample(
+                num_batch,
+                num_res,
+                self.model,
+                ref_feature_dict=noisy_batch['ref_feature_dict'],
+                aatype=noisy_batch['aatype'],
+                trans_1=noisy_batch['trans_1'],
+                rotmats_1=noisy_batch['rotmats_1'],
+                diffuse_mask=noisy_batch['diffuse_mask'],
+                chain_idx=noisy_batch['chain_idx'],
+                res_idx=noisy_batch['res_idx'],
+                pair_init=noisy_batch['pair_init'],
+                rollout=True
+            )
 
             mini_prmsd = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
-            prmsd_loss = compute_prmsd_loss(logits=mini_prmsd,
+            prmsd_loss = lddt_loss(logits=mini_prmsd,
                                     all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
                                     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
                                     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],

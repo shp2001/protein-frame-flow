@@ -22,7 +22,7 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 80
+    max_batch_size: 1
     max_num_res_squared: 185_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -85,7 +85,7 @@ mini_rollout:
       cutoff: 5.0
 
   sampling:
-    num_timesteps: 10
+    num_timesteps: 8
     do_sde: False
 
   use_prmsd: ${model.prmsd.use_prmsd}
@@ -98,7 +98,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 1
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_hybrid/2025-05-28_17-17-52/epoch=105-step=150096_copy.ckpt
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -134,7 +134,7 @@ experiment:
     aux_loss_within_clash_loss_weight: 0.1 # 1.5 ~ 3.0
     aux_loss_bond_angle_weight: 0.00001 # ?????????
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_prmsd_loss_weight: 0.03 # 4.0 ~ 6.0
+    aux_loss_prmsd_loss_weight: 0.1 # 4.0 ~ 6.0
     aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
     aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
     
@@ -160,7 +160,7 @@ experiment:
     deterministic: False
     strategy: ddp
     check_val_every_n_epoch: 2
-    accumulate_grad_batches: 2
+    accumulate_grad_batches: 1
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

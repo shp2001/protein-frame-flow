@@ -211,7 +211,8 @@ class Interpolant:
             verbose=False,
             save_all_repr=False,
             atom14_gt_positions=None,
-            atom14_gt_exists=None
+            atom14_gt_exists=None,
+            rollout=False
         ):
         res_mask = torch.ones(num_batch, num_res, device=self._device)
 
@@ -377,8 +378,13 @@ class Interpolant:
                 raise ValueError('Must provide rotmats_1 if not corrupting.')
             batch['rotmats_t'] = rotmats_1
         batch['t'] = torch.ones((num_batch, 1), device=self._device) * t_1
-        with torch.no_grad():
-            model_out = model(batch)
+        
+        if rollout:
+            with torch.inference_mode(False):
+                model_out = model(batch)
+        else:
+            with torch.no_grad():
+                model_out = model(batch)
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]

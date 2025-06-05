@@ -80,7 +80,7 @@ proj_name = "IPA_plddt_fm_hybrid_only_ab"
 wandb.init(project='confidence_model_training', 
            name=f"{proj_name}",
            config={
-    "learning_rate": 1e-4,
+    "learning_rate": 2e-4,
     "epochs": 1000,
     "batch_size": 1,
     "model_config": '/home/psh/protein-frame-flow/configs/model.yaml',
@@ -89,13 +89,13 @@ config = wandb.config
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-checkpoint_dir = os.path.join('/home/psh/protein-frame-flow/ckpt/confidence/fm_hybrid_final', proj_name)
+checkpoint_dir = os.path.join('/home/psh/protein-frame-flow/ckpt/confidence/fm_hybrid_final_2e-4', proj_name)
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 model_conf_path = '/home/psh/protein-frame-flow/configs/model.yaml'
 model_conf = OmegaConf.load(model_conf_path)
 model = ConfidenceModel(model_conf.model).to(device)
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=2e-4)
 
 class ConfidencePTDataset(Dataset):
     def __init__(self, pt_dir):
