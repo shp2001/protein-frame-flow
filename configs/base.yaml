@@ -22,7 +22,7 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 1
+    max_batch_size: 80
     max_num_res_squared: 185_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -96,9 +96,9 @@ mini_rollout:
 experiment:
   add_modules: False
   debug: False
-  seed: 123
+  seed: 73
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_hybrid/2025-05-28_17-17-52/epoch=105-step=150096_copy.ckpt
+  warm_start: null
   warm_start_cfg_override: True
   training:
     mask_plddt: True
@@ -141,10 +141,10 @@ experiment:
     # fape loss
     aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
     aux_loss_fape_sc_loss_weight: 2.0 # 0.3 ~ 0.7
-    aux_loss_t_pass: 0.2 
-    viol_loss_t_pass: 0.5
+    aux_loss_t_pass: 0.1
+    viol_loss_t_pass: 0.2
   wandb:
-    name: fm_hybrid
+    name: CDRFlow_v1.0.0
     project: se3-fm
   optimizer:
     warmup_steps: 0

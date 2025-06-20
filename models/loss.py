@@ -300,10 +300,17 @@ def compute_rmsd(
     cdr_mask, # (b, l)  <- cdr: 1 fv: 0
     atom14_gt_exists, # (b, l, 14) <- exists: 1 non-exists: 0
     mode,
+    data_mode, # ab or general or nanobody 
     cdr_clamp=30,
-    compute_non_cdr=False
+    compute_non_cdr=False,
+    compute_cdr=False,
+    compute_h3=False,
 ):
-
+    if compute_cdr == False and compute_non_cdr == False and compute_h3 == False:
+        assert "At least one of 'compute_cdr' or 'compute_non_cdr' or 'compute_cdr' must be True."
+    if data_mode not in ['ab', 'nanobody', 'general']:
+        assert "Data mode should be one of 'compute_cdr', 'compute_non_cdr' and 'compute_cdr'."
+    
     if mode == 'bb':
         pred = pred[:, :, :, :3]
         aligned_target = aligned_target[:, :, :3]
@@ -313,29 +320,43 @@ def compute_rmsd(
         aligned_target = aligned_target[:, :, 3:]
         atom14_gt_exists = atom14_gt_exists[:, :, 3:]
 
+    if data_mode == 'general' and mode != 'bb':
+        compute_cdr = False
+    
     mse = torch.nn.functional.mse_loss(
         pred,
         aligned_target[None, ...],
         reduction='none',
     ).mean(-1) # (o, b, L, a)
 
-    mask = cdr_mask[..., None] * atom14_gt_exists # (b, L, a)
-    cdr_mse = mse * mask[None, ...] # (o, b, L, a)
+    loss = 0
+    if compute_cdr: 
+        if compute_h3:
+            mask = cdr_mask[..., None] * atom14_gt_exists # (b, L, a)
+        else:
+            h3_anchor = find_anchor(cdr_mask[0], only_h3=True) # [a, b]
+            cdr_residues = [i for i in range(h3_anchor[0]+1, h3_anchor[1]) if cdr_mask[0,i]==1]
+            cdr_mask_wo_h3 = cdr_mask.clone()
+            cdr_mask_wo_h3[:, cdr_residues] = 0
+            mask = cdr_mask_wo_h3[..., None] * atom14_gt_exists
+            
+        cdr_mse = mse * mask[None, ...] # (o, b, L, a)
 
-    cdr_mse = cdr_mse.permute(1,0,2,3) # (b, o, L, a)
+        cdr_mse = cdr_mse.permute(1,0,2,3) # (b, o, L, a)
 
-    if cdr_clamp > 0:
-        cdr_mse = torch.clamp(cdr_mse, max=cdr_clamp**2)
+        if cdr_clamp > 0:
+            cdr_mse = torch.clamp(cdr_mse, max=cdr_clamp**2)
 
-    cdr_mse = torch.sum(
-        cdr_mse,
-        dim=(-1,-2,-3),
-    ) / (torch.sum(
-        mask,
-        dim=(-1,-2),
-    ) * 3)
-    
-    cdr_mse = torch.sqrt(cdr_mse) # (b)
+        cdr_mse = torch.sum(
+            cdr_mse,
+            dim=(-1,-2,-3),
+        ) / (torch.sum(
+            mask,
+            dim=(-1,-2),
+        ) * 3)
+        
+        cdr_mse = torch.sqrt(cdr_mse) # (b)
+        loss = loss + cdr_mse 
 
     if compute_non_cdr:
         mask = (1-cdr_mask[..., None]) * atom14_gt_exists # (b, L, a)
@@ -354,11 +375,10 @@ def compute_rmsd(
             dim=(-1,-2),
         ) * 3)
         
-
         non_cdr_mse = torch.sqrt(non_cdr_mse) # (b)
-        cdr_mse = non_cdr_mse + cdr_mse 
+        loss = loss + non_cdr_mse 
 
-    return cdr_mse
+    return loss
 
 def cdr_clamp(error_dist, l1_clamp_distance, l1_clamp_distance_large, cdr_mask):
     intra_clamped = torch.clamp(error_dist, min=0, max=l1_clamp_distance_large)
@@ -833,6 +853,7 @@ def compute_all_atom_clash_loss(
         residue_constants.van_der_waals_radius[name[0]]
         for name in residue_constants.atom_types
     ]
+    print(f'atomtype_radius: {atomtype_radius}')
     atomtype_radius = atom14_pred_positions.new_tensor(atomtype_radius)
     atom14_atom_radius = (
         atom14_atom_exists

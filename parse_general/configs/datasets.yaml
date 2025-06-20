@@ -10,12 +10,9 @@ shared:
   max_motif_percent: 1
 
   # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
-  mode: ab
-  loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
+  masking_dir: /home/psh/data/general/masking_index
   
-  # masking scheduling 
-  init_masking_prob: 0.3 
-  masking_increase_ratio: 0.02
+
 scope_dataset:
   seed: ${shared.seed}
   csv_path: ./metadata/scope_metadata.csv
@@ -71,8 +68,8 @@ pdb_dataset:
     min_num_res: 100
     max_coil_percent: 1.0
     rog_quantile: 1.0
-    # oligomeric: ['monomeric', 'heteromer']
-    # num_chains: [2,3,4,5,6,7]
+    oligomeric: ['monomeric', 'heteromer']
+    num_chains: [2,3,4,5,6,7]
 
   # Scaffolding
   min_motif_percent: ${shared.min_motif_percent} 

@@ -16,7 +16,7 @@ import json
 from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 
-from data.motif_index import load_loop_file, crop_antigen, crop_general_protein
+from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein
 
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
@@ -181,6 +181,7 @@ class BaseDataset(Dataset):
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
         print(f"curr_epoch", self.current_epoch)
+        
     def _create_split(self, data_csv):
         # Training or validation specific logic.
         if self.is_training:
@@ -217,10 +218,22 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=self.current_epoch + idx)
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
         
+        if csv_row['mode'] == 'monomer':
+            mask_info_file = csv_row['mask_info_file']
+            loop_start, loop_end = load_monomer_mask(mask_info_file)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+
+        if csv_row['mode'] == 'polymer':
+            mask_info_file = csv_row['mask_info_file']
+            interface_start, interface_end = load_polymer_mask(mask_info_file)
+            scaffold_idx[f'loop_start'] = interface_start
+            scaffold_idx[f'loop_end'] = interface_end
+
         processed_row = _process_csv_row(path, raw_path, scaffold_idx)
         processed_row['masked_chain'] = masked_chain
         processed_row['first_chain_len'] = first_chain_len
@@ -235,7 +248,7 @@ class BaseDataset(Dataset):
         scaffold_idx = batch['scaffold_idx']
         scaffold_mask = torch.zeros(num_res)
 
-        if mode == 'general': # general loop PPI
+        if mode == 'general' or mode == 'polymer' or mode == 'monomer': # general loop PPI
             loop_indices = []
             for scf, idx in scaffold_idx.items():
                 loop_indices.append(idx)
@@ -243,7 +256,7 @@ class BaseDataset(Dataset):
 
             scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
 
-        elif mode == 'ab': # antibody-antigen
+        if mode == 'ab': # antibody-antigen
             cdr_indices = []
             for scf, idx in scaffold_idx.items():
                 cdr_indices.append(idx)
@@ -251,15 +264,16 @@ class BaseDataset(Dataset):
             for i in range(6):
                 scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
 
-        elif mode == 'nanobody': # Nanobody-antigen
+        if mode == 'nanobody': # Nanobody-antigen
             cdr_indices = []
             for scf, idx in scaffold_idx.items():
                 cdr_indices.append(idx)
             cdr_indices = sorted(cdr_indices)
             for i in range(3):
                 scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
-                
+
         return scaffold_mask * batch['res_mask']
+
     
     def setup_inpainting(self, feats, rng):
         diffuse_mask = self._sample_scaffold_mask(feats, rng)
@@ -330,13 +344,11 @@ class BaseDataset(Dataset):
                                                 crop_ab=self.dataset_cfg.crop_ab,
                                                 mode=mode
                                                 )   
-            if mode == 'general':
+            if mode == 'general' or mode == 'polymer' or mode == 'monomer':
                 feats['res_idx'] = crop_general_protein(feats['trans_1'],
                                 loop_mask=feats['diffuse_mask'],
                                 nan_mask=feats['res_mask'],
                                 max_len=self.dataset_cfg.general_max_num_res,
-                                masked_chain=feats['masked_chain'],
-                                first_chain_len=feats['first_chain_len'],
                                 seq_list=feats['chain_seq_list']
                                 )
 
@@ -407,7 +419,7 @@ class PdbDataset(BaseDataset):
 
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
-
+        print(epoch)
     def _filter_metadata(self, raw_csv):
         """Filter metadata."""
         filter_cfg = self.dataset_cfg.filter

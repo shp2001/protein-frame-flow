@@ -232,12 +232,15 @@ class FlowModule(LightningModule):
                                     cdr_mask=noisy_batch['diffuse_mask'],
                                     atom14_gt_exists=renamed_atom14_gt_exists,
                                     mode='bb',
-                                    compute_non_cdr=False
+                                    data_mode=noisy_batch['mode'],
+                                    compute_non_cdr=False,
+                                    compute_cdr=True,
+                                    compute_h3=True
                                     )
                                 
         # sc atom loss (final layer만 계산)
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        interface_mask = noisy_batch['diffuse_mask']
+        interface_mask = noisy_batch['diffuse_mask'].clone()
         interface_mask[:, neighbor_indices] = 1
 
         if training_cfg.aux_loss_use_sc_atom_loss:
@@ -246,7 +249,10 @@ class FlowModule(LightningModule):
                                     cdr_mask=interface_mask,
                                     atom14_gt_exists=renamed_atom14_gt_exists,
                                     mode='sc',
-                                    compute_non_cdr=True
+                                    data_mode=noisy_batch['mode'],
+                                    compute_non_cdr=True,
+                                    compute_cdr=True,
+                                    compute_h3=True
                                     )    
         # torsion angle loss 
         # chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
@@ -268,7 +274,10 @@ class FlowModule(LightningModule):
                                 cdr_mask=noisy_batch['diffuse_mask'],
                                 atom14_gt_exists=renamed_atom14_gt_exists,
                                 mode='bb',
-                                compute_non_cdr=False
+                                data_mode=noisy_batch['mode'],
+                                compute_non_cdr=False,
+                                compute_cdr=True,
+                                compute_h3=True
                                 )
 
         final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)

@@ -111,10 +111,64 @@ def load_loop_file(loop_file, seed=None):
     
     if seed != None:
         random.seed(seed)
-    loop_indices = random.choice(loop_indices) # [start, end]
+    loop_index = random.choice(loop_indices) # [start, end]
 
-    return int(loop_indices[0]), int(loop_indices[1]), masked_chain, first_chain_length
+    return int(loop_index[0]), int(loop_index[1]), masked_chain, first_chain_length
 
+def load_monomer_mask(mask_info_file, seed=None):
+    with open(mask_info_file, 'r') as file:
+        loop_indices = json.load(file)
+    
+    if seed != None:
+        random.seed(seed)
+    loop_index = random.choice(loop_indices)
+    
+    return int(loop_index[0]), int(loop_index[-1])
+
+def load_polymer_mask(mask_info_file, seed=None):
+    if seed is not None:
+        random.seed(seed)
+
+    with open(mask_info_file, 'r') as file:
+        interface_indices = json.load(file)
+
+    # 1. 체인 선택 (길이 50 이상 중 무작위, 없으면 최장)
+    chain_lengths = interface_indices["chain_lengths"]
+    long_chains = [c for c, l in chain_lengths.items() if l >= 50]
+    selected_chain = random.choice(long_chains) if long_chains else max(chain_lengths, key=chain_lengths.get)
+
+    # 2. 체인 오프셋 계산: 각 체인의 시작 residue index
+    chain_ids = sorted(chain_lengths.keys())  # 예: A, B, C ...
+    chain_offsets = {}
+    offset = 0
+    for cid in chain_ids:
+        chain_offsets[cid] = offset
+        offset += chain_lengths[cid]
+
+    # 3. 선택된 체인의 시작·끝 인덱스
+    start_index = chain_offsets[selected_chain]
+    end_index = start_index + chain_lengths[selected_chain] - 1
+
+    # 4. interface residue 리스트 가져오기 (A→0, B→1, ...)
+    chain_index = str(ord(selected_chain) - ord('A'))
+    interface_list = interface_indices["interface_residues"].get(chain_index, [])
+
+    if not interface_list:
+        raise ValueError(f"No interface residues found for chain {selected_chain}")
+
+    interface = random.choices(interface_list, weights=[len(g) for g in interface_list])[0]
+
+    # 5. 길이 자르기 (30 초과시 연속 30개)
+    if len(interface) > 30:
+        start = random.randint(0, len(interface) - 30)
+        interface = interface[start:start + 30]
+
+    # 6. clipping: 선택된 체인의 범위 안에서만 확장
+    min_res = max(start_index, interface[0] - 5)
+    max_res = min(end_index, interface[-1] + 5)
+
+    return int(min_res), int(max_res)
+    
 ######################## crop_antigen ########################
 
 def group_numbers(numbers, nan_mask):
@@ -215,7 +269,7 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, mode='
 
 ######################## crop_general_protein ########################
 
-def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, masked_chain, first_chain_len, seq_list):  
+def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):  
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)
     residue_indices = None
