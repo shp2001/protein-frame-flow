@@ -98,8 +98,8 @@ experiment:
   debug: False
   seed: 123
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_general/2025-06-24_00-46-50/last.ckpt
-  warm_start_cfg_override: True
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_general/2025-06-25_10-16-35/last.ckpt
+  warm_start_cfg_override: False
   training:
     mask_plddt: True
     bb_atom_scale: 0.1
@@ -144,13 +144,13 @@ experiment:
     aux_loss_t_pass: 0.1
     viol_loss_t_pass: 0.2
   wandb:
-    name: CDRFlow_general
+    name: CDRFlow_stage2
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 4e5
-    min_lr: 1e-5
-    max_lr: 1e-4
+    min_lr: 1e-6
+    max_lr: 1e-5
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

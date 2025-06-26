@@ -307,7 +307,8 @@ class FlowModule(LightningModule):
             )
             # contact_map_loss = contact_map_loss * scale_factor.squeeze()
         # all atom clash loss 
-        all_atom_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        batch_size = gt_atom14_pos.shape[0]
+        all_atom_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.aux_loss_use_all_atom_clash_loss:
             try:
                 all_atom_clash_loss = compute_all_atom_clash_loss(
@@ -319,9 +320,9 @@ class FlowModule(LightningModule):
                 )
             except Exception as e:
                 print(f"[Warning] all atom clash loss skipped due to error: {e}")
-                all_atom_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+                all_atom_clash_loss = torch.zeros(batch_size).to(device)
 
-        within_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        within_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.aux_loss_use_within_clash_loss:
             try:
                 within_clash_loss = compute_within_clash_loss(
@@ -331,7 +332,7 @@ class FlowModule(LightningModule):
                                                             noisy_batch['aatype'])   
             except Exception as e:
                 print(f"[Warning] within clash loss skipped due to error: {e}")
-                within_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+                within_clash_loss = torch.zeros(batch_size).to(device)
 
         bond_angle_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_bond_angle_loss:
