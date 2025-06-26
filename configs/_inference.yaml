@@ -20,7 +20,7 @@ inference:
   num_gpus: 2
 
   interpolant:
-    use_prmsd: True
+    use_prmsd: False
     min_t: 1e-2
     rots:
       corrupt: True
