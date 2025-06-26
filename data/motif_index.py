@@ -115,15 +115,20 @@ def load_loop_file(loop_file, seed=None):
 
     return int(loop_index[0]), int(loop_index[1]), masked_chain, first_chain_length
 
-def load_monomer_mask(mask_info_file, seed=None):
+def load_monomer_mask(mask_info_file, seq_len, seed=None):
     with open(mask_info_file, 'r') as file:
         loop_indices = json.load(file)
     
-    if seed != None:
+    if seed is not None:
         random.seed(seed)
-    loop_index = random.choice(loop_indices)
     
-    return int(loop_index[0]), int(loop_index[-1])
+    loop_index = random.choice(loop_indices)
+
+    # 시작과 끝을 clipping
+    start = max(0, int(loop_index[0]))
+    end = min(seq_len - 1, int(loop_index[-1]))
+
+    return start, end
 
 def load_polymer_mask(mask_info_file, seed=None):
     if seed is not None:
@@ -132,40 +137,56 @@ def load_polymer_mask(mask_info_file, seed=None):
     with open(mask_info_file, 'r') as file:
         interface_indices = json.load(file)
 
-    # 1. 체인 선택 (길이 50 이상 중 무작위, 없으면 최장)
     chain_lengths = interface_indices["chain_lengths"]
-    long_chains = [c for c, l in chain_lengths.items() if l >= 50]
-    selected_chain = random.choice(long_chains) if long_chains else max(chain_lengths, key=chain_lengths.get)
+    chain_ids = list(chain_lengths.keys())  # 등장 순서 보장
 
-    # 2. 체인 오프셋 계산: 각 체인의 시작 residue index
-    chain_ids = sorted(chain_lengths.keys())  # 예: A, B, C ...
+    # interface_residues에 존재하는 체인 인덱스들만 추출
+    interface_residues = interface_indices["interface_residues"]
+    interface_chain_indices = [
+        idx for idx, residues in interface_residues.items()
+        if residues  # 빈 리스트가 아닌 경우
+    ]
+
+    interface_chains = [
+        chain_ids[int(idx)] for idx in interface_chain_indices
+    ]
+
+    long_chains = [c for c in interface_chains if chain_lengths[c] >= 50]
+
+    if long_chains:
+        selected_chain = random.choice(long_chains)
+    else:
+        selected_chain = max(interface_chains, key=lambda c: chain_lengths[c])
+
+    # 체인 오프셋 계산
     chain_offsets = {}
     offset = 0
     for cid in chain_ids:
         chain_offsets[cid] = offset
         offset += chain_lengths[cid]
 
-    # 3. 선택된 체인의 시작·끝 인덱스
     start_index = chain_offsets[selected_chain]
     end_index = start_index + chain_lengths[selected_chain] - 1
 
-    # 4. interface residue 리스트 가져오기 (A→0, B→1, ...)
-    chain_index = str(ord(selected_chain) - ord('A'))
+    # interface residue 리스트 가져오기
+    chain_index = str(chain_ids.index(selected_chain))  # 등장 순서 기반 인덱싱
     interface_list = interface_indices["interface_residues"].get(chain_index, [])
 
     if not interface_list:
-        raise ValueError(f"No interface residues found for chain {selected_chain}")
+        raise ValueError(f"{mask_info_file}: No interface residues found for chain {selected_chain}")
 
     interface = random.choices(interface_list, weights=[len(g) for g in interface_list])[0]
 
-    # 5. 길이 자르기 (30 초과시 연속 30개)
+    # 5. clipping: 선택된 체인의 범위 안에서만 확장
+    min_res = max(start_index, interface[0] - 5)
+    max_res = min(end_index, interface[-1] + 5)
+    
+    interface = [res for res in interface if min_res <= res <= max_res]
+
+    # 6. 길이 자르기 (30 초과시 연속 30개)
     if len(interface) > 30:
         start = random.randint(0, len(interface) - 30)
         interface = interface[start:start + 30]
-
-    # 6. clipping: 선택된 체인의 범위 안에서만 확장
-    min_res = max(start_index, interface[0] - 5)
-    max_res = min(end_index, interface[-1] + 5)
 
     return int(min_res), int(max_res)
     
@@ -210,6 +231,63 @@ def find_anchor(pattern, only_h3=True):
     if only_h3:
         anchor = anchor[4:6]
     return anchor
+
+def provide_anchor(diffuse_mask, res_mask, chain_index, mode):
+    if mode == 'monomer':
+        indices = torch.nonzero(diffuse_mask, as_tuple=False).squeeze()
+        if indices.numel() > 0:
+            start, end = indices[0].item(), indices[-1].item()
+
+            # 시작 이전에 anchor(res_mask==1)가 없으면 앞을 마스킹
+            if res_mask[:start].sum() == 0:
+                for i in range(start, end + 1):
+                    diffuse_mask[i] = 0
+                    if res_mask[i] == 1:
+                        break
+
+            # 끝 이후에 anchor(res_mask==1)가 없으면 뒤를 마스킹
+            if res_mask[end + 1:].sum() == 0:
+                for i in range(end, start - 1, -1):
+                    diffuse_mask[i] = 0
+                    if res_mask[i] == 1:
+                        break
+
+    elif mode == 'polymer':
+        unique_chains = torch.unique(chain_index)
+
+        for chain_id in unique_chains:
+            chain_mask = (chain_index == chain_id)
+            chain_indices = torch.nonzero(chain_mask, as_tuple=False).squeeze()
+
+            if chain_indices.numel() == 0:
+                continue
+
+            chain_diffuse = diffuse_mask[chain_mask]
+            chain_res_mask = res_mask[chain_mask]
+
+            if chain_diffuse.sum() == 0:
+                continue
+
+            start = torch.nonzero(chain_diffuse, as_tuple=False)[0].item()
+            end = torch.nonzero(chain_diffuse, as_tuple=False)[-1].item()
+
+            # 앞쪽 anchor가 없으면 앞을 마스킹
+            if chain_res_mask[:start].sum() == 0:
+                for i in range(start, end + 1):
+                    diffuse_mask[chain_indices[i]] = 0
+                    if chain_res_mask[i] == 1:
+                        break
+
+            # 뒤쪽 anchor가 없으면 뒤를 마스킹
+            if chain_res_mask[end + 1:].sum() == 0:
+                for i in range(end, start - 1, -1):
+                    diffuse_mask[chain_indices[i]] = 0
+                    if chain_res_mask[i] == 1:
+                        break
+    else:
+        return diffuse_mask
+
+    return diffuse_mask
 
 # get alpha carbon distance map with translation vector 
 def get_distance_map(trans_1):
@@ -293,6 +371,7 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
 
         residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
         residue_indices = [i for i in residue_indices if nan_mask[i] == 1]
+
     return residue_indices
 
 ######################## relpos ########################

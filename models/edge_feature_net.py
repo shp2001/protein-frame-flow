@@ -62,6 +62,7 @@ class EdgeFeatureNet(nn.Module):
         if self._cfg.embed_ref_pos:
             ref_pos = self.ref_pos_embedder(input_feature_dict)
             all_edge_feats.append(ref_pos)
+
         if self._cfg.embed_diffuse_mask:
             diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
             all_edge_feats.append(diff_feat[..., None])
@@ -71,7 +72,7 @@ class EdgeFeatureNet(nn.Module):
                 trans_t, min_bin=2.0, max_bin=22.0, num_bins=self._cfg.num_bins)
             distogram_t = distogram_t * diff_feat[..., None]
             all_edge_feats.append(distogram_t)
-            
+
             distogram_sc = calc_distogram(
                 trans_sc, min_bin=2.0, max_bin=22.0, num_bins=self._cfg.num_bins)
             all_edge_feats.append(distogram_sc)
@@ -85,7 +86,6 @@ class EdgeFeatureNet(nn.Module):
             rigid_sc = create_rigid(rotmats_sc, trans_sc)
             unit_vec_sc = calc_unit_vector(rigid_sc)
             all_edge_feats.append(unit_vec_sc)
-
 
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)

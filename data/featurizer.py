@@ -57,7 +57,6 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     ref_pos = []
 
     aatype = aatype_batch[0]
-    atom14_mask = atom_14_mask_batch[0]
     res_indices = res_indices_batch[0]
 
     for i, restype_int in enumerate(aatype):
@@ -65,6 +64,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         restype3 = residue_constants.restype_1to3.get(restype1, "UNK")
         
         if restype3 == "UNK":
+            print("There is a UNK in restype")
             continue
 
         atom_names = residue_constants.restype_name_to_atom14_names[restype3]
@@ -73,7 +73,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         res_idx = res_indices[i]
     
         for j, atom_name in enumerate(atom_names):
-            if atom_name != '' and atom14_mask[i, j]==1:
+            if atom_name != '':
                 ref_space_uid.append(res_idx)
                 
                 atom_list.append(atom_name)
@@ -104,32 +104,6 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
 
     return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos
-
-
-def init_ref_pos(aatype, atom14_mask, noisy_trans, noisy_rotmats):
-    """
-    input
-    aatype: (B, N)
-    atom14_mask: (B, N, 14)
-    noisy_trans: (B, N, 3)
-    noisy_rots: (B, N, 3)
-
-    return 
-    ref_pos: tensor([B, N_atom, 3])
-    """
-    B, N = aatype.shape
-    noisy_rigids = du.create_rigid(noisy_rotmats, noisy_trans)
-
-    ideal_pos = torch.tensor(residue_constants.restype_atom14_rigid_group_positions, device=aatype.device) # (21, 14, 3)
-    pos = ideal_pos[aatype] # (B, N, 14, 3)
-    pred_xyz = local_to_global(noisy_rigids, pos) # (B, N, 14, 3)
-
-    mask = atom14_mask.bool()  # (B, N, 14)
-    ref_pos = pred_xyz[mask]   # (B * N_atom_per_batch, 3)
-    ref_pos = ref_pos.view(B, -1, 3)
-
-    return ref_pos    
-    
 
 def atom14_flat(pred_xyz, atom14_mask):
     """

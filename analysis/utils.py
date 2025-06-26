@@ -84,17 +84,18 @@ def write_prot_to_pdb(
     return save_path
 
 def get_cdr_and_neighbors(
-                          atom14_pred_positions,
-                          atom14_gt_positions, 
-                          atom14_gt_exists,
-                          original_diffuse_mask, 
-                          mode,
-                          scale_factor,
-                          distance_threshold=5
-                          ):
+            atom14_pred_positions,
+            atom14_gt_positions, 
+            atom14_gt_exists,
+            original_diffuse_mask, 
+            mode,
+            scale_factor,
+            distance_threshold=5
+            ):
     
     device = atom14_pred_positions.device
     # find anchor residues 
+
     anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
     if mode == 'ab' or mode == 'nanobody': # ab dataset -> extract only_h3 
         anchor_residues = anchor_residues[4:6]

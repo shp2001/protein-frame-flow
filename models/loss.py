@@ -265,7 +265,6 @@ def supervised_chi_loss(
 
     sq_chi_loss = masked_mean(chi_mask[..., None, :, :], sq_chi_error, dim=(-1, -2, -3))
     loss = chi_weight * sq_chi_loss
-    print(f'sq_chi_loss: {sq_chi_loss}')
     
     ## cdr_mask for sq_chi_error
     cdr_chi_mask = cdr_mask.unsqueeze(-1) * chi_mask
@@ -288,7 +287,6 @@ def supervised_chi_loss(
     )
 
     loss = loss + angle_norm_weight * angle_norm_loss
-    print(f'angle_norm_loss: {angle_norm_loss}')
     # # Average over the batch dimension
     # loss = torch.mean(loss)
 
@@ -308,8 +306,8 @@ def compute_rmsd(
 ):
     if compute_cdr == False and compute_non_cdr == False and compute_h3 == False:
         assert "At least one of 'compute_cdr' or 'compute_non_cdr' or 'compute_cdr' must be True."
-    if data_mode not in ['ab', 'nanobody', 'general']:
-        assert "Data mode should be one of 'compute_cdr', 'compute_non_cdr' and 'compute_cdr'."
+    if data_mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
+        assert "Data mode should be one of 'ab', 'nanobody', 'general', 'monomer', and 'polymer'."
     
     if mode == 'bb':
         pred = pred[:, :, :, :3]
@@ -320,7 +318,7 @@ def compute_rmsd(
         aligned_target = aligned_target[:, :, 3:]
         atom14_gt_exists = atom14_gt_exists[:, :, 3:]
 
-    if data_mode == 'general' and mode != 'bb':
+    if data_mode in ['general', 'monomer', 'polymer'] and mode != 'bb':
         compute_cdr = False
     
     mse = torch.nn.functional.mse_loss(
@@ -814,7 +812,6 @@ def lddt_loss(
     ca_pos = residue_constants.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
-    print("positions_diff", all_atom_pred_pos[0] - all_atom_positions[0])
     all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
 
     score = lddt(
@@ -853,7 +850,7 @@ def compute_all_atom_clash_loss(
         residue_constants.van_der_waals_radius[name[0]]
         for name in residue_constants.atom_types
     ]
-    print(f'atomtype_radius: {atomtype_radius}')
+
     atomtype_radius = atom14_pred_positions.new_tensor(atomtype_radius)
     atom14_atom_radius = (
         atom14_atom_exists
@@ -963,8 +960,6 @@ def compute_bond_angle_loss(
     dot = (v1 * v2).sum(-1)
     cosine = dot / (v1_norm * v2_norm + 1e-8)
     angle = torch.acos(cosine.clamp(-1.0, 1.0))  # (B, L, 14, 14, 14)
-    print("pred_angle_scale", torch.mean(angle))
-    print("ref_angle_scale", torch.mean(ref_angle))
 
     # 존재 여부 마스크
     exists_triplet = (upper_bound[aatype] > 0) # (B, L, 14, 14, 14)
@@ -988,8 +983,6 @@ def compute_bond_angle_loss(
         interface_loss = (angle_z ** 2) * interface_valid.float()
         loss_interface = interface_loss.sum(dim=(1, 2, 3, 4)) / (interface_valid.float().sum(dim=(1, 2, 3, 4)) + 1e-6)
 
-        print(f"non_cdr_angle: {loss_per_batch}")
-        print(f"cdr_loss: {loss_interface}")
         loss_per_batch = loss_per_batch + loss_interface
 
     return loss_per_batch  # (B,)

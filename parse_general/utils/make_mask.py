@@ -252,6 +252,7 @@ def make_mask(file_path: str, cfg: str):
     metadata = {}
     pdb_name = os.path.basename(file_path).replace('.cif.gz', '')
     if os.path.exists(os.path.join('/home/psh/data/general/masking_index', pdb_name + '.json')):
+        print(f'{pdb_name} already exists')
         return None
     with open(cfg, 'r') as f:
         cfg = yaml.safe_load(f)
@@ -361,7 +362,7 @@ def process_fn(
 def main(args):
     pdb_ids_path = args.pdb_ids_path
     cfg = args.config
-    debug = True  # 예: argparse.ArgumentParser에서 추가했다고 가정
+    debug = False  # 예: argparse.ArgumentParser에서 추가했다고 가정
 
     with open(pdb_ids_path, 'r') as f:
         pdb_ids = [line.strip() for line in f if line.strip()]

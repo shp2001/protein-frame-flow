@@ -3,20 +3,17 @@ import numpy as np
 import pandas as pd
 import logging
 import torch
-
+from collections import defaultdict
 
 from torch.utils.data import Dataset
 from data import utils as du
-
+from data import residue_constants as rc 
 
 from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from Bio.PDB import PDBParser
-from Bio.SeqUtils import seq1
-
-from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein
+from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein, provide_anchor
 
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
@@ -56,22 +53,25 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.parse_chain_feats(processed_feats)
 
     # make chain sequence list (for the multimer relpos embedding)
-    chain_seq_list = []
-    pdb_file = raw_path
+    int_to_aa = {i: restype for restype, i in rc.restype_order_with_x.items()}
+    aatypes = processed_feats["aatype"]             # [L]
+    chain_indices = processed_feats["chain_index"]  # [L]
 
-    p = PDBParser()
-    structure = p.get_structure(
-        'protein',
-        pdb_file,
-    )
+    chain_seqs = defaultdict(list)
+    chain_order = []
 
-    for chain in structure.get_chains():
-        pdb_seq = "".join([seq1(r.get_resname()) for r in chain.get_residues()])
-        chain_seq_list.append(pdb_seq)
+    for aa_int, chain_id in zip(aatypes, chain_indices):
+        aa_letter = int_to_aa.get(int(aa_int), "X")
+        chain_seqs[chain_id].append(aa_letter)
+        if chain_id not in chain_order:
+            chain_order.append(chain_id)
 
+    chain_seq_list = ["".join(chain_seqs[chain_id]) for chain_id in chain_order]
+ 
     # Run through OpenFold data transforms.
     chain_feats = {
         'aatype': torch.tensor(processed_feats['aatype']).long(),
+        'chain_index': torch.tensor(processed_feats['chain_index']),
         'all_atom_positions': torch.tensor(processed_feats['atom_positions']).float(),
         'all_atom_mask': torch.tensor(processed_feats['atom_mask']).float(),
         'seq_mask': torch.tensor(processed_feats['bb_mask']).int()
@@ -88,13 +88,14 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
                                                                 None)
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
-
+    res_mask[chain_feats['aatype'] == 20] = 0
     chain_idx = torch.tensor(processed_feats['chain_index'])
     res_idx = processed_feats['residue_index']
 
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
+        'chain_index': chain_feats['chain_index'],
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'res_idx': res_idx,
@@ -180,7 +181,6 @@ class BaseDataset(Dataset):
 
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
-        print(f"curr_epoch", self.current_epoch)
         
     def _create_split(self, data_csv):
         # Training or validation specific logic.
@@ -218,19 +218,19 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file)
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=self.current_epoch + idx)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
         
         if csv_row['mode'] == 'monomer':
             mask_info_file = csv_row['mask_info_file']
-            loop_start, loop_end = load_monomer_mask(mask_info_file)
+            loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=self.current_epoch + idx)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
 
         if csv_row['mode'] == 'polymer':
             mask_info_file = csv_row['mask_info_file']
-            interface_start, interface_end = load_polymer_mask(mask_info_file)
+            interface_start, interface_end = load_polymer_mask(mask_info_file, seed=self.current_epoch + idx)
             scaffold_idx[f'loop_start'] = interface_start
             scaffold_idx[f'loop_end'] = interface_end
 
@@ -283,7 +283,7 @@ class BaseDataset(Dataset):
             # Should only happen rarely.
             diffuse_mask = torch.ones_like(diffuse_mask)
         feats['diffuse_mask'] = diffuse_mask
-    
+
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row = self.csv.iloc[row_idx]
@@ -304,6 +304,12 @@ class BaseDataset(Dataset):
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
 
+            # modify diffuse mask (if it is terminal mask, exclude end residue to provide an anchor)
+            feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
+                                                   feats['res_mask'], 
+                                                   feats['chain_index'],
+                                                   feats['mode'])
+            
             # Center based on motif locations
             motif_mask = 1 - feats['diffuse_mask']
             motif_1 = trans_1 * motif_mask[:, None]
@@ -323,8 +329,8 @@ class BaseDataset(Dataset):
             # create res_idx for cropping 
             mode = feats['mode']
             
-            if mode not in ['ab', 'nanobody', 'general']:
-                raise ValueError('Mode should be one of [ab, nanobody, general]')
+            if mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
+                raise ValueError('Mode should be one of [ab, nanobody, general, monomer, polymer]')
 
             if mode == 'ab':
                 feats['res_idx'] = crop_antigen(feats['trans_1'],
@@ -407,6 +413,7 @@ class PdbDataset(BaseDataset):
         self._missing_pdbs = 0
         def cluster_lookup(pdb):
             if pdb not in list(self._pdb_to_cluster.keys()):
+                print(f"{pdb} not in the cluster file")
                 self._pdb_to_cluster[pdb] = self._max_cluster + 1
                 self._max_cluster += 1
                 self._missing_pdbs += 1
@@ -419,7 +426,7 @@ class PdbDataset(BaseDataset):
 
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
-        print(epoch)
+
     def _filter_metadata(self, raw_csv):
         """Filter metadata."""
         filter_cfg = self.dataset_cfg.filter

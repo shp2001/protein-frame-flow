@@ -143,6 +143,8 @@ class FlowModule(LightningModule):
         rigidgroups_gt_frames = noisy_batch['rigidgroups_gt_frames'].clone()
         rigidgroups_alt_gt_frames = noisy_batch['rigidgroups_alt_gt_frames'].clone()
 
+        print("raw_path", noisy_batch['raw_path'])
+        
         gt_rot_vf = so3_utils.calc_rot_vf(
             rotmats_t, gt_rotmats_1.type(torch.float32))
         # if torch.any(torch.isnan(gt_rot_vf)):
@@ -252,7 +254,7 @@ class FlowModule(LightningModule):
                                     data_mode=noisy_batch['mode'],
                                     compute_non_cdr=True,
                                     compute_cdr=True,
-                                    compute_h3=True
+                                    compute_h3=False
                                     )    
         # torsion angle loss 
         # chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
@@ -307,20 +309,29 @@ class FlowModule(LightningModule):
         # all atom clash loss 
         all_atom_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_all_atom_clash_loss:
-            all_atom_clash_loss = compute_all_atom_clash_loss(
-                                                            model_output['all_atom_preds']['positions'][-1],
-                                                            noisy_batch['atom14_gt_exists'],
-                                                            noisy_batch['res_idx'],
-                                                            noisy_batch['residx_atom14_to_atom37'],
-                                                            interface_mask=interface_mask)
+            try:
+                all_atom_clash_loss = compute_all_atom_clash_loss(
+                    model_output['all_atom_preds']['positions'][-1],
+                    noisy_batch['atom14_gt_exists'],
+                    noisy_batch['res_idx'],
+                    noisy_batch['residx_atom14_to_atom37'],
+                    interface_mask=interface_mask
+                )
+            except Exception as e:
+                print(f"[Warning] all atom clash loss skipped due to error: {e}")
+                all_atom_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
         within_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_within_clash_loss:
-            within_clash_loss = compute_within_clash_loss(
-                                                        model_output['all_atom_preds']['positions'][-1],
-                                                        noisy_batch['atom14_gt_exists'],
-                                                        interface_mask,
-                                                        noisy_batch['aatype'])   
+            try:
+                within_clash_loss = compute_within_clash_loss(
+                                                            model_output['all_atom_preds']['positions'][-1],
+                                                            noisy_batch['atom14_gt_exists'],
+                                                            interface_mask,
+                                                            noisy_batch['aatype'])   
+            except Exception as e:
+                print(f"[Warning] within clash loss skipped due to error: {e}")
+                within_clash_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
         bond_angle_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_bond_angle_loss:
@@ -758,7 +769,13 @@ class FlowModule(LightningModule):
             self._exp_cfg.optimizer.max_lr,
         )
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
-    
+
+    def on_train_batch_start(self, batch, batch_idx):
+        # 첫 번째 optimizer 기준
+        optimizer = self.trainer.optimizers[0]
+        lr = optimizer.param_groups[0]['lr']
+        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
+        
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
         device = f'cuda:{torch.cuda.current_device()}'
@@ -789,7 +806,6 @@ class FlowModule(LightningModule):
 
         # Sample batch
         if self.save_file:
-            print("save_file", self.save_file)
             sample_dirs = [os.path.join(
                 self.inference_dir, pdb_id, f'sample_{sample_id}')
                 for sample_id in sample_ids]
@@ -806,7 +822,6 @@ class FlowModule(LightningModule):
             if self.confidence_model != None:
                 prmsd = self.confidence_model(input_for_confidence, batch['res_mask'])
                 prmsd_final = compute_plddt(prmsd, cdr_mask=batch['diffuse_mask'])
-                print("prmsd_final", prmsd_final[0])
             # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             #     torch.tensor(pred_positions, device=batch['aatype'].device),
             #     batch['atom14_gt_positions'],
