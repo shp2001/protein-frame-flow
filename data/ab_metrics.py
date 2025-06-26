@@ -130,12 +130,7 @@ def get_ab_metrics(pdb_file_1, pdb_file_2, output_file):
         pose_i1,
         pose_i2,
     )
-
-    # 결과 레이블과 결과 딕셔너리 준비
-    # results_labels = [
-    #     'ocd', 'frh_rms', 'h1_rms', 'h2_rms', 'h3_rms', 'frl_rms', 'l1_rms',
-    #     'l2_rms', 'l3_rms', 'interface_energy', 'label_interface_energy', 'sasa', 'label_sasa', 'total_Hbond_E', 'label_total_Hbond_E'
-    # ]
+    
     results_labels = [
         'ocd', 'frh_rms', 'h1_rms', 'h2_rms', 'h3_rms', 'frl_rms', 'l1_rms', 'l2_rms', 'l3_rms'
     ]

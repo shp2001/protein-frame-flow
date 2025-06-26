@@ -59,21 +59,21 @@ class EvalRunner:
                 checkpoint_path=ckpt_path,
                 cfg=self._cfg,
             )
-        else:
-            # 먼저 FlowModule 인스턴스를 생성 (초기화만 하고 checkpoint는 사용하지 않음)
-            self._cfg.model.prmsd.use_prmsd = True
-            self._flow_module = FlowModule(cfg=self._cfg)
+        # else:
+        #     # 먼저 FlowModule 인스턴스를 생성 (초기화만 하고 checkpoint는 사용하지 않음)
+        #     self._cfg.model.prmsd.use_prmsd = True
+        #     self._flow_module = FlowModule(cfg=self._cfg)
 
-            # self.model의 가중치 불러오기
-            main_ckpt = torch.load(ckpt_path, map_location='cpu')
-            main_ckpt_dict = {k.replace("model.", ""): v for k, v in main_ckpt['state_dict'].items() if k.startswith("model.")}
-            self._flow_module.model.load_state_dict(main_ckpt_dict)
+        #     # self.model의 가중치 불러오기
+        #     main_ckpt = torch.load(ckpt_path, map_location='cpu')
+        #     main_ckpt_dict = {k.replace("model.", ""): v for k, v in main_ckpt['state_dict'].items() if k.startswith("model.")}
+        #     self._flow_module.model.load_state_dict(main_ckpt_dict)
 
-            # self.confidence_model의 가중치 불러오기
-            ckpt_path_conf = '/home/psh/protein-frame-flow/ckpt/confidence/IPA_plddt_fm_hybrid_only_ab/checkpoint_epoch_14.ckpt'
-            conf_ckpt = torch.load(ckpt_path_conf, map_location='cpu')
-            # confidence_model 관련 키만 골라서 로드
-            self._flow_module.confidence_model.load_state_dict(conf_ckpt['model_state_dict'], strict=True)
+        #     # self.confidence_model의 가중치 불러오기
+        #     ckpt_path_conf = '/home/psh/protein-frame-flow/ckpt/confidence/IPA_plddt_fm_hybrid_only_ab/checkpoint_epoch_14.ckpt'
+        #     conf_ckpt = torch.load(ckpt_path_conf, map_location='cpu')
+        #     # confidence_model 관련 키만 골라서 로드
+        #     self._flow_module.confidence_model.load_state_dict(conf_ckpt['model_state_dict'], strict=True)
         log.info(pl.utilities.model_summary.ModelSummary(self._flow_module))
         self._flow_module.eval()
         self._flow_module._infer_cfg = self._infer_cfg

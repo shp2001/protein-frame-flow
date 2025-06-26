@@ -789,7 +789,7 @@ class FlowModule(LightningModule):
 
 
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
-
+        print("pdb_id", pdb_id)
         if 'diffuse_mask' in batch: # motif-scaffolding
             trans_1 = batch['trans_1']
             rotmats_1 = batch['rotmats_1']

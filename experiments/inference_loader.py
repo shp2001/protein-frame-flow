@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import logging
 import torch
-
+from collections import defaultdict
 
 from torch.utils.data import Dataset
 from data import utils as du
@@ -13,11 +13,8 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from Bio.PDB import PDBParser
-from Bio.SeqUtils import seq1
-
-from data.motif_index import load_loop_file
-from data.motif_index import embed_relpos, crop_antigen
+from data.motif_index import embed_relpos, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor
+from data import residue_constants as rc
 
 from itertools import accumulate
 import bisect
@@ -61,22 +58,25 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.parse_chain_feats(processed_feats)
 
     # make chain sequence list (for the multimer relpos embedding)
-    chain_seq_list = []
-    pdb_file = raw_path
+    int_to_aa = {i: restype for restype, i in rc.restype_order_with_x.items()}
+    aatypes = processed_feats["aatype"]             # [L]
+    chain_indices = processed_feats["chain_index"]  # [L]
 
-    p = PDBParser()
-    structure = p.get_structure(
-        'protein',
-        pdb_file,
-    )
+    chain_seqs = defaultdict(list)
+    chain_order = []
 
-    for chain in structure.get_chains():
-        pdb_seq = "".join([seq1(r.get_resname()) for r in chain.get_residues()])
-        chain_seq_list.append(pdb_seq)
+    for aa_int, chain_id in zip(aatypes, chain_indices):
+        aa_letter = int_to_aa.get(int(aa_int), "X")
+        chain_seqs[chain_id].append(aa_letter)
+        if chain_id not in chain_order:
+            chain_order.append(chain_id)
+
+    chain_seq_list = ["".join(chain_seqs[chain_id]) for chain_id in chain_order]
 
     # Run through OpenFold data transforms.
     chain_feats = {
         'aatype': torch.tensor(processed_feats['aatype']).long(),
+        'chain_index': torch.tensor(processed_feats['chain_index']),
         'all_atom_positions': torch.tensor(processed_feats['atom_positions']).float(),
         'all_atom_mask': torch.tensor(processed_feats['atom_mask']).float(),
         'seq_mask': torch.tensor(processed_feats['bb_mask']).int()
@@ -100,6 +100,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
+        'chain_index': chain_feats['chain_index'],
         'rotmats_1': rotmats_1,
         'trans_1': trans_1,
         'res_mask': res_mask,
@@ -202,6 +203,24 @@ class BaseDataset(Dataset):
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
 
+        if csv_row['mode'] == 'general':
+            loop_info_file = csv_row['loop_info_dir']
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=123)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+        
+        if csv_row['mode'] == 'monomer':
+            mask_info_file = csv_row['mask_info_file']
+            loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=123)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+
+        if csv_row['mode'] == 'polymer':
+            mask_info_file = csv_row['mask_info_file']
+            interface_start, interface_end = load_polymer_mask(mask_info_file, seed=123)
+            scaffold_idx[f'loop_start'] = interface_start
+            scaffold_idx[f'loop_end'] = interface_end
+
         # Large protein files are slow to read. Cache them.
         use_cache = True
         if use_cache and path in self._cache:
@@ -211,6 +230,7 @@ class BaseDataset(Dataset):
         processed_row['masked_chain'] = masked_chain
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
+        processed_row['mode'] = csv_row['mode']
         if use_cache:
             self._cache[path] = processed_row
         
@@ -262,7 +282,10 @@ class BaseDataset(Dataset):
 
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
-
+            feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
+                                                   feats['res_mask'], 
+                                                   feats['chain_index'],
+                                                   feats['mode'])
             # Center based on motif locations
             motif_mask = 1 - feats['diffuse_mask']
             trans_1 = feats['trans_1']
@@ -286,22 +309,30 @@ class BaseDataset(Dataset):
 
 def collate_fn(batch):
     cropped_batch = []
-
     for feat in batch:
+        mode = feat['mode']
         # crop the feats
         cropped_feat = {}
 
-        cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
-                                                cdr_mask=feat['diffuse_mask'],
-                                                nan_mask=feat['res_mask'],
-                                                max_len=300,
-                                                seq_list=feat['chain_seq_list'],
-                                                crop_ab=True
-                                                )
+        if mode =='ab':
+            cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
+                                                    cdr_mask=feat['diffuse_mask'],
+                                                    nan_mask=feat['res_mask'],
+                                                    max_len=300,
+                                                    seq_list=feat['chain_seq_list'],
+                                                    crop_ab=True
+                                                    )
+        if mode == 'general' or mode == 'polymer' or mode == 'monomer':
+            cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
+                            loop_mask=feat['diffuse_mask'],
+                            nan_mask=feat['res_mask'],
+                            max_len=256,
+                            seq_list=feat['chain_seq_list']
+                            )
         # del feat['masked_chain']
         # del feat['first_chain_len']
 
-        not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id']
+        not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
 
         for key in feat.keys():
             if key not in not_crop_key:
@@ -357,4 +388,5 @@ def collate_fn(batch):
         'atom_to_token_idx': atom_to_token_idx,
         'ref_pos': ref_pos,
         }
+
     return cropped_batch

@@ -83,7 +83,7 @@ class ProteinData(LightningDataModule):
         cropped_batch['mode'] = feat['mode']
         cropped_batch['raw_path'] = feat['raw_path']
         cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
-
+        
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
         cropped_batch['ref_feature_dict'] = {
