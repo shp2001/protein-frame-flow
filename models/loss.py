@@ -889,23 +889,20 @@ def compute_within_clash_loss(
         restype_atom14_bounds["upper_bound"]
     )[aatype]
     
-    within_residue_viol = within_residue_violations(
+    within_residue_clashes = within_residue_violations(
         atom14_pred_positions,
         atom14_atom_exists,
         atom14_dists_lower_bound,
         atom14_dists_upper_bound,
-    ) # ([B, N, 14])
+    )['per_atom_loss_sum'] # ([B, N, 14])
 
-    within_residue_clashes = within_residue_viol['per_atom_loss_sum']
-    within_residue_violation_mask = within_residue_viol['per_atom_violations']
-
-    mean_loss = torch.sum(within_residue_clashes * within_residue_violation_mask, dim=(1,2)) / (1e-6 + torch.sum(within_residue_violation_mask, dim=(1,2)))
+    mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))
     if interface_mask is not None:
         # interface_mask: (B, L) → (B, L, 1) → (B, L, 14)
         interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
 
         # 평균을 위해 존재하는 CDR atom 수 계산
-        interface_exists = within_residue_violation_mask * interface_mask_exp  # (B, L, 14)
+        interface_exists = atom14_atom_exists * interface_mask_exp  # (B, L, 14)
         per_atom_interface_loss = within_residue_clashes * interface_exists  # (B, L, 14)
         interface_loss = torch.sum(per_atom_interface_loss, dim=(1, 2)) / (1e-6 + torch.sum(interface_exists, dim=(1, 2)))
 
