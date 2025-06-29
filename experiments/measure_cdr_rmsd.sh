@@ -9,4 +9,4 @@
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd.err
 
 echo "Measure CDR Metric.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/measure_cdr_rmsd.py --pred_dir /home/psh/protein-frame-flow/inference_outputs/fm_hybrid/2025-05-28_17-17-52/epoch=113-step=161424/run_2025-06-08_12-26-27 --label_dir /home/psh/benchmark_after210930/pdb_only_ab > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/measure_cdr_rmsd.py --pred_dir /home/psh/protein-frame-flow/inference_outputs/CDRFlow_stage2/2025-06-26_13-37-15/epoch=110-step=317016/run_2025-06-29_13-59-24 --label_dir /home/psh/benchmark_after210930/pdb_only_ab > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
