@@ -7,7 +7,8 @@ from data import all_atom
 import copy
 from torch import autograd
 from motif_scaffolding import twisting
-from models.loss import compute_prmsd
+from models.loss import compute_prmsd, compute_all_atom_clash_loss, compute_within_clash_loss
+import analysis.utils as au 
 
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
@@ -196,25 +197,15 @@ class Interpolant:
             num_batch,
             num_res,
             model,
-            aatype,
-            ref_feature_dict,
+            batch,
             num_timesteps=None,
             trans_potential=None,
             trans_0=None,
             rotmats_0=None,
-            trans_1=None,
-            rotmats_1=None,
-            diffuse_mask=None,
-            chain_idx=None,
-            res_idx=None,
-            pair_init=None,
             verbose=False,
             save_all_repr=False,
-            atom14_gt_positions=None,
-            atom14_gt_exists=None,
             rollout=False
         ):
-        res_mask = torch.ones(num_batch, num_res, device=self._device)
 
         # Set-up initial prior samples
         if trans_0 is None:
@@ -223,30 +214,19 @@ class Interpolant:
 
             trans_0 *= du.NM_TO_ANG_SCALE
 
-            masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
+            masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["diffuse_mask"].bool())
             trans_0 = trans_0 + masked_trans
-            trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
+            trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], batch["diffuse_mask"])
 
         if rotmats_0 is None:
             rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
-        if res_idx is None:
-            res_idx = torch.arange(
-                num_res,
-                device=self._device,
-                dtype=torch.float32)[None].repeat(num_batch, 1)
-        
-        batch = {
-            'aatype': aatype,
-            'res_mask': res_mask,
-            'diffuse_mask': diffuse_mask,
-            'res_idx': res_idx,
-            'pair_init': pair_init,
-            'ref_feature_dict': ref_feature_dict,
-        }
 
         motif_scaffolding = False
-        if diffuse_mask is not None and trans_1 is not None and rotmats_1 is not None:
+        diffuse_mask = batch['diffuse_mask']
+        trans_1 = batch['trans_1']
+        rotmats_1 = batch['rotmats_1']
 
+        if diffuse_mask is not None and trans_1 is not None and rotmats_1 is not None:
             motif_scaffolding = True
             motif_mask = ~diffuse_mask.bool().squeeze(0)
         else:
@@ -346,14 +326,28 @@ class Interpolant:
             if not self._cfg.inference_time_scaling.use:
                 trans_t_2 = self._trans_euler_step(
                     d_t, t_1, pred_trans_1, trans_t_1)
+                
             if self._cfg.inference_time_scaling.use:
-                trans_pred = pred_trans_1.clone().detach().requires_grad_(True)
-                vdw_energy = du.compute_vdw_energy(trans_pred, atom_types, r_min_table, mask=res_mask.bool())
-                grad = torch.autograd.grad(vdw_energy, trans_pred)[0]  # shape: (B, N, 3)
+                with torch.inference_mode(False):
+                    trans_pred = pred_trans_1.clone().detach().requires_grad_(True)
+                    within_clash_loss = compute_within_clash_loss(
+                                        model_out['all_atom_preds']['positions'][-1],
+                                        batch['atom14_gt_exists'],
+                                        batch["interface_mask"],
+                                        batch['aatype'])
+                    inter_clash_loss = compute_all_atom_clash_loss(
+                        model_out['all_atom_preds']['positions'][-1],
+                        batch['atom14_gt_exists'],
+                        batch['res_idx'],
+                        batch['residx_atom14_to_atom37'],
+                        interface_mask=batch['interface_mask']
+                    )
+                    clash_loss = within_clash_loss + inter_clash_loss
+                    grad = torch.autograd.grad(clash_loss, trans_pred)[0]  # shape: (B, N, 3)
 
-                # Guidance 적용
-                scale = self._cfg.vdw_guidance.scale
-                trans_t_2 = trans_t_2 - scale * grad * d_t
+                    # Guidance 적용
+                    scale = self._cfg.vdw_guidance.scale
+                    trans_t_2 = trans_t_2 - scale * grad * d_t
 
             if trans_potential is not None:
                 with torch.inference_mode(False):
@@ -411,8 +405,8 @@ class Interpolant:
         prot_traj.append((pred_trans_1, pred_rotmats_1))
 
         # Convert trajectories to atom37.
-        atom37_traj = all_atom.transrot_to_atom37(prot_traj, res_mask)
-        clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, res_mask)
+        atom37_traj = all_atom.transrot_to_atom37(prot_traj, batch["res_mask"])
+        clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, batch["res_mask"])
         # if not (prmsd == 0).all():
         #     prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
         #     print(f'prmsd_final_val : {torch.max(prmsd_final)}')
@@ -422,13 +416,14 @@ class Interpolant:
             return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence
         else:
             all_input_for_confidence = {
-                "atom14_gt_positions": atom14_gt_positions,
-                "atom14_gt_exists": atom14_gt_exists,
+                "atom14_gt_positions": batch["atom14_gt_positions"],
+                "atom14_gt_exists": batch["atom14_gt_exists"],
                 "diffuse_mask": diffuse_mask,
                 "pred_positions": model_out['all_atom_preds']['positions'],
                 "input_for_confidence": input_for_confidence
             }
             return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, all_input_for_confidence
+    
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif
         motif_mask = motif_mask.clone()

@@ -377,18 +377,21 @@ class FlowModule(LightningModule):
         if training_cfg.aux_loss_use_prmsd_loss:
             self.mini_rollout.set_device(loss_mask.device)
 
+            interface_residues = au.get_cdr_and_neighbors(
+                atom14_gt_positions=noisy_batch["atom14_gt_positions"],
+                atom14_gt_exists=noisy_batch["atom14_gt_exists"],
+                original_diffuse_mask=noisy_batch["original_diffuse_mask"][0],
+                mode=noisy_batch['mode'],
+                scale_factor=torch.ones(num_batch)
+                )
+            
+            noisy_batch['interface_residues'] = interface_residues
+
             _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _, input_for_confidence = self.mini_rollout.sample(
                 num_batch,
                 num_res,
                 self.model,
-                ref_feature_dict=noisy_batch['ref_feature_dict'],
-                aatype=noisy_batch['aatype'],
-                trans_1=noisy_batch['trans_1'],
-                rotmats_1=noisy_batch['rotmats_1'],
-                diffuse_mask=noisy_batch['diffuse_mask'],
-                chain_idx=noisy_batch['chain_idx'],
-                res_idx=noisy_batch['res_idx'],
-                pair_init=noisy_batch['pair_init'],
+                noisy_batch,
                 rollout=True
             )
 
@@ -474,18 +477,22 @@ class FlowModule(LightningModule):
         diffuse_mask = batch['diffuse_mask']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
+
+        interface_residues = au.get_cdr_and_neighbors(
+            atom14_gt_positions=batch["atom14_gt_positions"],
+            atom14_gt_exists=batch["atom14_gt_exists"],
+            original_diffuse_mask=batch["original_diffuse_mask"][0],
+            mode=batch['mode'],
+            scale_factor=torch.ones(num_batch)
+            )
+        
+        batch['interface_residues'] = interface_residues
+
         atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
-            aatype=batch['aatype'],
-            ref_feature_dict=batch['ref_feature_dict'],
-            trans_1=batch['trans_1'],
-            rotmats_1=batch['rotmats_1'],
-            diffuse_mask=diffuse_mask,
-            chain_idx=batch['chain_idx'],
-            res_idx=batch['res_idx'],
-            pair_init=batch['pair_init']
+            batch
         )
         
         pred_positions_37 = []
@@ -497,7 +504,6 @@ class FlowModule(LightningModule):
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
         cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            torch.tensor(pred_positions, device=batch['aatype'].device),
             batch['atom14_gt_positions'],
             batch['atom14_gt_exists'],
             batch['original_diffuse_mask'][0],
@@ -805,19 +811,26 @@ class FlowModule(LightningModule):
             trans_1 = rotmats_1 = diffuse_mask = None
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
+        interface_residues = au.get_cdr_and_neighbors(
+            atom14_gt_positions=batch["atom14_gt_positions"],
+            atom14_gt_exists=batch["atom14_gt_exists"],
+            original_diffuse_mask=batch["original_diffuse_mask"][0],
+            mode=batch['mode'],
+            scale_factor=torch.ones(num_batch)
+            )
+        batch['interface_residues'] = interface_residues
+
         # Sample batch
         if self.save_file:
             sample_dirs = [os.path.join(
                 self.inference_dir, pdb_id, f'sample_{sample_id}')
                 for sample_id in sample_ids]
+
             atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
-                num_batch, sample_length, self.model,
-                aatype=batch['aatype'],
-                ref_feature_dict=batch['ref_feature_dict'],
-                trans_1=trans_1, 
-                rotmats_1=rotmats_1, 
-                diffuse_mask=diffuse_mask,
-                pair_init=batch['pair_init']
+                num_batch, 
+                sample_length, 
+                self.model,
+                batch
             )
 
             if self.confidence_model != None:
@@ -892,14 +905,12 @@ class FlowModule(LightningModule):
                 '/home/psh/protein-frame-flow/train_conf', f'{pdb_id}_sample_{sample_id}.pt')
                 for sample_id in sample_ids]
             atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
-                num_batch, sample_length, self.model,
-                aatype=batch['aatype'],
-                ref_feature_dict=batch['ref_feature_dict'],
-                trans_1=trans_1, rotmats_1=rotmats_1, diffuse_mask=diffuse_mask,
-                pair_init=batch['pair_init'],
+                num_batch, 
+                sample_length, 
+                self.model,
+                batch,
                 save_all_repr=True,
-                atom14_gt_positions=batch['atom14_gt_positions'],
-                atom14_gt_exists=batch['atom14_gt_exists']
+
             )
             def extract_i(all_input_for_confidence, i):
                 out = {}

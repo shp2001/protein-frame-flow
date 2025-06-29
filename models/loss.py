@@ -998,7 +998,6 @@ def local_distance_loss(
     In order to update interface properly, this loss will scan distance among interface atoms.
     """
     cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        atom14_pred_positions,
         renamed_atom14_gt_positions,
         renamed_atom14_gt_exists,
         original_diffuse_mask,
