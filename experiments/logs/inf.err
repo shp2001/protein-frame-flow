@@ -9,3 +9,33 @@ All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+--- Logging error ---
+Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/logging/__init__.py", line 1104, in emit
+    self.flush()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/logging/__init__.py", line 1084, in flush
+    self.stream.flush()
+OSError: [Errno 116] Stale file handle
+Call stack:
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 132, in <module>
+    run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 129, in run
+    log.info(f'Finished in {elapsed_time:.2f}s')
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_utilities/core/rank_zero.py", line 32, in wrapped_fn
+    return fn(*args, **kwargs)
+Message: 'Finished in 14234.60s'
+Arguments: ()

@@ -343,8 +343,18 @@ class Interpolant:
 
             # Take reverse step
             
-            trans_t_2 = self._trans_euler_step(
-                d_t, t_1, pred_trans_1, trans_t_1)
+            if not self._cfg.inference_time_scaling.use:
+                trans_t_2 = self._trans_euler_step(
+                    d_t, t_1, pred_trans_1, trans_t_1)
+            if self._cfg.inference_time_scaling.use:
+                trans_pred = pred_trans_1.clone().detach().requires_grad_(True)
+                vdw_energy = du.compute_vdw_energy(trans_pred, atom_types, r_min_table, mask=res_mask.bool())
+                grad = torch.autograd.grad(vdw_energy, trans_pred)[0]  # shape: (B, N, 3)
+
+                # Guidance 적용
+                scale = self._cfg.vdw_guidance.scale
+                trans_t_2 = trans_t_2 - scale * grad * d_t
+
             if trans_potential is not None:
                 with torch.inference_mode(False):
                     grad_pred_trans_1 = pred_trans_1.clone().detach().requires_grad_(True)

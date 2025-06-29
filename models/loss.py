@@ -1,9 +1,8 @@
 import torch 
 from typing import Optional, Dict
 
-from data import residue_constants
+from data import residue_constants as rc
 from openfold.utils.loss import between_residue_clash_loss, within_residue_violations
-from openfold.data.data_transforms import pseudo_beta_fn
 from openfold.utils.rigid_utils import Rigid, Rotation
 from openfold.utils.tensor_utils import permute_final_dims
 
@@ -243,12 +242,12 @@ def supervised_chi_loss(
     pred_angles = angles_sin_cos[..., 3:, :] # (O, B, L, 4, 2)
     residue_type_one_hot = torch.nn.functional.one_hot(
         aatype,
-        residue_constants.restype_num + 1,
+        rc.restype_num + 1,
     )
     chi_pi_periodic = torch.einsum(
         "...ij,jk->ik",
         residue_type_one_hot.type(angles_sin_cos.dtype),
-        angles_sin_cos.new_tensor(residue_constants.chi_pi_periodic),
+        angles_sin_cos.new_tensor(rc.chi_pi_periodic),
     )
 
     true_chi = chi_angles_sin_cos[None]  # (1, B, L, 4, 2)
@@ -709,7 +708,7 @@ def compute_prmsd_loss(
     eps: float = 1e-10,
     **kwargs,
 ) -> torch.Tensor:
-    ca_pos = residue_constants.atom_order["CA"]
+    ca_pos = rc.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
     all_atom_mask = all_atom_mask[..., ca_pos]  # keep dim
@@ -809,7 +808,7 @@ def lddt_loss(
 ) -> torch.Tensor:
     n = all_atom_mask.shape[-2]
 
-    ca_pos = residue_constants.atom_order["CA"]
+    ca_pos = rc.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
     all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
@@ -847,8 +846,8 @@ def compute_all_atom_clash_loss(
         interface_mask):
 
     atomtype_radius = [
-        residue_constants.van_der_waals_radius[name[0]]
-        for name in residue_constants.atom_types
+        rc.van_der_waals_radius[name[0]]
+        for name in rc.atom_types
     ]
 
     atomtype_radius = atom14_pred_positions.new_tensor(atomtype_radius)
@@ -879,7 +878,7 @@ def compute_within_clash_loss(
         clash_overlap_tolerance=0.5,
         violation_tolerance_factor=2.0):
 
-    restype_atom14_bounds = residue_constants.make_atom14_dists_bounds(
+    restype_atom14_bounds = rc.make_atom14_dists_bounds(
         overlap_tolerance=clash_overlap_tolerance,
         bond_length_tolerance_factor=violation_tolerance_factor,
     )
@@ -890,20 +889,23 @@ def compute_within_clash_loss(
         restype_atom14_bounds["upper_bound"]
     )[aatype]
     
-    within_residue_clashes = within_residue_violations(
+    within_residue_viol = within_residue_violations(
         atom14_pred_positions,
         atom14_atom_exists,
         atom14_dists_lower_bound,
         atom14_dists_upper_bound,
-    )['per_atom_loss_sum'] # ([B, N, 14])
+    ) # ([B, N, 14])
 
-    mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))
+    within_residue_clashes = within_residue_viol['per_atom_loss_sum']
+    within_residue_violation_mask = within_residue_viol['per_atom_violations']
+
+    mean_loss = torch.sum(within_residue_clashes * within_residue_violation_mask, dim=(1,2)) / (1e-6 + torch.sum(within_residue_violation_mask, dim=(1,2)))
     if interface_mask is not None:
         # interface_mask: (B, L) → (B, L, 1) → (B, L, 14)
         interface_mask_exp = interface_mask[..., None].expand(-1, -1, 14)
 
         # 평균을 위해 존재하는 CDR atom 수 계산
-        interface_exists = atom14_atom_exists * interface_mask_exp  # (B, L, 14)
+        interface_exists = within_residue_violation_mask * interface_mask_exp  # (B, L, 14)
         per_atom_interface_loss = within_residue_clashes * interface_exists  # (B, L, 14)
         interface_loss = torch.sum(per_atom_interface_loss, dim=(1, 2)) / (1e-6 + torch.sum(interface_exists, dim=(1, 2)))
 
@@ -925,7 +927,7 @@ def compute_bond_angle_loss(
     B, L, _, _ = atom14_pred_positions.shape
     
     # 기준값들 불러오기 (21,14,14,14)
-    angle_bounds = residue_constants.make_atom14_angles_bounds(
+    angle_bounds = rc.make_atom14_angles_bounds(
         angle_tolerance_degree=angle_tolerance_degree,
         angle_stddev_factor=angle_stddev_factor
     )
@@ -1133,3 +1135,79 @@ def aa_contact_map_loss(
     local_loss = torch.sum(local_masked_loss, dim=(1,2,3)) / (torch.sum(local_loss_mask, dim=(1,2,3)) + eps)
 
     return loss + local_loss
+
+def compute_vdw_clash_loss(coords, atom_14_mask, aatype, repulsion_only=True):
+    """
+    Compute van der Waals clash-based loss.
+    
+    coords: (B, N, 14, 3)
+    atom_14_mask: (B, N, 14) -> 1 if atom exists
+    aatype: (B, N) -> amino acid type index
+    rc: reference class with residue_atoms, atom_type_to_element, van_der_waals_radius, etc.
+
+    Returns: scalar loss (float, differentiable)
+    """
+    B, N, A, _ = coords.shape
+    device = coords.device
+
+    # === Step 1: atom name and element lookup ===
+    restypes_1 = rc.restypes_with_x
+    restype_1_to_3 = {
+        'A': 'ALA', 'R': 'ARG', 'N': 'ASN', 'D': 'ASP', 'C': 'CYS',
+        'Q': 'GLN', 'E': 'GLU', 'G': 'GLY', 'H': 'HIS', 'I': 'ILE',
+        'L': 'LEU', 'K': 'LYS', 'M': 'MET', 'F': 'PHE', 'P': 'PRO',
+        'S': 'SER', 'T': 'THR', 'W': 'TRP', 'Y': 'TYR', 'V': 'VAL',
+        'X': 'UNK'
+    }
+    restypes_3 = [restype_1_to_3[r] for r in restypes_1]
+
+    atom_names = torch.empty((21, 14), dtype=torch.object)
+    for i, resname in enumerate(restypes_3):
+        atoms = rc.residue_atoms.get(resname, [])
+        for j in range(14):
+            atom_names[i, j] = atoms[j] if j < len(atoms) else ''
+
+    atom_elements = torch.empty((21, 14), dtype=torch.object)
+    for i in range(21):
+        for j in range(14):
+            name = atom_names[i, j]
+            atom_elements[i, j] = rc.atom_type_to_element.get(name, '')
+
+    vdw_radii = torch.zeros((21, 14), dtype=torch.float32)
+    for i in range(21):
+        for j in range(14):
+            element = atom_elements[i, j]
+            vdw_radii[i, j] = rc.van_der_waals_radius.get(element, 0.0)
+
+    vdw_radii = vdw_radii.to(device)  # (21, 14)
+
+    # === Step 2: get per-residue radius ===
+    radii = vdw_radii[aatype]  # (B, N, 14)
+
+    # === Step 3: compute distances and radius sum ===
+    coords_flat = coords.view(B, N * A, 3)        # (B, NA, 3)
+    mask_flat = atom_14_mask.view(B, N * A)       # (B, NA)
+    radii_flat = radii.view(B, N * A)             # (B, NA)
+
+    diffs = coords_flat.unsqueeze(2) - coords_flat.unsqueeze(1)  # (B, NA, NA, 3)
+    dists = torch.norm(diffs + 1e-8, dim=-1)                    # (B, NA, NA)
+
+    r_i = radii_flat.unsqueeze(2)  # (B, NA, 1)
+    r_j = radii_flat.unsqueeze(1)  # (B, 1, NA)
+    r_sum = r_i + r_j              # (B, NA, NA)
+
+    # === Step 4: clash penalty ===
+    # Only penalize when atoms are too close: d < r_sum
+    clash_mask = (dists < r_sum) & (dists > 0.0)
+
+    # Optional: square penalty
+    penalty = (r_sum - dists).clamp(min=0.0) ** 2
+
+    # Apply atom existence mask
+    mask_i = mask_flat.unsqueeze(2)  # (B, NA, 1)
+    mask_j = mask_flat.unsqueeze(1)  # (B, 1, NA)
+    pair_mask = mask_i & mask_j & (~torch.eye(N * A, device=device, dtype=torch.bool).unsqueeze(0))
+
+    clash_loss = (penalty * clash_mask.float() * pair_mask).sum() / (B * N)
+
+    return clash_loss

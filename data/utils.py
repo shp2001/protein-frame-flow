@@ -2,7 +2,7 @@ import sys
 from typing import List, Dict, Any
 
 from openfold.utils import rigid_utils as ru
-from data import residue_constants
+from data import residue_constants as rc
 import numpy as np
 import collections
 import string
@@ -36,7 +36,7 @@ CHAIN_FEATS = [
 
 to_numpy = lambda x: x.detach().cpu().numpy()
 aatype_to_seq = lambda aatype: ''.join([
-        residue_constants.restypes_with_x[x] for x in aatype])
+        rc.restypes_with_x[x] for x in aatype])
 
 
 class CPU_Unpickler(pickle.Unpickler):
@@ -212,7 +212,7 @@ def chain_str_to_int(chain_str: str):
 
 
 def parse_chain_feats(chain_feats, scale_factor=1.):
-    ca_idx = residue_constants.atom_order['CA']
+    ca_idx = rc.atom_order['CA']
     chain_feats['bb_mask'] = chain_feats['atom_mask'][:, ca_idx]
     scaled_pos = chain_feats['atom_positions']  / scale_factor
     chain_feats['atom_positions'] = scaled_pos * chain_feats['atom_mask'][..., None]
@@ -416,18 +416,18 @@ def process_chain(chain: Chain, chain_id: str) -> Protein:
     b_factors = []
     chain_ids = []
     for res in chain:
-        res_shortname = residue_constants.restype_3to1.get(res.resname, 'X')
-        restype_idx = residue_constants.restype_order.get(
-            res_shortname, residue_constants.restype_num)
-        pos = np.zeros((residue_constants.atom_type_num, 3))
-        mask = np.zeros((residue_constants.atom_type_num,))
-        res_b_factors = np.zeros((residue_constants.atom_type_num,))
+        res_shortname = rc.restype_3to1.get(res.resname, 'X')
+        restype_idx = rc.restype_order.get(
+            res_shortname, rc.restype_num)
+        pos = np.zeros((rc.atom_type_num, 3))
+        mask = np.zeros((rc.atom_type_num,))
+        res_b_factors = np.zeros((rc.atom_type_num,))
         for atom in res:
-            if atom.name not in residue_constants.atom_types:
+            if atom.name not in rc.atom_types:
                 continue
-            pos[residue_constants.atom_order[atom.name]] = atom.coord
-            mask[residue_constants.atom_order[atom.name]] = 1.
-            res_b_factors[residue_constants.atom_order[atom.name]
+            pos[rc.atom_order[atom.name]] = atom.coord
+            mask[rc.atom_order[atom.name]] = 1.
+            res_b_factors[rc.atom_order[atom.name]
                           ] = atom.bfactor
         aatype.append(restype_idx)
         atom_positions.append(pos)

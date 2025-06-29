@@ -33,6 +33,10 @@ inference:
       num_timesteps: 20
     self_condition: True
 
+    inference_time_scaling:
+      use: True
+      scale: 0.1
+
     twisting:
       use: False
       t_min: 0.2
