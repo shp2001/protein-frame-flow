@@ -892,6 +892,10 @@ class Rigid:
 
         if((rots.shape != trans.shape[:-1]) or
            (rots.device != trans.device)):
+            print("rots.shape", rots.shape)
+            print("rots.device", rots.device)
+            print("trans.shape", trans.shape)
+            print("trans.device", trans.device)            
             raise ValueError("Rots and trans incompatible")
 
         # Force full precision. Happens to the rotations automatically.

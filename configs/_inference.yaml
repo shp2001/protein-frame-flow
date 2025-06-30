@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_stage2/2025-06-26_13-37-15/epoch=110-step=317016.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/se3-fm/fm_hybrid/2025-05-28_17-17-52/epoch=105-step=150096_copy.ckpt
   use_gpu: True
   num_gpus: 2
 
@@ -35,8 +35,8 @@ inference:
 
     inference_time_scaling:
       use: True
-      scale: 0.1
-
+      grad_weight: 1.0
+      t_scaling: True
     twisting:
       use: False
       t_min: 0.2

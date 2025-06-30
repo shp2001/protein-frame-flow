@@ -111,6 +111,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
         'atom14_gt_positions': chain_feats['atom14_gt_positions'],
         'residx_atom37_to_atom14': chain_feats['residx_atom37_to_atom14'],
+        'residx_atom14_to_atom37': chain_feats['residx_atom14_to_atom37'],
         'atom37_atom_exists': chain_feats['atom37_atom_exists'],
         'pseudo_beta': chain_feats['pseudo_beta'],
     }
@@ -371,13 +372,14 @@ def collate_fn(batch):
         cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
     cropped_batch['raw_path'] = feat['raw_path']
+    cropped_batch['mode'] = feat['mode']
     cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
     cropped_batch['original_residx_atom37_to_atom14'] = feat['residx_atom37_to_atom14']
     cropped_batch['original_atom37_atom_exists'] = feat['atom37_atom_exists']
     cropped_batch['original_aatype'] = feat['aatype']
-    cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
     cropped_batch['original_aatype'] = feat['aatype']
     cropped_batch['original_chain_idx'] = feat['chain_idx']
+    cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
 
     ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
     cropped_batch['ref_feature_dict'] = {

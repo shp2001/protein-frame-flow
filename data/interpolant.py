@@ -7,8 +7,9 @@ from data import all_atom
 import copy
 from torch import autograd
 from motif_scaffolding import twisting
-from models.loss import compute_prmsd, compute_all_atom_clash_loss, compute_within_clash_loss
-import analysis.utils as au 
+from models.loss import compute_all_atom_clash_loss, compute_within_clash_loss, clash_potential
+
+from openfold.utils import rigid_utils
 
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
@@ -322,32 +323,27 @@ class Interpolant:
                     batch['rotmats_sc'] = pred_rotmats_1
 
             # Take reverse step
+            trans_t_2 = self._trans_euler_step(
+                d_t, t_1, pred_trans_1, trans_t_1)
             
-            if not self._cfg.inference_time_scaling.use:
-                trans_t_2 = self._trans_euler_step(
-                    d_t, t_1, pred_trans_1, trans_t_1)
-                
             if self._cfg.inference_time_scaling.use:
                 with torch.inference_mode(False):
-                    trans_pred = pred_trans_1.clone().detach().requires_grad_(True)
-                    within_clash_loss = compute_within_clash_loss(
-                                        model_out['all_atom_preds']['positions'][-1],
-                                        batch['atom14_gt_exists'],
-                                        batch["interface_mask"],
-                                        batch['aatype'])
-                    inter_clash_loss = compute_all_atom_clash_loss(
-                        model_out['all_atom_preds']['positions'][-1],
-                        batch['atom14_gt_exists'],
-                        batch['res_idx'],
-                        batch['residx_atom14_to_atom37'],
-                        interface_mask=batch['interface_mask']
+                    # (B, N, 14, 3)
+                    grad_pred_trans_1 = pred_trans_1.clone().detach().requires_grad_(True)
+                    clash_energy = clash_potential(
+                        grad_pred_trans_1,
+                        pred_rotmats_1,
+                        model_out['local_atom_pos'],
+                        batch
                     )
-                    clash_loss = within_clash_loss + inter_clash_loss
-                    grad = torch.autograd.grad(clash_loss, trans_pred)[0]  # shape: (B, N, 3)
+                    grad = torch.autograd.grad(outputs=clash_energy, inputs=grad_pred_trans_1)[0]
 
                     # Guidance 적용
-                    scale = self._cfg.vdw_guidance.scale
-                    trans_t_2 = trans_t_2 - scale * grad * d_t
+                    scale = self._cfg.inference_time_scaling.grad_weight
+                    if self._cfg.inference_time_scaling.t_scaling:
+                        trans_t_2 = trans_t_2 - t_1 / (1 - t_1) * scale * grad * d_t
+                    else:
+                        trans_t_2 = trans_t_2 - scale * grad * d_t
 
             if trans_potential is not None:
                 with torch.inference_mode(False):

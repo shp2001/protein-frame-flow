@@ -242,6 +242,7 @@ class FlowModule(LightningModule):
                                 
         # sc atom loss (final layer만 계산)
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+
         interface_mask = noisy_batch['diffuse_mask'].clone()
         interface_mask[:, neighbor_indices] = 1
 
@@ -377,7 +378,7 @@ class FlowModule(LightningModule):
         if training_cfg.aux_loss_use_prmsd_loss:
             self.mini_rollout.set_device(loss_mask.device)
 
-            interface_residues = au.get_cdr_and_neighbors(
+            cdr_residues, interface_residues = au.get_cdr_and_neighbors(
                 atom14_gt_positions=noisy_batch["atom14_gt_positions"],
                 atom14_gt_exists=noisy_batch["atom14_gt_exists"],
                 original_diffuse_mask=noisy_batch["original_diffuse_mask"][0],
@@ -385,7 +386,9 @@ class FlowModule(LightningModule):
                 scale_factor=torch.ones(num_batch)
                 )
             
-            noisy_batch['interface_residues'] = interface_residues
+            interface_mask = noisy_batch['diffuse_mask'].clone()
+            interface_mask[:, interface_residues] = 1
+            noisy_batch['interface_mask'] = interface_mask
 
             _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, _, input_for_confidence = self.mini_rollout.sample(
                 num_batch,
@@ -478,7 +481,7 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
-        interface_residues = au.get_cdr_and_neighbors(
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             atom14_gt_positions=batch["atom14_gt_positions"],
             atom14_gt_exists=batch["atom14_gt_exists"],
             original_diffuse_mask=batch["original_diffuse_mask"][0],
@@ -486,7 +489,9 @@ class FlowModule(LightningModule):
             scale_factor=torch.ones(num_batch)
             )
         
-        batch['interface_residues'] = interface_residues
+        interface_mask = batch['diffuse_mask'].clone()
+        interface_mask[:, neighbor_indices] = 1
+        batch['interface_mask'] = interface_mask
 
         atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
             num_batch,
@@ -503,14 +508,6 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            batch['atom14_gt_positions'],
-            batch['atom14_gt_exists'],
-            batch['original_diffuse_mask'][0],
-            batch['mode'],
-            scale_factor=torch.ones(b),
-            distance_threshold=5
-        )
 
         # calculate cb contact map (B, N, 14, 3)
         gt_cb_distance_map = torch.linalg.norm(
@@ -811,14 +808,17 @@ class FlowModule(LightningModule):
             trans_1 = rotmats_1 = diffuse_mask = None
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
-        interface_residues = au.get_cdr_and_neighbors(
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
             atom14_gt_positions=batch["atom14_gt_positions"],
             atom14_gt_exists=batch["atom14_gt_exists"],
-            original_diffuse_mask=batch["original_diffuse_mask"][0],
+            original_diffuse_mask=batch["original_diffuse_mask"],
             mode=batch['mode'],
             scale_factor=torch.ones(num_batch)
             )
-        batch['interface_residues'] = interface_residues
+        
+        interface_mask = batch['diffuse_mask'].clone()
+        interface_mask[:, neighbor_indices] = 1
+        batch['interface_mask'] = interface_mask
 
         # Sample batch
         if self.save_file:
@@ -884,7 +884,8 @@ class FlowModule(LightningModule):
                 # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
                 #                          title=pdb_id.split('_')[0] + '_gt',
                 #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
-            
+
+                print("original_diffuse_mask", batch['original_diffuse_mask'].shape)
                 _ = eu.save_traj(
                     sample=pred_position, # (L, 37, 3)
                     bb_prot_traj=bb_traj, 

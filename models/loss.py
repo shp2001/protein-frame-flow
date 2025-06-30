@@ -3,7 +3,7 @@ from typing import Optional, Dict
 
 from data import residue_constants as rc
 from openfold.utils.loss import between_residue_clash_loss, within_residue_violations
-from openfold.utils.rigid_utils import Rigid, Rotation
+from openfold.utils.rigid_utils import Rigid, Rotation, local_to_global
 from openfold.utils.tensor_utils import permute_final_dims
 
 from models.utils import calc_distogram
@@ -874,14 +874,9 @@ def compute_within_clash_loss(
         atom14_pred_positions,
         atom14_atom_exists,
         interface_mask,
-        aatype,
-        clash_overlap_tolerance=0.5,
-        violation_tolerance_factor=2.0):
+        aatype):
 
-    restype_atom14_bounds = rc.make_atom14_dists_bounds(
-        overlap_tolerance=clash_overlap_tolerance,
-        bond_length_tolerance_factor=violation_tolerance_factor,
-    )
+    restype_atom14_bounds = rc.make_atom14_dists_bounds()
     atom14_dists_lower_bound = atom14_pred_positions.new_tensor(
         restype_atom14_bounds["lower_bound"]
     )[aatype]
@@ -1207,3 +1202,24 @@ def compute_vdw_clash_loss(coords, atom_14_mask, aatype, repulsion_only=True):
     clash_loss = (penalty * clash_mask.float() * pair_mask).sum() / (B * N)
 
     return clash_loss
+
+
+def clash_potential(translations: torch.Tensor, rotmats: torch.Tensor, local_atom_pos: torch.Tensor, batch: dict):
+    rot = Rotation(rotmats.detach())
+    frame = Rigid(rot, translations)
+    pred_xyz = local_to_global(frame, local_atom_pos.detach())
+
+    within = compute_within_clash_loss(
+        pred_xyz,
+        batch['atom14_gt_exists'].clone(),
+        batch['interface_mask'].clone(),
+        batch['aatype'].clone()
+    )
+    inter = compute_all_atom_clash_loss(
+        pred_xyz,
+        batch['atom14_gt_exists'].clone(),
+        batch['res_idx'].clone(),
+        batch['residx_atom14_to_atom37'].clone(),
+        interface_mask=batch['interface_mask'].clone()
+    )
+    return within + inter*30
