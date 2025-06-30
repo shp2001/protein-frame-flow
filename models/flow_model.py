@@ -245,6 +245,8 @@ class FlowModel(nn.Module):
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
+            'backb_frame': curr_rigids,
+            'local_atom_pos': local_atom_pos_pred,
             'all_atom_preds': all_atom_outputs,
             'input_for_confidence': input_for_confidence,
             'pair_outputs': pair_outputs # b-1개의 pair 기반 output (b-2개는 beta carbon distogram, 마지막은 all atom contact map)
