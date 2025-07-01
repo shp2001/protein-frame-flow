@@ -1222,4 +1222,4 @@ def clash_potential(translations: torch.Tensor, rotmats: torch.Tensor, local_ato
         batch['residx_atom14_to_atom37'].clone(),
         interface_mask=batch['interface_mask'].clone()
     )
-    return within + inter*30
+    return within + inter

@@ -329,7 +329,8 @@ class Interpolant:
             if self._cfg.inference_time_scaling.use:
                 with torch.inference_mode(False):
                     # (B, N, 14, 3)
-                    grad_pred_trans_1 = pred_trans_1.clone().detach().requires_grad_(True)
+                    grad_xyz = model_out['all_atom_preds']['positions'][-1]
+                    grad_pred_trans_1 = model_out.clone().detach().requires_grad_(True)
                     clash_energy = clash_potential(
                         grad_pred_trans_1,
                         pred_rotmats_1,
@@ -337,7 +338,7 @@ class Interpolant:
                         batch
                     )
                     grad = torch.autograd.grad(outputs=clash_energy, inputs=grad_pred_trans_1)[0]
-
+                    print("grad_mean", torch.mean(grad))
                     # Guidance 적용
                     scale = self._cfg.inference_time_scaling.grad_weight
                     if self._cfg.inference_time_scaling.t_scaling:

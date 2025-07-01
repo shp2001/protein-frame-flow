@@ -2,8 +2,8 @@
 #SBATCH -J cdr_pred
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=10g
-#SBATCH -c 6
+#SBATCH --mem=5g
+#SBATCH -c 3
 #SBATCH -w gpu02
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd.err
