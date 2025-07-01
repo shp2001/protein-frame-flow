@@ -87,8 +87,6 @@ class EdgeFeatureNet(nn.Module):
             unit_vec_sc = calc_unit_vector(rigid_sc)
             all_edge_feats.append(unit_vec_sc)
 
-        for data in all_edge_feats:
-            print(data.shape)
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)
         return edge_feats

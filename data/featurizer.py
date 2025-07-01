@@ -99,7 +99,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     ref_element = torch.tensor(ref_element).unsqueeze(0).repeat(B,1,1)
     ref_charge = torch.tensor(ref_charge).unsqueeze(0).repeat(B,1) 
     ref_atom_name_chars = torch.tensor(ref_atom_name_chars).unsqueeze(0).repeat(B,1,1,1) 
-    atom_to_token_idx = torch.tensor(atom_to_token_idx).unsqueeze(0).repeat(B,1)
+    atom_to_token_idx = torch.tensor(atom_to_token_idx)
 
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
 

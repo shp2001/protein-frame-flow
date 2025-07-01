@@ -413,7 +413,6 @@ class PdbDataset(BaseDataset):
         self._missing_pdbs = 0
         def cluster_lookup(pdb):
             if pdb not in list(self._pdb_to_cluster.keys()):
-                print(f"{pdb} not in the cluster file")
                 self._pdb_to_cluster[pdb] = self._max_cluster + 1
                 self._max_cluster += 1
                 self._missing_pdbs += 1

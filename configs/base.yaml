@@ -22,7 +22,7 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 1
+    max_batch_size: 20
     max_num_res_squared: 185_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -51,6 +51,8 @@ interpolant:
       weight: 10.0
       cutoff: 5.0
 
+  inference_time_scaling:
+    use: False
   sampling:
     num_timesteps: 20
     do_sde: False
@@ -95,7 +97,7 @@ mini_rollout:
   
 experiment:
   add_modules: False
-  debug: True
+  debug: False
   seed: 123
   num_devices: 1
   warm_start: null
@@ -131,7 +133,7 @@ experiment:
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.01
-    aux_loss_within_clash_loss_weight: 0.5 # 1.5 ~ 3.0
+    aux_loss_within_clash_loss_weight: 0.5 # 1.5 ~ 3.0 -> 0.1
     aux_loss_bond_angle_weight: 0.00001 # ?????????
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_prmsd_loss_weight: 0.1 # 4.0 ~ 6.0
@@ -144,22 +146,22 @@ experiment:
     aux_loss_t_pass: 0.1
     viol_loss_t_pass: 0.2
   wandb:
-    name: CDRFlow_stage2
+    name: CDRFlow_v1.1.2
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 4e5
-    min_lr: 1e-6
-    max_lr: 1e-5
+    min_lr: 1e-5
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
-    max_epochs: 140
+    max_epochs: 200
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
     strategy: auto
-    check_val_every_n_epoch: 1
+    check_val_every_n_epoch: 2
     accumulate_grad_batches: 1
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}

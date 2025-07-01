@@ -34,7 +34,7 @@ inference:
     self_condition: True
 
     inference_time_scaling:
-      use: True
+      use: False
       grad_weight: 1.0
       t_scaling: True
     twisting:
