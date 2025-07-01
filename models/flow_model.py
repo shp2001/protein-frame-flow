@@ -79,37 +79,7 @@ class FlowModel(nn.Module):
                     self._all_atom_conf.n_blocks,
                     self._all_atom_conf.atom_num,
                 )
-        
-        self.init_parameters(self._model_conf.initialization)
-
-    def init_parameters(self, initialization: dict):
-        """
-        Initializes the parameters of the diffusion module according to the provided initialization configuration.
-
-        Args:
-            initialization (dict): A dictionary containing initialization settings.
-        """
-
-        for b in range(self._model_conf.num_blocks):
-            self.trunk[f"atom_attention_encoder_{b}"].linear_init(
-                zero_init_atom_encoder_residual_linear=initialization.get(
-                    "zero_init_atom_encoder_residual_linear", False
-                ),
-                he_normal_init_atom_encoder_small_mlp=initialization.get(
-                    "he_normal_init_atom_encoder_small_mlp", False
-                ),
-                he_normal_init_atom_encoder_output=initialization.get(
-                    "he_normal_init_atom_encoder_output", False
-                ),
-            )
-
-            if initialization.get("glorot_init_self_attention", False):
-                for (
-                    block
-                ) in (
-                    self.trunk[f"atom_attention_encoder_{b}"].atom_transformer.diffusion_transformer.blocks
-                ):
-                    block.attention_pair_bias.glorot_init()        
+            
 
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']

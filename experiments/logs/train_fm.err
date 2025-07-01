@@ -1,12 +1,3 @@
-wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.20.1 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250626_133722-bnsx8h6w
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run CDRFlow_stage2
-wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/bnsx8h6w
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
@@ -15,9 +6,56 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
 ------------------------------------
-0 | model | FlowModel | 12.7 M
+0 | model | FlowModel | 13.0 M
 ------------------------------------
-12.7 M    Trainable params
+13.0 M    Trainable params
 0         Non-trainable params
-12.7 M    Total params
-50.697    Total estimated model params size (MB)
+13.0 M    Total params
+51.880    Total estimated model params size (MB)
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 145, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 116, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1021, in _run_stage
+    self._run_sanity_check()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1050, in _run_sanity_check
+    val_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/utilities.py", line 181, in _decorator
+    return loop_run(self, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/evaluation_loop.py", line 115, in run
+    self._evaluation_step(batch, batch_idx, dataloader_idx)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/evaluation_loop.py", line 376, in _evaluation_step
+    output = call._call_strategy_hook(trainer, hook_name, *step_kwargs.values())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 293, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/strategy.py", line 393, in validation_step
+    return self.model.validation_step(*args, **kwargs)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 496, in validation_step
+    atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, contact_map, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
+  File "/home/psh/protein-frame-flow/data/interpolant.py", line 303, in sample
+    model_out = model(batch)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1532, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1541, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/protein-frame-flow/models/flow_model.py", line 113, in forward
+    edge_embed = self.edge_feature_net(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1532, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1541, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/psh/protein-frame-flow/models/edge_feature_net.py", line 92, in forward
+    edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
+RuntimeError: Tensors must have same number of dimensions: got 4 and 5
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
