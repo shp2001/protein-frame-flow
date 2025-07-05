@@ -171,8 +171,9 @@ class FlowModel(nn.Module):
                 rigid_update, (node_mask * diffuse_mask)[..., None])
             if b < self._model_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
+                    curr_rigids_unscale = self.rigids_nm_to_ang(curr_rigids)
                     edge_embed = self.trunk[f'edge_transition_{b}'](
-                        node_embed, edge_embed, curr_rigids, edge_mask
+                        node_embed, edge_embed, curr_rigids_unscale, edge_mask
                     )
                     edge_embed = edge_embed * edge_mask[..., None]
     
@@ -193,29 +194,29 @@ class FlowModel(nn.Module):
             if all_atom_contact_map != None:
                 pair_outputs.append(all_atom_contact_map)
                 
-            backb_to_global = self.rigids_nm_to_ang(curr_rigids)
+            curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
             local_atom_pos_pred = self.trunk[f"allatom_module_{b}"](node_embed, init_node_embed)
-            pred_xyz = local_to_global(backb_to_global, local_atom_pos_pred)
+            pred_xyz = local_to_global(curr_rigids_unscaled, local_atom_pos_pred)
             all_atom_preds = {
                 "positions": pred_xyz
             }
             
             all_atom_outputs.append(all_atom_preds)
-        curr_rigids = self.rigids_nm_to_ang(curr_rigids)
-        pred_trans = curr_rigids.get_trans()
-        pred_rotmats = curr_rigids.get_rots().get_rot_mats()
+
+        pred_trans = curr_rigids_unscaled.get_trans()
+        pred_rotmats = curr_rigids_unscaled.get_rots().get_rot_mats()
 
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
         input_for_confidence = {
             'node_embed': node_embed,
             'edge_embed': edge_embed,
-            'curr_rigids': curr_rigids
+            'curr_rigids': curr_rigids_unscaled
         }
 
         return {
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
-            'backb_frame': curr_rigids,
+            'backb_frame': curr_rigids_unscaled,
             'local_atom_pos': local_atom_pos_pred,
             'all_atom_preds': all_atom_outputs,
             'input_for_confidence': input_for_confidence,
