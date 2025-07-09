@@ -1,16 +1,17 @@
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.20.1 is available!  To upgrade, please run:
+wandb: wandb version 0.21.0 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250701_175238-e585qj81
+wandb: Run data is saved locally in ./wandb/run-20250709_200116-ygfi2i22
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run CDRFlow_v1.1.2
+wandb: Syncing run CDRFlow_v1.2.1
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/e585qj81
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/ygfi2i22
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
+Restoring states from the checkpoint path at /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.1/2025-07-09_10-40-56/last.ckpt
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 
   | Name  | Type      | Params
@@ -21,3 +22,4 @@ LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
 0         Non-trainable params
 12.9 M    Total params
 51.747    Total estimated model params size (MB)
+Restored all states from the checkpoint at /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.1/2025-07-09_10-40-56/last.ckpt

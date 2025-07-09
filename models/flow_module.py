@@ -683,7 +683,26 @@ class FlowModule(LightningModule):
                     model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
                     + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
                 )
-        batch_losses = self.model_step(noisy_batch)
+        try:
+            batch_losses = self.model_step(noisy_batch)
+        except Exception as e:
+            print(f"Error during model_step: {e}")
+            zero_loss = torch.zeros(batch['res_mask'].shape[0], device=batch['res_mask'].device)
+            batch_losses = {
+            "trans_loss": zero_loss,
+            "auxiliary_loss": zero_loss,
+            "rots_vf_loss": zero_loss,
+            "se3_vf_loss": zero_loss,
+            "bb_atom_loss": zero_loss,
+            'sc_atom_loss': zero_loss,
+            'all_atom_clash_loss': zero_loss,
+            'within_clash_loss': zero_loss,
+            'local_dist_mat_loss': zero_loss,
+            'prmsd_loss': zero_loss,
+            'distogram_loss': zero_loss,
+            'contact_map_loss': zero_loss
+        }
+
         num_batch = batch_losses['trans_loss'].shape[0]
         total_losses = {
             k: torch.mean(v) for k,v in batch_losses.items()

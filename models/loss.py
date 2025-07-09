@@ -1084,7 +1084,11 @@ def aa_contact_map_loss(
 ):
 
     device = pred_aa_contact_map.device
-
+    B, L, _, _ = pred_aa_contact_map.shape
+    assert torch.all(cdr_residues < L), f"cdr_residues index out of bounds: max={cdr_residues.max()}, L={L}"
+    assert torch.all(neighbor_indices < L), f"neighbor_indices index out of bounds: max={neighbor_indices.max()}, L={L}"
+    assert not torch.isnan(pred_aa_contact_map).any(), "NaN in prediction"
+    assert not torch.isinf(pred_aa_contact_map).any(), "Inf in prediction"
     # make pairwise all atom contact map 
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
     i_idx = torch.tensor([i for i, j in pair_indices], device=device)
