@@ -183,21 +183,7 @@ class FlowModule(LightningModule):
         pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
 
         if torch.isnan(pred_aa_contact_map).any() or torch.isnan(pred_cb_distogram).any() or torch.isnan(pred_atom_14_list).any():
-            dummy_loss = torch.zeros(gt_atom14_pos.shape[0], device=device, requires_grad=True)
-            return {
-                "trans_loss": dummy_loss,
-                "auxiliary_loss": dummy_loss,
-                "rots_vf_loss": dummy_loss,
-                "se3_vf_loss": dummy_loss,
-                "bb_atom_loss": dummy_loss,
-                'sc_atom_loss': dummy_loss,
-                'all_atom_clash_loss': dummy_loss,
-                'within_clash_loss': dummy_loss,
-                'local_dist_mat_loss': dummy_loss,
-                'prmsd_loss': dummy_loss,
-                'distogram_loss': dummy_loss,
-                'contact_map_loss': dummy_loss
-            }
+            raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_aa_contact_map).any()} \n pred_cb_distogram: {torch.isnan(pred_cb_distogram).any()} \n pred_aa_contact_map: {torch.isnan(pred_aa_contact_map).any()} \n")
         
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
         # if torch.any(torch.isnan(pred_rots_vf)):

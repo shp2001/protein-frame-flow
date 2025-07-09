@@ -98,9 +98,9 @@ mini_rollout:
 experiment:
   add_modules: False
   debug: False
-  seed: 123
+  seed: 703
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.1/2025-07-09_10-40-56/last.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.1/2025-07-05_13-58-20/last.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
