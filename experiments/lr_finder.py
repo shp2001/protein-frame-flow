@@ -13,7 +13,7 @@ from data.protein_dataloader import ProteinData
 from models.flow_module import FlowModule
 from experiments import utils as eu
 import wandb
-
+from pytorch_lightning.tuner.tuning import Tuner
 
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
@@ -33,7 +33,6 @@ class MaskingRatioCallback(Callback):
         log.info(f"Epoch {trainer.current_epoch}: masking_ratio = {datamodule.masking_ratio}")
 
 class Experiment:
-
     def __init__(self, *, cfg: DictConfig):
         self._cfg = cfg
         self._data_cfg = cfg.data
@@ -50,15 +49,10 @@ class Experiment:
         self._module: LightningModule = FlowModule(self._cfg)
 
         if self._exp_cfg.add_modules:
-            # 기존 모델 weight 로드
             state_dict = torch.load(cfg.experiment.warm_start, map_location='cpu')["state_dict"]
-            # 필요한 부분만 추출해서 로드
             flow_state_dict = {k.replace("flow.", ""): v for k, v in state_dict.items() if k.startswith("flow.")}
-
-            # FlowModule에만 로드
             self._module.model.load_state_dict(flow_state_dict, strict=False)
             for name, param in self._module.model.named_parameters():
-
                 log.info(f"Found prmsd param: {name}")
 
     def _setup_dataset(self):
@@ -68,44 +62,15 @@ class Experiment:
         elif self._data_cfg.dataset == 'pdb':
             self._train_dataset, self._valid_dataset = eu.dataset_creation(
                 PdbDataset, self._cfg.pdb_dataset, self._task)
-            
         else:
-            raise ValueError(f'Unrecognized dataset {self._data_cfg.dataset}') 
-        
-    def train(self):
-        callbacks = []
-        if self._exp_cfg.debug:
-            log.info("Debug mode.")
-            logger = None
-            self._train_device_ids = [self._train_device_ids[0]]
-            self._data_cfg.loader.num_workers = 0
-            callbacks.append(MaskingRatioCallback())
-        else:
-            logger = WandbLogger(
-                **self._exp_cfg.wandb,
-            )
-            
-            # Checkpoint directory.
-            ckpt_dir = self._exp_cfg.checkpointer.dirpath
-            os.makedirs(ckpt_dir, exist_ok=True)
-            log.info(f"Checkpoints saved to {ckpt_dir}")
-            
-            # Model checkpoints
-            callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
-            callbacks.append(MaskingRatioCallback())
-            # Save config only for main process.
-            local_rank = os.environ.get('LOCAL_RANK', 0)
-            if local_rank == 0:
-                cfg_path = os.path.join(ckpt_dir, 'config.yaml')
-                with open(cfg_path, 'w') as f:
-                    OmegaConf.save(config=self._cfg, f=f.name)
-                cfg_dict = OmegaConf.to_container(self._cfg, resolve=True)
-                flat_cfg = dict(eu.flatten_dict(cfg_dict))
-                if isinstance(logger.experiment.config, wandb.sdk.wandb_config.Config):
-                    logger.experiment.config.update(flat_cfg)
+            raise ValueError(f'Unrecognized dataset {self._data_cfg.dataset}')
+
+    def run_lr_finder(self):
+        # 설정된 logger 및 Trainer 준비
+        logger = None if self._exp_cfg.debug else WandbLogger(**self._exp_cfg.wandb)
+
         trainer = Trainer(
             **self._exp_cfg.trainer,
-            callbacks=callbacks,
             logger=logger,
             use_distributed_sampler=False,
             enable_progress_bar=True,
@@ -113,16 +78,21 @@ class Experiment:
             devices=self._train_device_ids,
             gradient_clip_val=1.0
         )
-        trainer.fit(
+
+        tuner = Tuner(trainer)
+        lr_finder = tuner.lr_find(
             model=self._module,
             datamodule=self._datamodule,
-            ckpt_path=self._exp_cfg.warm_start,
+            num_training=400,
+            max_lr=0.1
         )
-        # trainer.fit(
-        #     model=self._module,
-        #     datamodule=self._datamodule,
-        # )
 
+        fig = lr_finder.plot(suggest=True)
+        save_path = "/home/psh/protein-frame-flow/experiments/lr_find/lr_find_plot.png"
+        fig.savefig(save_path)
+        log.info(f"LR finder plot saved to {save_path}")
+        log.info(f"Suggested LR: {lr_finder.suggestion():.3e}")
+        print(f"Suggested LR: {lr_finder.suggestion():.3e}")
 
 @hydra.main(version_base=None, config_path="../configs", config_name="base.yaml")
 def main(cfg: DictConfig):
@@ -142,7 +112,7 @@ def main(cfg: DictConfig):
         log.info(f'Loaded warm start config from {warm_start_cfg_path}')
 
     exp = Experiment(cfg=cfg)
-    exp.train()
+    exp.run_lr_finder()
 
 if __name__ == "__main__":
     main()

@@ -127,6 +127,7 @@ class Experiment:
             enable_progress_bar=True,
             enable_model_summary=True,
             devices=self._train_device_ids,
+            gradient_clip_val=0.5
         )
 
         # 체크포인트 기반으로 훈련 재개

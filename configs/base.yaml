@@ -22,8 +22,8 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 20
-    max_num_res_squared: 185_000
+    max_batch_size: 80
+    max_num_res_squared: 200_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
     
@@ -100,7 +100,7 @@ experiment:
   debug: False
   seed: 703
   num_devices: 1
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.1/2025-07-05_13-58-20/last.ckpt
+  warm_start: null
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -122,11 +122,7 @@ experiment:
     aux_loss_use_within_clash_loss: True
     aux_loss_use_bond_angle_loss: False
     aux_loss_use_local_dist_mat_loss: True 
-    aux_loss_use_local_pair_feat_loss: True
 
-    # fape loss
-    aux_loss_use_fape_bb_loss: False
-    aux_loss_use_fape_sc_loss: False
 
     aux_loss_chi_loss_weight: 0.3 # 1.2 -> 0.7 ~ 0.8 
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
@@ -137,16 +133,11 @@ experiment:
     aux_loss_bond_angle_weight: 0.00001 # ?????????
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_prmsd_loss_weight: 0.1 # 4.0 ~ 6.0
-    aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
-    aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
     
-    # fape loss
-    aux_loss_fape_bb_loss_weight: 4.0 # 0.3 ~ 0.4
-    aux_loss_fape_sc_loss_weight: 2.0 # 0.3 ~ 0.7
     aux_loss_t_pass: 0.1
     viol_loss_t_pass: 0.2
   wandb:
-    name: CDRFlow_v1.2.1
+    name: CDRFlow_v1.2.2
     project: se3-fm
   optimizer:
     warmup_steps: 0
@@ -162,7 +153,7 @@ experiment:
     deterministic: False
     strategy: auto
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 1
+    accumulate_grad_batches: 4
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

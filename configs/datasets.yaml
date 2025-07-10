@@ -62,13 +62,13 @@ pdb_dataset:
   crop_ab: True
   ab_threshold: 40
   general_threshold: 40
-  ab_max_num_res: 300
+  ab_max_num_res: 256
   general_max_num_res: 256
   
   # Filtering
   filter:
     max_num_res: 2000
-    min_num_res: 150
+    min_num_res: 100
     max_coil_percent: 1.0
     rog_quantile: 1.0
     # oligomeric: ['monomeric', 'heteromer']
