@@ -69,14 +69,10 @@ class FlowModel(nn.Module):
                     )
 
 
-            self.trunk[f"allatom_module_{b}"] = AllAtomModule(
-                    self._all_atom_conf.d_single,
-                    self._all_atom_conf.d_hidden,
-                    self._all_atom_conf.n_blocks,
-                    self._all_atom_conf.atom_num,
-                )
+            self.trunk[f"allatom_tfmr_{b}"] = torch.nn.TransformerEncoder(
+                tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
+            self.trunk[f'allatom_proj_{b}'] = ipa_pytorch.Linear(self._ipa_conf.c_s, out_dim=14*3)
             
-
     def forward(self, input_feats):
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
@@ -130,10 +126,6 @@ class FlowModel(nn.Module):
         edge_embed = edge_embed * edge_mask[..., None]
 
         for b in range(self._model_conf.num_blocks):
-            cb_distogram = None
-            all_atom_contact_map = None 
-
-            init_node_embed = node_embed
             # atom embed 
             a_token, q_skip, c_skip, p_skip = self.trunk[f"atom_attention_encoder_{b}"](
                 input_feature_dict=ref_feature_dict,
@@ -179,7 +171,9 @@ class FlowModel(nn.Module):
                     edge_embed = edge_embed * edge_mask[..., None]
                 
             curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
-            local_atom_pos_pred = self.trunk[f"allatom_module_{b}"](node_embed, init_node_embed)
+            allatom_embed = self.trunk[f"allatom_tfmr_{b}"](node_embed)
+            local_atom_pos_pred = self.trunk[f"allatom_proj_{b}"](allatom_embed)
+            local_atom_pos_pred = local_atom_pos_pred.view(local_atom_pos_pred.shape[:-1] + (-1, 3))
             pred_xyz = local_to_global(curr_rigids_unscaled, local_atom_pos_pred)
             all_atom_preds = {
                 "positions": pred_xyz
@@ -229,7 +223,7 @@ class ConfidenceModel(nn.Module):
                 self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
                     c=self._prmsd_conf.c_s)
             else:
-                self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.pRMSDTransition(
+                self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.NodeTransition(
                     c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
                 )
     

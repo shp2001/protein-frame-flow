@@ -230,9 +230,9 @@ class StructureModuleTransition(nn.Module):
 
         return s
 
-class pRMSDTransition(nn.Module):
+class NodeTransition(nn.Module):
     def __init__(self, c, num_bins):
-        super(pRMSDTransition, self).__init__()
+        super(NodeTransition, self).__init__()
 
         self.c = c
         self.num_bins = num_bins
