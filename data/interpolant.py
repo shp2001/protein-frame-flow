@@ -140,6 +140,7 @@ class Interpolant:
         t = self.sample_t(num_batch)[:, None]
         so3_t = t
         r3_t = t
+        batch['t'] = t
         noisy_batch['so3_t'] = so3_t
         noisy_batch['r3_t'] = r3_t
 

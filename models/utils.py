@@ -51,6 +51,59 @@ def calc_all_atom_distogram(pos, min_bin, max_bin, num_bins):
     dgram = ((dists_2d > lower) * (dists_2d < upper)).type(pos.dtype)
     return dgram
 
+def get_bin_centers(min_bin: float, max_bin: float, no_bins: int) -> torch.Tensor:
+    """
+    Calculate the centers of the bins for a given range and number of bins.
+
+    Args:
+        min_bin (float): The minimum value of the bin range.
+        max_bin (float): The maximum value of the bin range.
+        no_bins (int): The number of bins.
+
+    Returns:
+        torch.Tensor: The centers of the bins.
+            Shape: [no_bins]
+    """
+    bin_width = (max_bin - min_bin) / no_bins
+    boundaries = torch.linspace(
+        start=min_bin,
+        end=max_bin - bin_width,
+        steps=no_bins,
+    )
+    bin_centers = boundaries + 0.5 * bin_width
+    return bin_centers
+
+
+def compute_contact_prob(
+    distogram_logits: torch.Tensor,
+    min_bin: float, # default 2.3125
+    max_bin: float, # default 21.6875
+    no_bins: int,
+    thres=8.0,
+) -> torch.Tensor:
+    """
+    Compute the contact probability from distogram logits.
+
+    Args:
+        distogram_logits (torch.Tensor): Logits for the distogram.
+            Shape: [N_token, N_token, N_bins]
+        min_bin (float): Minimum bin value.
+        max_bin (float): Maximum bin value.
+        no_bins (int): Number of bins.
+        thres (float): Threshold distance for contact probability. Defaults to 8.0.
+
+    Returns:
+        torch.Tensor: Contact probability.
+            Shape: [N_token, N_token]
+    """
+    distogram_prob = torch.nn.functional.softmax(
+        distogram_logits, dim=-1
+    )  # [N_token, N_token, N_bins]
+    distogram_bins = get_bin_centers(min_bin, max_bin, no_bins)
+    thres_idx = (distogram_bins < thres).sum()
+    contact_prob = distogram_prob[..., :thres_idx].sum(-1)
+    return contact_prob
+
 def get_index_embedding(indices, embed_size, max_len=2056):
     """Creates sine / cosine positional embeddings from a prespecified indices.
 

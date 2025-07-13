@@ -35,7 +35,9 @@ class FlowModule(LightningModule):
         self._interpolant_cfg = cfg.interpolant
 
         # Set-up vector field prediction model
-        self.model = FlowModel(cfg.model)
+        self.model = FlowModel(cfg.model, 
+                               training=cfg.experiment.training,
+                               train_confidence=cfg.experiment.train_confidence)
         self.confidence_model = None
         if cfg.model.prmsd.use_prmsd:
             self.confidence_model = ConfidenceModel(cfg.model)

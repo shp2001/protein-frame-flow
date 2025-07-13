@@ -96,6 +96,8 @@ mini_rollout:
   scaling_nm_ang: ${model.scaling_nm_ang}
   
 experiment:
+  training: True
+  train_confidence: False
   add_modules: False
   debug: False
   seed: 703

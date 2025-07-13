@@ -1,7 +1,7 @@
 model:
-  node_embed_size: 256
+  node_embed_size: 384
   edge_embed_size: 128
-  num_blocks: 4
+  num_cycles: 3
   symmetric: False
   scaling_nm_ang: False 
   
@@ -20,7 +20,7 @@ model:
     ref_pos_dim: 16
     relpos_k: 64
     relpos_dim: 73
-    feat_dim: 64
+    feat_dim: ${model.edge_embed_size}
     num_bins: 32
     self_condition: True
     embed_ref_pos: True
@@ -29,6 +29,13 @@ model:
     embed_unit_vector: True
     embed_distogram: True
 
+  pairformer: 
+    n_blocks: 3
+    n_heads: 16
+    c_z: 128
+    c_s: 384
+    block_per_ckpt: 1
+    
   aa_enc:
     c_token: ${model.node_embed_size}
     has_s_z: True
@@ -36,7 +43,7 @@ model:
     c_atompair: 16
     c_s: ${model.node_embed_size}
     c_z: 128
-    n_blocks: 2
+    n_blocks: 3
     n_heads: 4
     n_queries: 32
     n_keys: 128
@@ -49,8 +56,11 @@ model:
     no_heads: 8
     no_qk_points: 8
     no_v_points: 12
-    seq_tfmr_num_heads: 4
-    seq_tfmr_num_layers: 2
+    depth: 3
+
+    seq_tfmr_num_heads: 8
+    seq_tfmr_num_layers: 4
+
 
   local_triangle_attention_new:
     enable: True # true
@@ -68,8 +78,7 @@ model:
     pair_dropout: 0.25
     
   distogram_head: 
-    first_break: 2
-    last_break: 22
+    c_z: ${model.edge_embed_size}
     num_bins: 64
 
   angle:
@@ -108,3 +117,10 @@ model:
     zero_init_residual_condition_transition: False
     zero_init_dit_output: True
     zero_init_atom_decoder_linear: False
+
+conditioning_module:
+  c_s: ${model.node_embed_size}
+  c_z: ${model.edge_embed_size}
+  c_s_inputs: ${model.node_embed_size}
+  c_noise_embedding: 128
+  relpos_dim: 73

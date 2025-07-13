@@ -17,10 +17,10 @@ class EdgeFeatureNet(nn.Module):
         self.feat_dim = self._cfg.feat_dim
         self.relpos_dim = self._cfg.relpos_dim
 
-        self.linear_relpos = nn.Linear(self.relpos_dim, self.feat_dim)
+        self.linear_relpos = nn.Linear(self.relpos_dim, self.feat_dim, bias=False)
 
         # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
-        total_edge_feats = self.feat_dim
+        total_edge_feats = 0
         if self._cfg.ref_pos_dim: 
             total_edge_feats += self._cfg.ref_pos_dim
         if self._cfg.embed_chain:
@@ -43,21 +43,22 @@ class EdgeFeatureNet(nn.Module):
             nn.LayerNorm(self.c_z),
         )
 
-    def embed_relpos(self, pair_init):
-        return self.linear_relpos(pair_init)
-
     def forward(self, 
-                trans_t, trans_sc, 
-                rotmats_t, rotmats_sc, 
-                p_mask, diffuse_mask, pair_init,
+                trans_t, 
+                trans_sc, 
+                rotmats_t, 
+                rotmats_sc, 
+                p_mask, 
+                diffuse_mask,
+                pair_init,
                 input_feature_dict):
         """
         trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
                                 If not, it is cdr_masked (cdr masked to the closeast residues) value 
         """
-        # [b, n_res, c_z]
-        relpos_feats = self.embed_relpos(pair_init)
-        all_edge_feats = [relpos_feats]
+
+        relpos_feats = self.linear_relpos(pair_init)
+        all_edge_feats = []
 
         if self._cfg.embed_ref_pos:
             ref_pos = self.ref_pos_embedder(input_feature_dict)
@@ -89,4 +90,5 @@ class EdgeFeatureNet(nn.Module):
 
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)
+        edge_feats = edge_feats + relpos_feats
         return edge_feats

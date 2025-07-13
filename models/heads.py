@@ -48,21 +48,17 @@ class DistogramHead(nn.Module):
     Computes an all-atom contact map.
     """
 
-    def __init__(self, c_z, config):
+    def __init__(self, c_z, num_bins):
         """
         Args:
             c_z:
                 Input channel dimension
-            no_bins:
+            num_bins:
                 Number of distogram bins
         """
         super(DistogramHead, self).__init__()
-
-        self.c_z = c_z
-        self.config = config 
         
-        self.linear = ipa_pytorch.Linear(self.c_z, self.config.num_bins, init="glorot")
-        self.softmax = nn.Softmax(dim=-1)
+        self.linear = ipa_pytorch.Linear(c_z, num_bins, init="glorot")
 
     def forward(self, z):  
         """
@@ -81,22 +77,9 @@ class DistogramHead(nn.Module):
         left_half = self.linear(z)
         right_half = left_half.transpose(-2, -3)
         logits = left_half + right_half # (*, N, N, 14)
-        probs = self.softmax(logits) 
 
-        # breaks = np.linspace(self.config.first_break,
-        #                         self.config.last_break,
-        #                         self.config.num_bins-1)
-        
-        # bin_tops = np.append(breaks, breaks[-1] + (breaks[-1] + breaks[-2]))
-        # bin_tops = torch.tensor(bin_tops)
-        # threshold = 8 + 1e-3 # _CONTACT_THRESHOLD + _CONTACT_EPSILON
-        # is_contact_bin = 1.0 * (bin_tops <= threshold)
-        
-        # contact_probs = torch.einsum(
-        #     'ijk,k->ij', probs, is_contact_bin
-        # )
 
-        return probs
+        return logits
     
 class AngleResnetBlock(nn.Module):
     def __init__(self, c_hidden, use_original_sm):

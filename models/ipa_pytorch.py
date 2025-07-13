@@ -528,9 +528,36 @@ class InvariantPointAttention(nn.Module):
         
         return s
 
+class IPABlocks(nn.Module):
+    def __init__(
+        self,
+        ipa_conf,
+        depth,
+    ):
+        super().__init__()
 
+        # layers
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(InvariantPointAttention(ipa_conf))
 
+    def forward(
+        self,
+        s: torch.Tensor,
+        z: Optional[torch.Tensor],
+        r: Rigid,
+        mask: torch.Tensor,
+    ):
+        for block in self.layers:
+            s = block(
+                s,
+                z,
+                r,
+                mask=mask,
+            )
 
+        return s
+    
 ######################################################################
 ########################### pRMSD Module #############################
 
