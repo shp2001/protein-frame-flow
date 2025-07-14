@@ -1,0 +1,4 @@
+
+ERROR: Assertion `! lines.empty()` failed.
+ERROR:: Exit from: /home/benchmark/rosetta/source/src/core/io/pdb/pdb_reader.cc line: 79
+slurmstepd-gpu02: error: *** JOB 793242 ON gpu02 CANCELLED AT 2025-07-14T17:53:21 ***

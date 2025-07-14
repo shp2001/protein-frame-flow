@@ -96,6 +96,7 @@ mini_rollout:
   scaling_nm_ang: ${model.scaling_nm_ang}
   
 experiment:
+  do_training: True 
   train_confidence: ${model.confidence_head.use_confidence}
   add_modules: False
   debug: False

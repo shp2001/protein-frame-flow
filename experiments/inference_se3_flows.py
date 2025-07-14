@@ -36,7 +36,7 @@ class EvalRunner:
         OmegaConf.set_struct(ckpt_cfg, False)
         cfg = OmegaConf.merge(cfg, ckpt_cfg)
         cfg.experiment.checkpointer.dirpath = './'
-        cfg.experiment.training=False
+        cfg.experiment.do_training=False
         self._cfg = cfg
         self._exp_cfg = cfg.experiment
         self._infer_cfg = cfg.inference

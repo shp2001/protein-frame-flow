@@ -1,1 +1,73 @@
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.21.0 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.8
+wandb: Run data is saved locally in ./wandb/run-20250714_175336-kwo09zrz
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run CDRFlow_v1.4.0
+wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/kwo09zrz
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type      | Params
+------------------------------------
+0 | model | FlowModel | 23.5 M
+------------------------------------
+23.5 M    Trainable params
+0         Non-trainable params
+23.5 M    Total params
+93.918    Total estimated model params size (MB)
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 146, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 117, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
+    self.fit_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
+    self.advance(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 219, in advance
+    batch_output = self.automatic_optimization.run(trainer.optimizers[0], kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 181, in run
+    closure()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 142, in __call__
+    self._result = self.closure(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 128, in closure
+    step_output = self._step_fn()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/optimization/automatic.py", line 315, in _training_step
+    training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 293, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/strategy.py", line 380, in training_step
+    return self.model.training_step(*args, **kwargs)
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 603, in training_step
+    batch_losses = self.model_step(noisy_batch,
+  File "/home/psh/protein-frame-flow/models/flow_module.py", line 160, in model_step
+    r3_t[..., None], torch.tensor(training_cfg.t_normalize_clip))
+AttributeError: 'bool' object has no attribute 't_normalize_clip'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: 🚀 View run CDRFlow_v1.4.0 at: https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/kwo09zrz
+wandb: ️⚡ View job at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjY0MzUzMzk0MA==/version_details/v116
+wandb: Synced 6 W&B file(s), 1 media file(s), 5 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20250714_175336-kwo09zrz/logs

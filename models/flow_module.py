@@ -36,8 +36,8 @@ class FlowModule(LightningModule):
     
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model, 
-                               training=cfg.experiment.training,
-                               train_confidence=cfg.experiment.train_confidence)
+                               training=self._exp_cfg.do_training,
+                               train_confidence=self._exp_cfg.train_confidence)
         
         # Set-up interpolant
         self.interpolant = Interpolant(cfg.interpolant)
@@ -128,6 +128,7 @@ class FlowModule(LightningModule):
                    N_cycle: int):
         
         training_cfg = self._exp_cfg.training
+        print("training_cfg", training_cfg)
         loss_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
@@ -676,13 +677,15 @@ class FlowModule(LightningModule):
     
 
     def configure_optimizers(self):
-        all_params = self.model.parameters()
-        conf_params = self.model.confidence_head.parameters()
+        all_params = list(self.model.parameters())
+        pairformer_params = list(self.model.pairformer.parameters())
+        distogram_head_params = list(self.model.distogram_head_pairformer.parameters())
 
         if self._exp_cfg.train_confidence:
             parameters = all_params
         else:
-            parameters = [p for p in all_params if p not in conf_params]
+            excluded_ids = set(id(p) for p in pairformer_params + distogram_head_params)
+            parameters = [p for p in all_params if id(p) not in excluded_ids]
             
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01

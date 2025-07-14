@@ -127,6 +127,11 @@ class ConditioningModule(nn.Module):
         
         # Single conditioning
         print(f"timestep shape: {t.shape}")
+        single_s = torch.cat(
+            tensors=[s_trunk, s_inputs], dim=-1
+        )  # [..., N_tokens, c_s + c_s_inputs]
+        single_s = self.linear_no_bias_s(self.layernorm_s(single_s))
+
         time_embed = get_time_embedding(t[:, 0], 
                                         self.c_noise_embedding,
                                         2056
@@ -134,10 +139,7 @@ class ConditioningModule(nn.Module):
         time_embed = self.linear_no_bias_n(
                     self.layernorm_n(time_embed)
                     )
-        single_s = torch.cat(
-            tensors=[s_trunk, s_inputs], dim=-1
-        )  # [..., N_tokens, c_s + c_s_inputs]
-        single_s = self.linear_no_bias_s(self.layernorm_s(single_s))
+
         single_s = single_s + time_embed
 
         if inplace_safe:
@@ -273,7 +275,7 @@ class FlowModel(nn.Module):
                     z=z,
                     pair_mask=edge_mask,
                     use_memory_efficient_kernel=False,
-                    use_deepspeed_evo_attention=True,
+                    use_deepspeed_evo_attention=False,
                     use_lma=False
                 )
         
@@ -371,8 +373,8 @@ class FlowModel(nn.Module):
 
         # Initialize node and edge embeddings
         s_init = self.node_feature_net(
-            diffuse_mask[0].unsqeeze(0),
-            aatype[0].unsqeeze(0)
+            diffuse_mask[0].unsqueeze(0),
+            aatype[0].unsqueeze(0)
         ) # (1, N_res, c_s)
 
         squeezed_dict = {}
@@ -383,13 +385,13 @@ class FlowModel(nn.Module):
                 squeezed_dict[k] = v[0].unsqueeze(0)
 
         z_init = self.edge_feature_net(
-            trans_t=trans_t[0].unsqeeze(0),
+            trans_t=trans_t[0].unsqueeze(0),
             trans_sc=None,
-            rotmats_t=rotmats_t[0].unsqeeze(0),
+            rotmats_t=rotmats_t[0].unsqueeze(0),
             rotmats_sc=None,
-            p_mask=edge_mask[0].unsqeeze(0),
-            diffuse_mask=diffuse_mask[0].unsqeeze(0),
-            pair_init=pair_init[0].unsqeeze(0),
+            p_mask=edge_mask[0].unsqueeze(0),
+            diffuse_mask=diffuse_mask[0].unsqueeze(0),
+            pair_init=pair_init[0].unsqueeze(0),
             input_feature_dict=squeezed_dict
         ) # (1, N_res, N_res, c_z)
 
