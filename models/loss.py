@@ -2,7 +2,7 @@ import torch
 from typing import Optional, Dict
 
 from data import residue_constants as rc
-from openfold.utils.loss import between_residue_clash_loss, within_residue_violations
+from openfold.utils.loss import between_residue_clash_loss, within_residue_violations, softmax_cross_entropy
 from openfold.utils.rigid_utils import Rigid, Rotation, local_to_global
 from openfold.utils.tensor_utils import permute_final_dims
 
@@ -671,13 +671,6 @@ def sidechain_fape_loss(
 #     debug_loss = torch.sum(loss, dim=-1) / bb_dev.shape[1]
 #     return debug_loss + cdr_loss
 
-def softmax_cross_entropy(logits, labels):
-    loss = -1 * torch.sum(
-        labels * torch.nn.functional.log_softmax(logits, dim=-1),
-        dim=-1,
-    )
-    return loss
-
 def compute_prmsd(prmsd: torch.Tensor,
                   cdr_mask: torch.Tensor) -> torch.Tensor:
     """Computes plddt from the model output. The output is a histogram of unnormalised
@@ -729,7 +722,7 @@ def compute_prmsd_loss(
 
     return loss
 
-def compute_plddt(logits: torch.Tensor, # (b, L, 50)
+def compute_plddt(logits: torch.Tensor, # (b, L, num_bins)
                   cdr_mask = None) -> torch.Tensor:
     num_bins = logits.shape[-1]
     bin_width = 1.0 / num_bins
@@ -1040,10 +1033,9 @@ def local_distance_loss(
     return dist_mat_loss, neighbor_indices, cdr_residues
 
 def b_carbon_distogram_loss(
-    pred_cb_distogram: torch.Tensor,  # (O-2, B, L, L, 64)
+    pred_cb_distogram_logit: torch.Tensor,  # (B, L, L, num_bins)
     gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
     res_mask: torch.Tensor,
-    neighbor_indices, 
     cdr_residues: torch.Tensor, # (N)
     eps: float = 1e-10
 ):
@@ -1051,24 +1043,23 @@ def b_carbon_distogram_loss(
     gt_cb_distogram = calc_distogram(  
         gt_pseudo_beta,
         min_bin=2.0,
-        max_bin=22.0,
-        num_bins=64
-    ).unsqueeze(0) # (B, L, L, 64), one-hot
+        max_bin=32.0,
+        num_bins=32
+    ) # (B, L, L, 64), one-hot
 
-    # 2. Cross entropy: - sum y * log p
-    loss_per_pair = -torch.sum(gt_cb_distogram * torch.log(pred_cb_distogram), dim=-1)  # (O-2, B, L, L)
-    loss_per_pair = torch.mean(loss_per_pair, dim=0) # (B, L, L)
+    # 2. Cross entropy
+    loss_per_pair = softmax_cross_entropy(gt_cb_distogram, pred_cb_distogram_logit)  # (B, L, L)
 
     # total loss 
     edge_mask = res_mask[:, None] * res_mask[:, :, None] # (B, L, L)
     masked_loss = loss_per_pair * edge_mask
-    loss = torch.sum(masked_loss, dim=(1,2)) / (torch.sum(edge_mask, dim=(1,2)) + eps)
+    loss = torch.sum(masked_loss, dim=(-1,-2)) / (torch.sum(edge_mask, dim=(-1,-2)) + eps)
 
     # local loss  
-    local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
-    local_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
+    local_loss_per_pair = loss_per_pair[:, cdr_residues]
+    local_mask = edge_mask[:, cdr_residues]
     local_masked_loss = local_loss_per_pair * local_mask
-    local_loss = torch.sum(local_masked_loss, dim=(1,2)) / (torch.sum(local_mask, dim=(1,2)) + eps)
+    local_loss = torch.sum(local_masked_loss, dim=(-1,-2)) / (torch.sum(local_mask, dim=(-1,-2)) + eps)
 
     return local_loss + loss
     

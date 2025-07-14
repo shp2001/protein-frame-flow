@@ -36,6 +36,7 @@ class EvalRunner:
         OmegaConf.set_struct(ckpt_cfg, False)
         cfg = OmegaConf.merge(cfg, ckpt_cfg)
         cfg.experiment.checkpointer.dirpath = './'
+        cfg.experiment.training=False
         self._cfg = cfg
         self._exp_cfg = cfg.experiment
         self._infer_cfg = cfg.inference
@@ -54,7 +55,6 @@ class EvalRunner:
             log.info(f'Saving inference config to {config_path}')
 
         # Read checkpoint and initialize module.
-            self._cfg.experiment.training = False # change mode from training to inference 
             self._flow_module = FlowModule.load_from_checkpoint(
                 checkpoint_path=ckpt_path,
                 cfg=self._cfg,

@@ -28,13 +28,15 @@ model:
     embed_diffuse_mask: True
     embed_unit_vector: True
     embed_distogram: True
+    embed_self_condition: False
 
   pairformer: 
     n_blocks: 3
     n_heads: 16
     c_z: 128
     c_s: 384
-    block_per_ckpt: 1
+    blocks_per_ckpt: 1
+    dropout: 0.2
     
   aa_enc:
     c_token: ${model.node_embed_size}
@@ -60,26 +62,10 @@ model:
 
     seq_tfmr_num_heads: 8
     seq_tfmr_num_layers: 4
-
-
-  local_triangle_attention_new:
-    enable: True # true
-    c_s: ${model.node_embed_size}
-    c_z: ${model.edge_embed_size}
-    c_rbf: 64
-    c_gate_s: 16
-    c_hidden: 128
-    c_hidden_mul: 128
-    no_heads: 4
-    transition_n: 2
-    k_neighbour: 32
-    k_linear: 0 # residue index 상에서 앞뒤로 존재하는 얘들을 강제로 포함
-    inf: 1e9
-    pair_dropout: 0.25
     
   distogram_head: 
     c_z: ${model.edge_embed_size}
-    num_bins: 64
+    num_bins: 32
 
   angle:
     c_resnet: 256
@@ -93,34 +79,24 @@ model:
     d_single: 256
     d_hidden: 128
     atom_num: 14
-    
-  prmsd:
-    use_prmsd: False
+
+
+  conditioning_module:
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
-    c_hidden: 16
-    no_heads: 8
-    no_qk_points: 8
-    no_v_points: 12
-    seq_tfmr_num_heads: 4
-    seq_tfmr_num_layers: 2
-    num_blocks: 3
-    num_bins: 50
+    c_s_inputs: ${model.node_embed_size}
+    c_noise_embedding: 128
+    relpos_dim: 73
+    num_bins: 32 # self conditioning distogram 
 
-  initialization:
-    zero_init_condition_transition: False
-    zero_init_atom_encoder_residual_linear: False
-    he_normal_init_atom_encoder_small_mlp: False
-    he_normal_init_atom_encoder_output: False
-    glorot_init_self_attention: False
-    zero_init_adaln: True
-    zero_init_residual_condition_transition: False
-    zero_init_dit_output: True
-    zero_init_atom_decoder_linear: False
 
-conditioning_module:
-  c_s: ${model.node_embed_size}
-  c_z: ${model.edge_embed_size}
-  c_s_inputs: ${model.node_embed_size}
-  c_noise_embedding: 128
-  relpos_dim: 73
+  confidence_head:
+    use_confidence: False
+    n_blocks: 3
+    c_s: ${model.node_embed_size}
+    c_z: ${model.edge_embed_size}
+    c_s_inputs: ${model.node_embed_size}
+    min_bins: 2.0
+    max_bins: 32.0
+    num_bins: 32
+    blocks_per_ckpt: 3

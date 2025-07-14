@@ -13,7 +13,7 @@ import torch.distributed as dist
 from pytorch_lightning import LightningModule
 from analysis import metrics 
 from analysis import utils as au
-from models.flow_model import FlowModel, ConfidenceModel
+from models.flow_model import FlowModel
 from models import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
@@ -33,14 +33,12 @@ class FlowModule(LightningModule):
         self._model_cfg = cfg.model
         self._data_cfg = cfg.data
         self._interpolant_cfg = cfg.interpolant
-
+    
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model, 
                                training=cfg.experiment.training,
                                train_confidence=cfg.experiment.train_confidence)
-        self.confidence_model = None
-        if cfg.model.prmsd.use_prmsd:
-            self.confidence_model = ConfidenceModel(cfg.model)
+        
         # Set-up interpolant
         self.interpolant = Interpolant(cfg.interpolant)
         self.mini_rollout = Interpolant(cfg.mini_rollout)
@@ -97,22 +95,22 @@ class FlowModule(LightningModule):
         # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
         self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
-    # def on_train_batch_end(self, outputs, batch, batch_idx):
-    #     # Backward 이후 gradient가 계산된 파라미터 추적
-    #     grads = {}
-    #     for n, p in self.named_parameters():
-    #         if p.requires_grad and p.grad is not None:
-    #             grads[id(p)] = n
+    def on_train_batch_end(self, outputs, batch, batch_idx):
+        # Backward 이후 gradient가 계산된 파라미터 추적
+        grads = {}
+        for n, p in self.named_parameters():
+            if p.requires_grad and p.grad is not None:
+                grads[id(p)] = n
         
-    #     # 사용되지 않은 파라미터 찾기
-    #     unused = [self._params_before[id_p] for id_p in self._params_before 
-    #             if id_p not in grads]
+        # 사용되지 않은 파라미터 찾기
+        unused = [self._params_before[id_p] for id_p in self._params_before 
+                if id_p not in grads]
         
-    #     if unused:
-    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-    #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
-    #     else:
-    #         print("✅ 모든 파라미터가 사용되었습니다.")
+        if unused:
+            print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+            raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+        else:
+            print("✅ 모든 파라미터가 사용되었습니다.")
 
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
@@ -125,7 +123,10 @@ class FlowModule(LightningModule):
         )
         self._epoch_start_time = time.time()
 
-    def model_step(self, noisy_batch: Any):
+    def model_step(self, 
+                   noisy_batch: Any,
+                   N_cycle: int):
+        
         training_cfg = self._exp_cfg.training
         loss_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
@@ -137,7 +138,6 @@ class FlowModule(LightningModule):
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
         rotmats_t = noisy_batch['rotmats_t']
-        gt_chi_angle = noisy_batch['chi_angles_sin_cos']
         gt_atom14_pos = noisy_batch['atom14_gt_positions'].clone()
         alt_atom14_pos = noisy_batch['atom14_alt_gt_positions'].clone()
         gt_pseudo_beta = noisy_batch['pseudo_beta'].clone()
@@ -171,28 +171,25 @@ class FlowModule(LightningModule):
         rigidgroups_alt_gt_frames[..., :3, 3] = rigidgroups_alt_gt_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Model output predictions.
-        model_output = self.model(noisy_batch)
+        model_output = self.model(noisy_batch, N_cycle)
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
-        # pred_angles_list = model_output['all_atom_preds']['angles'].clone()
-        # pred_unnormalized_angles_list = model_output['all_atom_preds']['unnormalized_angles'].clone()
+        distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
+        distogram_logit_condition = model_output['distogram_logit_condition'].clone()
 
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
 
         if torch.isnan(pred_atom_14_list).any():
-            raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_atom_14_list).any()} \n")
+            raise ValueError(f"pred_atom_14_list: {torch.isnan(pred_atom_14_list).any()} \n")
         
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
-        # if torch.any(torch.isnan(pred_rots_vf)):
-        #     raise ValueError('NaN encountered in pred_rots_vf')
 
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
                                                     atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
 
-        alt_naming_is_better = renamed_dict['alt_naming_is_better'].clone()
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
@@ -259,19 +256,6 @@ class FlowModule(LightningModule):
                                     compute_cdr=True,
                                     compute_h3=False
                                     )    
-        # torsion angle loss 
-        # chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        # if training_cfg.aux_loss_use_chi_loss:
-        #     chi_loss = supervised_chi_loss(pred_angles_list,
-        #                                 pred_unnormalized_angles_list,
-        #                                 noisy_batch['aatype'],
-        #                                 noisy_batch['res_mask'],
-        #                                 noisy_batch['chi_mask'],
-        #                                 gt_chi_angle,
-        #                                 chi_weight=0.5,
-        #                                 angle_norm_weight=0.02,
-        #                                 cdr_mask=interface_mask
-        #                                 )
             
         # final layer backbone rmsd loss
         final_bb_rmsd = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
@@ -287,9 +271,26 @@ class FlowModule(LightningModule):
 
         final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
         
-
-        # all atom clash loss 
+        # pair head loss 
         batch_size = gt_atom14_pos.shape[0]
+        pair_head_loss = torch.zeros(batch_size, device=device)
+        if training_cfg.aux_loss_use_pair_head_loss:
+            pairformer_pair_head_loss = b_carbon_distogram_loss(
+                pred_cb_distogram=distogram_logit_pairformer,
+                gt_pseudo_beta=gt_pseudo_beta,
+                res_mask=noisy_batch['res_mask'],
+                cdr_residues=cdr_residues
+            )
+            condition_pair_head_loss = b_carbon_distogram_loss(
+                pred_cb_distogram=distogram_logit_condition,
+                gt_pseudo_beta=gt_pseudo_beta,
+                res_mask=noisy_batch['res_mask'],
+                cdr_residues=cdr_residues
+            )
+            pair_head_loss = (pairformer_pair_head_loss + condition_pair_head_loss) / 2
+            
+        # all atom clash loss 
+        
         all_atom_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.aux_loss_use_all_atom_clash_loss:
             try:
@@ -317,9 +318,9 @@ class FlowModule(LightningModule):
                 within_clash_loss = torch.zeros(batch_size).to(device)
 
 
-        # calculate prmsd (perform mini rollout with 10 timesteps)
-        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        if training_cfg.aux_loss_use_prmsd_loss:
+        # calculate plddt
+        plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        if training_cfg.aux_loss_use_plddt_loss:
             self.mini_rollout.set_device(loss_mask.device)
 
             cdr_residues, interface_residues = au.get_cdr_and_neighbors(
@@ -334,20 +335,20 @@ class FlowModule(LightningModule):
             interface_mask[:, interface_residues] = 1
             noisy_batch['interface_mask'] = interface_mask
 
-            _, _, mini_pred_positions, prmsd_final, mini_prmsd, _, _, input_for_confidence = self.mini_rollout.sample(
+            _, _, mini_pred_positions, _, _, plddt_logit = self.mini_rollout.sample(
                 num_batch,
                 num_res,
                 self.model,
                 noisy_batch,
-                rollout=True
+                N_cycle=self._model_cfg.num_cycles,
             )
 
-            mini_prmsd = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
-            prmsd_loss = lddt_loss(logits=mini_prmsd,
-                                    all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
-                                    all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-                                    all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
-                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
+            plddt_loss = lddt_loss(
+                logits=plddt_logit, # (b, l, num_bins)
+                all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
+                all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
+                all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
+                cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
 
             # final_prmsd = compute_prmsd(pred_rmsd, cdr_mask=noisy_batch['diffuse_mask'])
             # print(f"prmsd_max: {torch.max(final_prmsd[0])}")
@@ -357,6 +358,7 @@ class FlowModule(LightningModule):
         auxiliary_loss = (
             bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
+            + pair_head_loss * training_cfg.aux_loss_use_pair_head_loss * training_cfg.aux_loss_pair_head_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
         )
@@ -378,7 +380,7 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
         )
     
-        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
+        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + plddt_loss * training_cfg.aux_loss_prmsd_loss_weight
         if torch.any(torch.isnan(se3_vf_loss)):
             se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
@@ -405,7 +407,7 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'prmsd_loss': prmsd_loss
+            'plddt_loss': plddt_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
@@ -417,11 +419,12 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
-        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
+        atom37_traj, clean_atom37_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
-            batch
+            batch,
+            N_cycle=self._model_cfg.num_cycles
         )
         
         pred_positions_37 = []
@@ -442,13 +445,15 @@ class FlowModule(LightningModule):
 
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
-            b_factors = prmsd_final[i].cpu().numpy()
-            if (b_factors==0).all():
+
+            if (plddt_logit[i]==0).all():
                 b_factor_alt = diffuse_mask.cpu().numpy()
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
             
             else:
-                b_factors = np.tile((b_factors)[:, None], (1, 37))
+                plddt = compute_plddt(plddt_logit[i])
+                plddt = plddt.cpu().numpy()
+                b_factors = np.tile((plddt)[:, None], (1, 37))
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
@@ -539,18 +544,13 @@ class FlowModule(LightningModule):
             )
         self.validation_epoch_metrics.clear()
 
-    # def on_after_backward(self):
-    #     # 모든 파라미터에 대해 gradient 값 확인
-    #     for name, param in self.named_parameters():
-    #         if param.grad is not None:
-    #             # 클리핑 전 gradient의 norm 출력
-    #             grad_norm_before = param.grad.norm(2).item()
-    #             print(f"Gradient norm for {name} before clipping: {grad_norm_before}")
-                
-    #             # 클리핑 후 gradient의 norm 출력
-    #             torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
-    #             grad_norm_after = param.grad.norm(2).item()
-    #             print(f"Gradient norm for {name} after clipping: {grad_norm_after}")
+    def on_after_backward(self):
+        self.nan_in_grad = False
+        for name, param in self.named_parameters():
+            if param.grad is not None and torch.isnan(param.grad).any():
+                self.print(f"⚠️ NaN detected in gradient of parameter: {name}")
+                self.nan_in_grad = True
+                break
 
     def _log_scalar(
             self,
@@ -580,13 +580,15 @@ class FlowModule(LightningModule):
     
     def training_step(self, batch: Any, stage: int):
         step_start_time = time.time()
-        params_before = {n: p.requires_grad for n, p in self.named_parameters() if p.requires_grad}
         self.interpolant.set_device(batch['res_mask'].device)
         noisy_batch = self.interpolant.corrupt_batch(batch)
+        N_cycle = random.randint(1, self._model_cfg.num_cycles+1)
         
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
-                model_sc = self.model(noisy_batch)
+                self.model.training = False
+                model_sc = self.model(noisy_batch, 
+                                      N_cycle)
                 noisy_batch['trans_sc'] = (
                     model_sc['pred_trans'] * noisy_batch['diffuse_mask'][..., None]
                     + noisy_batch['trans_1'] * (1 - noisy_batch['diffuse_mask'][..., None])
@@ -595,26 +597,11 @@ class FlowModule(LightningModule):
                     model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
                     + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
                 )
-        try:
-            batch_losses = self.model_step(noisy_batch)
-        except Exception as e:
-            print(f"Error during model_step: {e}")
-            zero_loss = torch.zeros(batch['res_mask'].shape[0], device=batch['res_mask'].device)
-            batch_losses = {
-            "trans_loss": zero_loss,
-            "auxiliary_loss": zero_loss,
-            "rots_vf_loss": zero_loss,
-            "se3_vf_loss": zero_loss,
-            "bb_atom_loss": zero_loss,
-            'sc_atom_loss': zero_loss,
-            'all_atom_clash_loss': zero_loss,
-            'within_clash_loss': zero_loss,
-            'local_dist_mat_loss': zero_loss,
-            'prmsd_loss': zero_loss,
-            'distogram_loss': zero_loss,
-            'contact_map_loss': zero_loss
-        }
+                self.model.training = True
 
+        batch_losses = self.model_step(noisy_batch,
+                                        N_cycle)
+            
         num_batch = batch_losses['trans_loss'].shape[0]
         total_losses = {
             k: torch.mean(v) for k,v in batch_losses.items()
@@ -689,10 +676,14 @@ class FlowModule(LightningModule):
     
 
     def configure_optimizers(self):
-        if self.confidence_model != None:
-            parameters = list(self.model.parameters()) + list(self.confidence_model.parameters())
+        all_params = self.model.parameters()
+        conf_params = self.model.confidence_head.parameters()
+
+        if self._exp_cfg.train_confidence:
+            parameters = all_params
         else:
-            parameters = self.model.parameters()
+            parameters = [p for p in all_params if p not in conf_params]
+            
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )
@@ -705,6 +696,14 @@ class FlowModule(LightningModule):
         # )
         # return {"optimizer": optimizer, "lr_scheduler": scheduler}
         return {"optimizer": optimizer}
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure, *args, **kwargs):
+        if self.nan_in_grad:
+            self.print(f"⚠️ Skipping optimizer step at step {self.global_step} due to NaN in gradient.")
+            optimizer.zero_grad()
+            return
+
+        optimizer.step()  # <- AdamW는 closure 필요 없음
 
     def on_train_batch_start(self, batch, batch_idx):
         # 첫 번째 optimizer 기준
@@ -746,25 +745,13 @@ class FlowModule(LightningModule):
                 self.inference_dir, pdb_id, f'sample_{sample_id}')
                 for sample_id in sample_ids]
 
-            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
+            atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = interpolant.sample(
                 num_batch, 
                 sample_length, 
                 self.model,
-                batch
+                batch,
+                N_cycle=self._model_cfg.num_cycles
             )
-
-            if self.confidence_model != None:
-                prmsd = self.confidence_model(input_for_confidence, batch['res_mask'])
-                prmsd_final = compute_plddt(prmsd, cdr_mask=batch['diffuse_mask'])
-            # cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-            #     torch.tensor(pred_positions, device=batch['aatype'].device),
-            #     batch['atom14_gt_positions'],
-            #     batch['atom14_gt_exists'],
-            #     batch['original_diffuse_mask'][0],
-            #     batch['mode'],
-            #     scale_factor=torch.ones(b),
-            #     distance_threshold=5
-            # )
             
             bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
             pred_positions_37 = []
@@ -825,13 +812,12 @@ class FlowModule(LightningModule):
             sample_files = [os.path.join(
                 '/home/psh/protein-frame-flow/train_conf', f'{pdb_id}_sample_{sample_id}.pt')
                 for sample_id in sample_ids]
-            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
+            atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = interpolant.sample(
                 num_batch, 
                 sample_length, 
                 self.model,
                 batch,
-                save_all_repr=True,
-
+                N_cycle=self._model_cfg.num_cycles,
             )
             def extract_i(all_input_for_confidence, i):
                 out = {}

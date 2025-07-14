@@ -23,7 +23,7 @@ def compute_distance_map(coords):
 
     return dist_map
 
-def calc_distogram(pos, min_bin, max_bin, num_bins):
+def calc_distogram(pos, min_bin, max_bin, num_bins, return_dist=False):
     # pos: (b, L, 3)
     dists_2d = torch.linalg.norm(
         pos[:, :, None, :] - pos[:, None, :, :], axis=-1)[..., None] # (b, L, L, 1)
@@ -34,7 +34,10 @@ def calc_distogram(pos, min_bin, max_bin, num_bins):
         device=pos.device)
     upper = torch.cat([lower[1:], lower.new_tensor([1e8])], dim=-1)
     dgram = ((dists_2d > lower) * (dists_2d < upper)).type(pos.dtype)
-    return dgram
+    if return_dist:
+        return dgram, dists_2d
+    else:
+        return dgram
 
 def calc_all_atom_distogram(pos, min_bin, max_bin, num_bins):
     # pos: (b, L, 14, 3)

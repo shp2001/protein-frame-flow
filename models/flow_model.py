@@ -1,17 +1,13 @@
-from typing import Optional, Union 
-
 import torch
 from torch import nn
 
 from models.node_feature_net import NodeFeatureNet
 from models.edge_feature_net import EdgeFeatureNet
 from models import ipa_pytorch
-from models.utils import get_time_embedding
-from models.heads import DistogramHead
+from models.utils import get_time_embedding, calc_distogram, calc_unit_vector
+from models.heads import DistogramHead, ConfidenceHead
 from data import utils as du
-from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
-from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 from Protenix.protenix.model.modules import transformer, pairformer
 from Protenix.protenix.model.modules.primitives import LayerNorm, LinearNoBias, Transition
 
@@ -32,13 +28,13 @@ class ConditioningModule(nn.Module):
         self.c_s_inputs = model_conf.c_s_inputs
         self.c_noise_embedding = model_conf.c_noise_embedding
         self.relpos_dim = model_conf.relpos_dim
-        self.feat_dim = model_conf.feat_dim
+        self.num_bins = model_conf.num_bins
 
         # Line1-Line3:
         self.linear_relpos = LinearNoBias(self.relpos_dim, self.c_z)
-        self.layernorm_z = LayerNorm(2 * self.c_z, create_offset=False)
+        self.layernorm_z = LayerNorm(2 * self.c_z + self.num_bins + 3, create_offset=False)
         self.linear_no_bias_z = LinearNoBias(
-            in_features=2 * self.c_z, out_features=self.c_z, precision=torch.float32
+            in_features=2 * self.c_z + self.num_bins + 3, out_features=self.c_z, precision=torch.float32
         )
         # Line3-Line5:
         self.transition_z1 = Transition(c_in=self.c_z, n=2)
@@ -64,6 +60,11 @@ class ConditioningModule(nn.Module):
         self.transition_s1 = Transition(c_in=self.c_s, n=2)
         self.transition_s2 = Transition(c_in=self.c_s, n=2)
 
+        self.distogram_head_condition = DistogramHead(
+            c_z=self.c_z,
+            num_bins=self.num_bins
+        )
+
     def forward(
         self,
         t: torch.Tensor,
@@ -71,6 +72,8 @@ class ConditioningModule(nn.Module):
         s_inputs: torch.Tensor,
         s_trunk: torch.Tensor,
         z_trunk: torch.Tensor,
+        trans_sc: torch.Tensor,
+        rotmats_sc:torch.Tensor,
         inplace_safe: bool = False,
         use_conditioning: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -85,6 +88,8 @@ class ConditioningModule(nn.Module):
                 [..., N_tokens, c_s]
             z_trunk (torch.Tensor): pair feature embedding from PairFormer (Alg17)
                 [..., N_tokens, N_tokens, c_z]
+            trans_sc (torch.Tensor): trans vector from self conditioning 
+            rotmats_sc (torch.Tensor): rotation matrix from self conditiong
             inplace_safe (bool): Whether it is safe to use inplace operations.
             use_conditioning (bool): Whether to drop the s/z embeddings.
         Returns:
@@ -100,10 +105,17 @@ class ConditioningModule(nn.Module):
                 s_trunk = 0 * s_trunk
                 z_trunk = 0 * z_trunk
 
+        # self conditioning 
+        distogram_sc = calc_distogram(
+            trans_sc, min_bin=2.0, max_bin=32.0, num_bins=self.num_bins)
+
+        rigid_sc = du.create_rigid(rotmats_sc, trans_sc)
+        unit_vec_sc = calc_unit_vector(rigid_sc)
+
         # Pair conditioning
         relative_position = self.linear_relpos(pair_init)
         pair_z = torch.cat(
-            tensors=[z_trunk, relative_position], dim=-1
+            tensors=[z_trunk, relative_position, distogram_sc, unit_vec_sc], dim=-1
         )  # [..., N_tokens, N_tokens, 2*c_z]
         pair_z = self.linear_no_bias_z(self.layernorm_z(pair_z))
         if inplace_safe:
@@ -112,7 +124,7 @@ class ConditioningModule(nn.Module):
         else:
             pair_z = pair_z + self.transition_z1(pair_z)
             pair_z = pair_z + self.transition_z2(pair_z)
-            
+        
         # Single conditioning
         print(f"timestep shape: {t.shape}")
         time_embed = get_time_embedding(t[:, 0], 
@@ -136,25 +148,28 @@ class ConditioningModule(nn.Module):
             single_s = single_s + self.transition_s2(single_s)
         if not self.training and pair_z.shape[-2] > 2000:
             torch.cuda.empty_cache()
-        return single_s, pair_z
+
+        distogram_logit = self.distogram_head_condition(pair_z)
+
+        return single_s, pair_z, distogram_logit
     
 class FlowModel(nn.Module):
-    def __init__(self, 
-                 model_conf, 
-                 training,
-                 train_confidence):
+    def __init__(
+            self, 
+            model_conf, 
+            training,
+            train_confidence):
         super(FlowModel, self).__init__()
         self.training = training
         self.train_confidence = train_confidence
         self._model_conf = model_conf
         self._pairformer_conf = model_conf.pairformer
         self._distogram_conf = model_conf.distogram_head
-
         self._condition_conf = model_conf.conditioning_module
-        
+        self._confidence_conf = model_conf.confidence_head
+
         self._aa_enc_conf = model_conf.aa_enc
         self._ipa_conf = model_conf.ipa
-        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
         self._all_atom_conf = model_conf.all_atom
         
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
@@ -182,9 +197,10 @@ class FlowModel(nn.Module):
         self.pairformer = pairformer.PairformerStack(
             self._pairformer_conf
         )
-        self.distogram_head = DistogramHead(c_z=self._distogram_conf.c_z, 
-                                            num_bins=self._distogram_conf.num_bins)
-
+        self.distogram_head_pairformer = DistogramHead(
+            c_z=self._distogram_conf.c_z, 
+            num_bins=self._distogram_conf.num_bins)
+    
         # Condition Module 
         self.condition = ConditioningModule(self._condition_conf)
 
@@ -194,9 +210,10 @@ class FlowModel(nn.Module):
                                          self._ipa_conf.depth)
         self.fuse_ln_aa_enc = LayerNorm(self._aa_enc_conf.c_token)
         self.fuse_ln_ipa = LayerNorm(self._ipa_conf.c_s)
-        self.fuse_linear = ipa_pytorch.Linear(in_dim=self._ipa_conf.c_s + self._aa_enc_conf.c_token,
-                                                            out_dim=self._ipa_conf.c_s
-                                                            )
+        self.fuse_linear = ipa_pytorch.Linear(
+            in_dim=self._ipa_conf.c_s + self._aa_enc_conf.c_token,
+            out_dim=self._ipa_conf.c_s
+            )
         tfmr_in = self._ipa_conf.c_s
         tfmr_layer = torch.nn.TransformerEncoderLayer(
             d_model=tfmr_in,
@@ -218,13 +235,26 @@ class FlowModel(nn.Module):
         self.allatom_tfmr = torch.nn.TransformerEncoder(
             tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
         self.allatom_proj = ipa_pytorch.Linear(self._ipa_conf.c_s, out_dim=14*3)
-    
-    def get_pairformer_output(self, 
-                              s_init: torch.Tensor,
-                              z_init: torch.Tensor,
-                              edge_mask: torch.Tensor,
-                              N_cycle: int):
 
+        # confidence head 
+        if self._confidence_conf.use_confidence:
+            self.confidence_head = ConfidenceHead(
+                n_blocks=self._confidence_conf.n_blocks,
+                c_s=self._confidence_conf.c_s,
+                c_z=self._confidence_conf.c_z,
+                c_s_inputs=self._confidence_conf.c_s_inputs,
+                min_bins=self._confidence_conf.min_bins,
+                max_bins=self._confidence_conf.max_bins,
+                num_bins=self._confidence_conf.num_bins,
+                blocks_per_ckpt=self._confidence_conf.blocks_per_ckpt
+            )
+
+    def get_pairformer_output(self, 
+                              s_init: torch.Tensor, # [1, N_res, c_s]
+                              z_init: torch.Tensor, # [1, N_res, N_res, c_z]
+                              edge_mask: torch.Tensor, # [1, N_res, N_res]
+                              N_cycle: int,
+                              B: int):
 
         z = torch.zeros_like(z_init)
         s = torch.zeros_like(s_init)
@@ -234,7 +264,7 @@ class FlowModel(nn.Module):
                 self.training
                 and (not self.train_confidence)
                 and cycle_no == (N_cycle - 1)
-            ):
+            ): # training을 하면서 confidence는 훈련하지 않고 마지막 cycle에서만 gradient
                 z = z_init + self.linear_no_bias_z_cycle(self.layernorm_z_cycle(z))
                 s = s_init + self.linear_no_bias_s(self.layernorm_s(s))
 
@@ -247,22 +277,27 @@ class FlowModel(nn.Module):
                     use_lma=False
                 )
         
-        distogram_logit = self.distogram_head(z)
+        distogram_logit = self.distogram_head_pairformer(z) # (1, N_res, N_res, num_bins)
+
+        s_init = s.repeat(B, 1, 1) # (B, N_res, c_s)
+        s = s.repeat(B, 1, 1) # (B, N_res, c_s)
+        z = z.repeat(B, 1, 1, 1) # (B, N_res, N_res, c_z)
+        distogram_logit = distogram_logit.repeat(B, 1, 1, 1) # (B, N_res, N_res, num_bins)
 
         return s_init, s, z, distogram_logit
     
-    def get_structure_output(self,         
-                            t: torch.Tensor,
-                            pair_init:torch.Tensor,
-                            s_inputs: torch.Tensor,
-                            s_single: torch.Tensor,
-                            z_pair: torch.Tensor,
-                            curr_rigids,
-                            ref_feature_dict):
+    def get_structure_output(
+            self,         
+            s_single: torch.Tensor,
+            s_trunk: torch.Tensor,
+            z_pair: torch.Tensor,
+            z_trunk: torch.Tensor,
+            curr_rigids,
+            ref_feature_dict,
+            node_mask: torch.Tensor,
+            diffuse_mask: torch.Tensor):
 
         # Main trunk
-        all_atom_outputs = []
-
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
 
         a_token, q_skip, c_skip, p_skip = self.atom_attention_encoder(
@@ -273,47 +308,44 @@ class FlowModel(nn.Module):
         a_token = a_token.to(dtype=torch.float32)
 
         # residue embed 
-        ipa_embed = self.trunk[f'ipa_{b}'](
-            node_embed,
-            edge_embed,
+        ipa_embed = self.ipa(
+            s_single,
+            z_pair,
             curr_rigids,
             node_mask)
         ipa_embed = ipa_embed * node_mask[..., None]
         
-        ipa_embed = self.trunk[f'fuse_ln_aa_enc_{b}'](ipa_embed + node_embed)
-        a_token = self.trunk[f'fuse_ln_ipa_{b}'](a_token)
+        ipa_embed = self.fuse_ln_ipa(ipa_embed + s_single)
+        a_token = self.fuse_ln_aa_enc(a_token)
 
-        node_embed = torch.cat([ipa_embed, a_token], dim=-1)
-        node_embed = self.trunk[f'fuse_linear_{b}'](node_embed)
+        s = torch.cat([ipa_embed, a_token], dim=-1)
+        s = self.fuse_linear(s)
 
-        seq_tfmr_out = self.trunk[f'seq_tfmr_{b}'](
-            node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
-        node_embed = node_embed + self.trunk[f'post_tfmr_{b}'](seq_tfmr_out)
-        node_embed = self.trunk[f'node_transition_{b}'](node_embed)
-        node_embed = node_embed * node_mask[..., None]
-        rigid_update = self.trunk[f'bb_update_{b}'](
-            node_embed * node_mask[..., None])
+        seq_tfmr_out = self.seq_tfmr(
+            s, src_key_padding_mask=(1 - node_mask).to(torch.bool))
+        s = s + self.post_tfmr(seq_tfmr_out)
+        s = self.node_transition(s)
+        s = s * node_mask[..., None]
+        rigid_update = self.bb_update(
+            s * node_mask[..., None])
         curr_rigids = curr_rigids.compose_q_update_vec(
             rigid_update, (node_mask * diffuse_mask)[..., None])
 
         curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
-        allatom_embed = self.trunk[f"allatom_tfmr_{b}"](node_embed)
-        local_atom_pos_pred = self.trunk[f"allatom_proj_{b}"](allatom_embed)
+        allatom_embed = self.allatom_tfmr(s)
+        local_atom_pos_pred = self.allatom_proj(allatom_embed)
         local_atom_pos_pred = local_atom_pos_pred.view(local_atom_pos_pred.shape[:-1] + (-1, 3))
         pred_xyz = local_to_global(curr_rigids_unscaled, local_atom_pos_pred)
         all_atom_preds = {
             "positions": pred_xyz
         }
-        
-        all_atom_outputs.append(all_atom_preds)
 
         pred_trans = curr_rigids_unscaled.get_trans()
         pred_rotmats = curr_rigids_unscaled.get_rots().get_rot_mats()
 
-        all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
         input_for_confidence = {
-            'node_embed': node_embed,
-            'edge_embed': edge_embed,
+            'node_embed': s_trunk,
+            'edge_embed': z_trunk,
             'curr_rigids': curr_rigids_unscaled
         }
 
@@ -321,15 +353,11 @@ class FlowModel(nn.Module):
             'pred_trans': pred_trans,
             'pred_rotmats': pred_rotmats,
             'backb_frame': curr_rigids_unscaled,
-            'local_atom_pos': local_atom_pos_pred,
-            'all_atom_preds': all_atom_outputs,
+            'all_atom_preds': all_atom_preds,
             'input_for_confidence': input_for_confidence,
         }
 
-    def forward(self,
-               input_feats,
-               N_cycle):
-        
+    def preprocess_input(self, input_feats, N_cycle):
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
         diffuse_mask = input_feats['diffuse_mask']
@@ -339,96 +367,110 @@ class FlowModel(nn.Module):
         aatype = input_feats['aatype']
         ref_feature_dict = input_feats['ref_feature_dict']
 
+        B = node_mask.shape[0]
+
         # Initialize node and edge embeddings
         s_init = self.node_feature_net(
-            diffuse_mask,
-            aatype
-        )
+            diffuse_mask[0].unsqeeze(0),
+            aatype[0].unsqeeze(0)
+        ) # (1, N_res, c_s)
 
+        squeezed_dict = {}
+        for k, v in ref_feature_dict.items():
+            if k == 'atom_to_token_idx':
+                squeezed_dict[k] = v
+            else:
+                squeezed_dict[k] = v[0].unsqueeze(0)
+
+        z_init = self.edge_feature_net(
+            trans_t=trans_t[0].unsqeeze(0),
+            trans_sc=None,
+            rotmats_t=rotmats_t[0].unsqeeze(0),
+            rotmats_sc=None,
+            p_mask=edge_mask[0].unsqeeze(0),
+            diffuse_mask=diffuse_mask[0].unsqeeze(0),
+            pair_init=pair_init[0].unsqeeze(0),
+            input_feature_dict=squeezed_dict
+        ) # (1, N_res, N_res, c_z)
+
+        # Pairformer 
+        s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.get_pairformer_output(
+            s_init,
+            z_init,
+            edge_mask[0].unsqueeze(0),
+            N_cycle,
+            B) # each output is expanded to batch dimension 
+        
+        return s_init, s_trunk, z_trunk, distogram_logit_pairformer
+    
+    def forward(self,
+               input_feats,
+               N_cycle,
+               do_pairformer=True):
+        
+        node_mask = input_feats['res_mask']
+        edge_mask = node_mask[:, None] * node_mask[:, :, None]
+        diffuse_mask = input_feats['diffuse_mask']
+        trans_t = input_feats['trans_t']
+        rotmats_t = input_feats['rotmats_t']
+        ref_feature_dict = input_feats['ref_feature_dict']
+
+        if do_pairformer:
+            s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.preprocess_input(input_feats, N_cycle)
+        else:
+            s_init = input_feats['s_init']
+            s_trunk = input_feats['s_trunk']
+            z_trunk = input_feats['z_trunk']
+            distogram_logit_pairformer = input_feats['distogram_logit_pairformer']
+            
+        # Conditioning 
+        # self-condition
         if 'trans_sc' not in input_feats:
-            trans_sc = du.manage_missing_batch(trans_t, mask=~diffuse_mask.bool())
+            trans_sc = torch.zeros_like(trans_t, device=trans_t.device)
         else:
             trans_sc = input_feats['trans_sc']
 
         if 'rotmats_sc' not in input_feats:
-            rotmats_sc = du.manage_missing_batch(rotmats_t, mask=~diffuse_mask.bool())
+            rotmats_sc = torch.zeros_like(rotmats_t, device=rotmats_t.device)
         else:
             rotmats_sc = input_feats['rotmats_sc']
 
-        z_init = self.edge_feature_net(
-            trans_t,
-            trans_sc,
-            rotmats_t,
-            rotmats_sc,
-            edge_mask,
-            diffuse_mask,
-            pair_init,
-            ref_feature_dict
-        )
+        s_single, z_pair, distogram_logit_condition = self.condition(
+            t=input_feats['t'],
+            pair_init=input_feats['pair_init'],
+            s_inputs=s_init,
+            s_trunk=s_trunk,
+            z_trunk=z_trunk,
+            trans_sc=trans_sc,
+            rotmats_sc=rotmats_sc
+            )
 
-        # Pairformer 
-        s_init, s_trunk, z_trunk, distogram_logit = self.get_pairformer_output(s_init,
-                                                                               z_init,
-                                                                               edge_mask,
-                                                                               N_cycle)
-
-        # Conditioning 
-        s_single, z_pair = self.condition(t=input_feats['t'],
-                                          pair_init=input_feats['pair_init'],
-                                          s_trunk=s_trunk,
-                                          z_trunk=z_trunk)
-        
-        # Initialize rigids
+        # Structure Module
         curr_rigids = du.create_rigid(rotmats_t, trans_t)
+        structure_output = self.get_structure_output(
+            s_single=s_single,
+            s_trunk=s_trunk,
+            z_pair=z_pair,
+            z_trunk=z_trunk,
+            curr_rigids=curr_rigids,
+            ref_feature_dict=ref_feature_dict,
+            node_mask=node_mask,
+            diffuse_mask=diffuse_mask
+        )
+        structure_output['distogram_logit_pairformer'] = distogram_logit_pairformer
+        structure_output['distogram_logit_condition'] = distogram_logit_condition
 
-class ConfidenceModel(nn.Module):
-    def __init__(self, model_conf):
-        super(ConfidenceModel, self).__init__()
-        self._model_conf = model_conf
-        self._prmsd_conf = model_conf.prmsd
-
-        self.prmsd = nn.ModuleDict()
-  
-        self.prmsd_node_transform = ipa_pytorch.Linear(self._prmsd_conf.c_s, self._prmsd_conf.c_s)
-        self.prmsd_edge_transform = ipa_pytorch.Linear(
-                self._prmsd_conf.c_z,
-                self._prmsd_conf.c_z
+        # Confidence Head
+        plddt_preds = None 
+        if self._confidence_conf.use_confidence:
+            plddt_preds = self.confidence_head(
+                s_inputs=s_init,
+                s_trunk=s_trunk,
+                z_trunk=z_trunk,
+                pair_mask=edge_mask,
+                pred_rigids=structure_output['backb_frame']
             )
+        structure_output['plddt'] = plddt_preds
 
-        for b in range(self._prmsd_conf.num_blocks):
-            self.prmsd[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
-            self.prmsd[f'ipa_ln_{b}'] = nn.LayerNorm(self._prmsd_conf.c_s)
-            
-            if b < self._prmsd_conf.num_blocks - 1:
-                self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
-                    c=self._prmsd_conf.c_s)
-            else:
-                self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.NodeTransition(
-                    c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
-                )
-    
-    def forward(self, input_feats, node_mask): 
-    # input feats is a dictionary which includes node_embed, edge_embed, curr_rigids, node_mask
-        node_embed = input_feats['node_embed']
-        edge_embed = input_feats['edge_embed']
-        curr_rigids = input_feats['curr_rigids']
-        prmsd_node = self.prmsd_node_transform(node_embed) 
-        prmsd_edge = self.prmsd_edge_transform(edge_embed)
-
-        for b in range(self._prmsd_conf.num_blocks):
-            prmsd_ipa_embed = self.prmsd[f'ipa_{b}'](
-                prmsd_node,
-                prmsd_edge,
-                curr_rigids,
-                node_mask
-            )
-            # prmsd_ipa_embed *= node_mask[..., None]
-            prmsd_node = self.prmsd[f'ipa_ln_{b}'](prmsd_node + prmsd_ipa_embed)
-            
-            if b < self._prmsd_conf.num_blocks - 1:
-                prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
-                prmsd_node = prmsd_node * node_mask[..., None]
-            else:
-                prmsd_node = self.prmsd[f'prmsd_transition_{b}'](prmsd_node)
-
-        return prmsd_node 
+        return structure_output
+        

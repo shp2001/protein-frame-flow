@@ -1,4 +1,6 @@
 from collections import defaultdict
+import time 
+
 import torch
 from data import so3_utils
 from data import utils as du
@@ -7,9 +9,7 @@ from data import all_atom
 import copy
 from torch import autograd
 from motif_scaffolding import twisting
-from models.loss import compute_all_atom_clash_loss, compute_within_clash_loss, clash_potential
-
-from openfold.utils import rigid_utils
+from models.loss import clash_potential
 
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
@@ -200,13 +200,12 @@ class Interpolant:
             num_res,
             model,
             batch,
+            N_cycle,
             num_timesteps=None,
             trans_potential=None,
             trans_0=None,
             rotmats_0=None,
-            verbose=False,
-            save_all_repr=False,
-            rollout=False
+            verbose=False
         ):
 
         # Set-up initial prior samples
@@ -259,6 +258,21 @@ class Interpolant:
         if motif_mask is not None and len(motif_mask.shape) == 1:
             motif_mask = motif_mask[None].expand((num_batch, -1))
 
+        # get pairformer output 
+        batch['trans_t'] = trans_0
+        batch['rotmats_t'] = rotmats_0 
+        print("Start to get pairformer output")
+        start_time = time.time()
+        s_init, s_trunk, z_trunk, distogram_logit_pairformer = model.preprocess_input(
+            batch, 
+            N_cycle
+        )
+        batch['s_init'] = s_init
+        batch['s_trunk'] = s_trunk
+        batch['z_trunk'] = z_trunk
+        batch['distogram_logit_pairformer'] = distogram_logit_pairformer
+        end_time = time.time()
+        print(f"Finished extracting pairformer output. Elapsed time  {end_time-start_time:.2f}초")
         # Set-up time
         if num_timesteps is None:
             num_timesteps = self._sample_cfg.num_timesteps
@@ -295,13 +309,13 @@ class Interpolant:
             if use_twisting: # Reconstruction guidance
                 with torch.inference_mode(False):
                     batch, Log_delta_R, delta_x = twisting.perturbations_for_grad(batch)
-                    model_out = model(batch)
+                    model_out = model(batch, N_cycle, do_pairformer=False)
                     t = batch['r3_t'] #TODO: different time for SO3?
                     trans_t_1, rotmats_t_1, logs_traj = self.guidance(trans_t_1, rotmats_t_1, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj)
 
             else:
                 with torch.no_grad():
-                    model_out = model(batch)
+                    model_out = model(batch, N_cycle, do_pairformer=False)
 
             # Process model output.
             pred_trans_1 = model_out['pred_trans']
@@ -355,8 +369,10 @@ class Interpolant:
                     trans_t_2 -= t_1 / (1 - t_1) * pred_trans_potential * d_t
                 else:
                     trans_t_2 -= pred_trans_potential * d_t
+
             rotmats_t_2 = self._rots_euler_step(
                 d_t, t_1, pred_rotmats_1, rotmats_t_1)
+            
             if motif_scaffolding and not self._cfg.twisting.use:
                 trans_t_2 = _trans_diffuse_mask(trans_t_2, trans_1, diffuse_mask)
                 rotmats_t_2 = _rots_diffuse_mask(rotmats_t_2, rotmats_1, diffuse_mask)
@@ -381,19 +397,16 @@ class Interpolant:
             batch['rotmats_t'] = rotmats_1
         batch['t'] = torch.ones((num_batch, 1), device=self._device) * t_1
         
-        if rollout:
-            with torch.inference_mode(False):
-                model_out = model(batch)
-        else:
-            with torch.no_grad():
-                model_out = model(batch)
+        with torch.no_grad():
+            model_out = model(batch, N_cycle, do_pairformer=False)
+            
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
+        plddt_logit = model_out['plddt']
 
-        input_for_confidence = model_out['input_for_confidence']
-        prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
-        prmsd_final = prmsd
+        if plddt_logit == None:
+            plddt_logit = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
 
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
@@ -404,22 +417,8 @@ class Interpolant:
         # Convert trajectories to atom37.
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, batch["res_mask"])
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, batch["res_mask"])
-        # if not (prmsd == 0).all():
-        #     prmsd_final = compute_prmsd(prmsd, batch['diffuse_mask'])
-        #     print(f'prmsd_final_val : {torch.max(prmsd_final)}')
-        # else:
-        #     prmsd_final = prmsd 
-        if not save_all_repr:
-            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence
-        else:
-            all_input_for_confidence = {
-                "atom14_gt_positions": batch["atom14_gt_positions"],
-                "atom14_gt_exists": batch["atom14_gt_exists"],
-                "diffuse_mask": diffuse_mask,
-                "pred_positions": model_out['all_atom_preds']['positions'],
-                "input_for_confidence": input_for_confidence
-            }
-            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, all_input_for_confidence
+
+        return atom37_traj, clean_atom37_traj, pred_positions_14, pred_trans_1, pred_rotmats_1, plddt_logit
     
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

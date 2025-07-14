@@ -1,8 +1,11 @@
-
+from typing import Optional, Union 
 import torch
 from torch import nn
 import numpy as np
 from models import ipa_pytorch
+from models.utils import calc_distogram, calc_unit_vector
+from Protenix.protenix.model.modules.primitives import LayerNorm, LinearNoBias
+from Protenix.protenix.model.modules.pairformer import PairformerStack
 
 class AAContactHead(nn.Module):
     """
@@ -80,133 +83,6 @@ class DistogramHead(nn.Module):
 
 
         return logits
-    
-class AngleResnetBlock(nn.Module):
-    def __init__(self, c_hidden, use_original_sm):
-        """
-        Args:
-            c_hidden:
-                Hidden channel dimension
-        """
-        super(AngleResnetBlock, self).__init__()
-
-        self.c_hidden = c_hidden
-        self.use_original_sm = use_original_sm
-
-        if not self.use_original_sm:
-            self.linear_1 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_2 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="relu")
-        self.linear_3 = ipa_pytorch.Linear(self.c_hidden, self.c_hidden, init="final")
-
-        self.relu = nn.ReLU()
-
-    def forward(self, a: torch.Tensor) -> torch.Tensor:
-        s_initial = a
-
-        if not self.use_original_sm:
-            a = self.relu(a)
-            a = self.linear_1(a)
-        a = self.relu(a)
-        a = self.linear_2(a)
-        a = self.relu(a)
-        a = self.linear_3(a)
-
-        return a + s_initial
-
-
-class AngleResnet(nn.Module):
-    """
-    Implements Algorithm 20, lines 11-14
-    """
-
-    def __init__(self, c_in, c_hidden, no_blocks, no_angles, epsilon, use_original_sm):
-        """
-        Args:
-            c_in:
-                Input channel dimension
-            c_hidden:
-                Hidden channel dimension
-            no_blocks:
-                Number of resnet blocks
-            no_angles:
-                Number of torsion angles to generate
-            epsilon:
-                Small constant for normalization
-            use_original_sm:
-                If True implement line 11 of algorithm 20 correctly else use the ABB3 implementation.
-        """
-        super(AngleResnet, self).__init__()
-
-        self.c_in = c_in
-        self.c_hidden = c_hidden
-        self.no_blocks = no_blocks
-        self.no_angles = no_angles
-        self.eps = epsilon
-        self.use_original_sm = use_original_sm
-
-        if self.use_original_sm:
-            self.linear_in = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-            self.linear_initial = ipa_pytorch.Linear(self.c_in, self.c_hidden)
-
-        self.layers = nn.ModuleList()
-        for _ in range(self.no_blocks):
-            layer = AngleResnetBlock(
-                c_hidden=self.c_hidden, use_original_sm=self.use_original_sm
-            )
-            self.layers.append(layer)
-
-        self.linear_out = ipa_pytorch.Linear(self.c_hidden, self.no_angles * 2)
-
-        self.relu = nn.ReLU()
-
-    def forward(
-        self, s: torch.Tensor, s_initial: torch.Tensor
-    ):
-        """
-        Args:
-            s:
-                [*, C_hidden] single embedding
-            s_initial:
-                [*, C_hidden] single embedding as of the start of the
-                StructureModule
-        Returns:
-            [*, no_angles, 2] predicted angles
-        """
-        # NOTE: The ReLU's applied to the inputs are absent from the supplement
-        # pseudocode but present in the source. For maximal compatibility with
-        # the pretrained weights, I'm going with the source.
-
-        # [*, C_hidden]
-        if self.use_original_sm:
-            s_initial = self.relu(s_initial)
-            s_initial = self.linear_initial(s_initial)
-            s = self.relu(s)
-            s = self.linear_in(s)
-            s = s + s_initial
-        else:
-            s = torch.cat((s, s_initial), dim=-1)
-
-        for l in self.layers:
-            s = l(s)
-
-        s = self.relu(s)
-
-        # [*, no_angles * 2]
-        s = self.linear_out(s)
-
-        # [*, no_angles, 2]
-        s = s.view(s.shape[:-1] + (-1, 2))
-
-        unnormalized_s = s
-        norm_denom = torch.sqrt(
-            torch.clamp(
-                torch.sum(s**2, dim=-1, keepdim=True),
-                min=self.eps,
-            )
-        )
-        s = s / norm_denom
-
-        return unnormalized_s, s
 
 class AllAtomModule(nn.Module):
     """All-atom update resnet module."""
@@ -245,3 +121,252 @@ class AllAtomModule(nn.Module):
 
         local_atom_pos = single.view(single.shape[:-1] + (-1, 3))
         return local_atom_pos
+
+class SmallMLP(nn.Module):
+    def __init__(self, c, num_bins):
+        super(SmallMLP, self).__init__()
+
+        self.c = c
+        self.num_bins = num_bins
+
+        self.linear_1 = LinearNoBias(self.c, self.c, initializer="relu")
+        self.linear_2 = LinearNoBias(self.c, self.c, initializer="relu")
+        self.linear_3 = LinearNoBias(self.c, self.num_bins)
+        self.relu = nn.ReLU()
+
+    def forward(self, s):
+        s = self.linear_1(s)
+        s = self.relu(s)
+        s = self.linear_2(s)
+        s = self.relu(s)
+        s = self.linear_3(s)
+
+        return s
+
+
+class ConfidenceHead(nn.Module):
+    """
+    Implements Algorithm 31 in AF3
+    """
+
+    def __init__(
+        self,
+        n_blocks: int = 3,
+        c_s: int = 384,
+        c_z: int = 128,
+        c_s_inputs: int = 384,
+        min_bins: int = 2.0,
+        max_bins: int = 32.0,
+        num_bins: int = 32,
+        pairformer_dropout: float = 0.0,
+        blocks_per_ckpt: Optional[int] = None,
+        stop_gradient: bool = True,
+    ) -> None:
+        """
+        Args:
+            n_blocks (int, optional): number of blocks for ConfidenceHead. Defaults to 4.
+            c_s (int, optional):  hidden dim [for single embedding]. Defaults to 384.
+            c_z (int, optional): hidden dim [for pair embedding]. Defaults to 128.
+            c_s_inputs (int, optional): hidden dim [for single embedding from InputFeatureEmbedder]. Defaults to 449.
+            max_atoms_per_token (int, optional): max atoms in a token. Defaults to 20.
+            pairformer_dropout (float, optional): dropout ratio for Pairformer. Defaults to 0.0.
+            blocks_per_ckpt: number of Pairformer blocks in each activation checkpoint
+            min_bins (float, optional): Start of the distance bin range. Defaults to 2.0.
+            max_bins (float, optional): End of the distance bin range. Defaults to 32.0.
+            num_bins (float, optional): The number of the bins. Defaults to 32.0.
+            stop_gradient (bool, optional): Whether to stop gradient propagation. Defaults to True.
+        """
+        super(ConfidenceHead, self).__init__()
+        self.n_blocks = n_blocks
+        self.c_s = c_s
+        self.c_z = c_z
+        self.c_s_inputs = c_s_inputs
+        self.min_bins = min_bins
+        self.max_bins = max_bins
+        self.num_bins = num_bins
+        self.stop_gradient = stop_gradient
+        self.linear_no_bias_s1 = LinearNoBias(
+            in_features=self.c_s_inputs, out_features=self.c_z
+        )
+        self.linear_no_bias_s2 = LinearNoBias(
+            in_features=self.c_s_inputs, out_features=self.c_z
+        )
+
+        self.linear_no_bias_d = LinearNoBias(
+            in_features=self.num_bins+3, out_features=self.c_z
+        )
+        self.linear_no_bias_d_wo_onehot = LinearNoBias(
+            in_features=1, out_features=self.c_z
+        )
+        self.pairformer_stack = PairformerStack(
+            c_z=self.c_z,
+            c_s=self.c_s,
+            n_blocks=n_blocks,
+            dropout=pairformer_dropout,
+            blocks_per_ckpt=blocks_per_ckpt,
+        )
+        self.linear_no_bias_pae = LinearNoBias(
+            in_features=self.c_z, out_features=self.b_pae
+        )
+        self.linear_no_bias_pde = LinearNoBias(
+            in_features=self.c_z, out_features=self.b_pde
+        )
+
+        self.input_strunk_ln = LayerNorm(self.c_s)
+        self.plddt_ln = LayerNorm(self.c_s)
+        self.plddt_transition = SmallMLP(self.c_s, num_bins=self.num_bins)
+
+        with torch.no_grad():
+            # Zero init for output layer (before softmax) to zero
+            nn.init.zeros_(self.linear_no_bias_pae.weight)
+            nn.init.zeros_(self.linear_no_bias_pde.weight)
+
+            # # Zero init for trunk embedding input layer
+            # nn.init.zeros_(self.linear_no_bias_s_trunk.weight)
+            # nn.init.zeros_(self.linear_no_bias_z_trunk.weight)
+
+    def forward(
+        self,
+        s_inputs: torch.Tensor,
+        s_trunk: torch.Tensor,
+        z_trunk: torch.Tensor,
+        pair_mask: torch.Tensor,
+        pred_rigids,
+        use_embedding: bool = True,
+        use_memory_efficient_kernel: bool = False,
+        use_deepspeed_evo_attention: bool = False,
+        use_lma: bool = False,
+        inplace_safe: bool = False,
+        chunk_size: Optional[int] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            s_inputs (torch.Tensor): single embedding from InputFeatureEmbedder
+                [..., N_tokens, c_s_inputs]
+            s_trunk (torch.Tensor): single feature embedding from PairFormer (Alg17)
+                [..., N_tokens, c_s]
+            z_trunk (torch.Tensor): pair feature embedding from PairFormer (Alg17)
+                [..., N_tokens, N_tokens, c_z]
+            pair_mask (torch.Tensor): pair mask
+                [..., N_token, N_token]
+            use_memory_efficient_kernel (bool, optional): Whether to use memory-efficient kernel. Defaults to False.
+            use_deepspeed_evo_attention (bool, optional): Whether to use DeepSpeed evolutionary attention. Defaults to False.
+            use_lma (bool, optional): Whether to use low-memory attention. Defaults to False.
+            inplace_safe (bool, optional): Whether to use inplace operations. Defaults to False.
+            chunk_size (Optional[int], optional): Chunk size for memory-efficient operations. Defaults to None.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+                - plddt_preds: Predicted pLDDT scores [..., N_sample, N_atom, plddt_bins].
+        """
+
+        if self.stop_gradient:
+            s_inputs = s_inputs.detach()
+            s_trunk = s_trunk.detach()
+            z_trunk = z_trunk.detach()
+
+        s_trunk = self.input_strunk_ln(torch.clamp(s_trunk, min=-512, max=512))
+
+        if not use_embedding:
+            if inplace_safe:
+                z_trunk *= 0
+            else:
+                z_trunk = 0 * z_trunk
+
+        pred_trans = pred_rigids.get_trans()
+        N_sample = pred_trans.size(-3)
+
+        z_init = (
+            self.linear_no_bias_s1(s_inputs)[..., None, :, :]
+            + self.linear_no_bias_s2(s_inputs)[..., None, :]
+        )
+        z_trunk = z_init + z_trunk
+        if not self.training:
+            del z_init
+            torch.cuda.empty_cache()
+
+        plddt_preds = []
+        for i in range(N_sample):
+            plddt_pred = (
+                self.memory_efficient_forward(
+                    s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
+                    z_pair=z_trunk.clone() if inplace_safe else z_trunk,
+                    pair_mask=pair_mask,
+                    pred_rigids=pred_rigids,
+                    use_memory_efficient_kernel=use_memory_efficient_kernel,
+                    use_deepspeed_evo_attention=use_deepspeed_evo_attention,
+                    use_lma=use_lma,
+                    inplace_safe=inplace_safe,
+                    chunk_size=chunk_size,
+                )
+            )
+
+            plddt_preds.append(plddt_pred)
+
+        plddt_preds = torch.stack(
+            plddt_preds, dim=-3
+        )  # [..., N_sample, N_res, plddt_bins]
+
+        return plddt_preds
+
+
+    def memory_efficient_forward(
+        self,
+        s_trunk: torch.Tensor,
+        z_pair: torch.Tensor,
+        pair_mask: torch.Tensor,
+        pred_rigids,
+        use_memory_efficient_kernel: bool = False,
+        use_deepspeed_evo_attention: bool = False,
+        use_lma: bool = False,
+        inplace_safe: bool = False,
+        chunk_size: Optional[int] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            ...
+            pred_trans (torch.Tensor): predicted coordinates
+                [..., N_res, 3] # Note: N_sample = 1 for avoiding CUDA OOM
+        """
+
+        pred_trans = pred_rigids.get_trans()
+        # Embed pair distances of representative atoms:
+        with torch.cuda.amp.autocast(enabled=False):
+            pred_trans = pred_trans.to(torch.float32)
+            
+            pred_distogarm, distance_pred = calc_distogram(pred_trans, 
+                                            min_bin=self.min_bins, 
+                                            max_bin=self.max_bins, 
+                                            num_bins=self.num_bins,
+                                            return_dist=True)
+            pred_unit_vector = calc_unit_vector(pred_rigids)
+            pred_z = torch.cat([pred_distogarm, pred_unit_vector], axis=-1)
+
+            z_pair = z_pair + self.linear_no_bias_d(pred_z)  # [..., N_res, N_res, c_z]
+
+            z_pair = z_pair + self.linear_no_bias_d_wo_onehot(
+                distance_pred.unsqueeze(dim=-1)
+            )  # [..., N_res, N_res, c_z]
+
+        # Line 4
+        s_single, z_pair = self.pairformer_stack(
+            s_trunk,
+            z_pair,
+            pair_mask,
+            use_memory_efficient_kernel=use_memory_efficient_kernel,
+            use_deepspeed_evo_attention=use_deepspeed_evo_attention,
+            use_lma=use_lma,
+            inplace_safe=inplace_safe,
+            chunk_size=chunk_size,
+        )
+
+        # Upcast after pairformer
+        z_pair = z_pair.to(torch.float32)
+        s_single = s_single.to(torch.float32)
+
+        plddt_logit = self.plddt_transition(self.plddt_ln(s_single))
+
+        if not self.training and z_pair.shape[-2] > 2000:
+            torch.cuda.empty_cache()
+
+        return plddt_logit
