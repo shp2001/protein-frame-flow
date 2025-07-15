@@ -309,11 +309,11 @@ def compute_rmsd(
         assert "Data mode should be one of 'ab', 'nanobody', 'general', 'monomer', and 'polymer'."
     
     if mode == 'bb':
-        pred = pred[:, :, :, :3]
+        pred = pred[:, :, :3]
         aligned_target = aligned_target[:, :, :3]
         atom14_gt_exists = atom14_gt_exists[:, :, :3]
     else:
-        pred = pred[:, :, :, 3:]
+        pred = pred[:, :, 3:]
         aligned_target = aligned_target[:, :, 3:]
         atom14_gt_exists = atom14_gt_exists[:, :, 3:]
 
@@ -322,9 +322,9 @@ def compute_rmsd(
     
     mse = torch.nn.functional.mse_loss(
         pred,
-        aligned_target[None, ...],
+        aligned_target,
         reduction='none',
-    ).mean(-1) # (o, b, L, a)
+    ).mean(-1) # (b, L, a)
 
     loss = 0
     if compute_cdr: 
@@ -337,16 +337,14 @@ def compute_rmsd(
             cdr_mask_wo_h3[:, cdr_residues] = 0
             mask = cdr_mask_wo_h3[..., None] * atom14_gt_exists
             
-        cdr_mse = mse * mask[None, ...] # (o, b, L, a)
-
-        cdr_mse = cdr_mse.permute(1,0,2,3) # (b, o, L, a)
+        cdr_mse = mse * mask # (b, L, a)
 
         if cdr_clamp > 0:
             cdr_mse = torch.clamp(cdr_mse, max=cdr_clamp**2)
 
         cdr_mse = torch.sum(
             cdr_mse,
-            dim=(-1,-2,-3),
+            dim=(-1,-2),
         ) / (torch.sum(
             mask,
             dim=(-1,-2),
@@ -357,16 +355,14 @@ def compute_rmsd(
 
     if compute_non_cdr:
         mask = (1-cdr_mask[..., None]) * atom14_gt_exists # (b, L, a)
-        non_cdr_mse = mse * mask[None, ...]
-
-        non_cdr_mse = non_cdr_mse.permute(1,0,2,3) # (b, o, L, a)
+        non_cdr_mse = mse * mask[None, ...] # (b, L, a)
 
         if cdr_clamp > 0:
             non_cdr_mse = torch.clamp(non_cdr_mse, max=cdr_clamp**2)
 
         non_cdr_mse = torch.sum(
             non_cdr_mse,
-            dim=(-1,-2,-3),
+            dim=(-1,-2),
         ) / (torch.sum(
             mask,
             dim=(-1,-2),
@@ -1035,7 +1031,7 @@ def local_distance_loss(
 def b_carbon_distogram_loss(
     pred_cb_distogram_logit: torch.Tensor,  # (B, L, L, num_bins)
     gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
-    res_mask: torch.Tensor,
+    res_mask: torch.Tensor, # (B, L)
     cdr_residues: torch.Tensor, # (N)
     eps: float = 1e-10
 ):
@@ -1047,9 +1043,8 @@ def b_carbon_distogram_loss(
         num_bins=32
     ) # (B, L, L, 64), one-hot
     
-    print("gt_cb_distogram", torch.any(gt_cb_distogram > 1))
     # 2. Cross entropy
-    loss_per_pair = softmax_cross_entropy(gt_cb_distogram, pred_cb_distogram_logit)  # (B, L, L)
+    loss_per_pair = softmax_cross_entropy(pred_cb_distogram_logit, gt_cb_distogram)  # (B, L, L)
 
     # total loss 
     edge_mask = res_mask[:, None] * res_mask[:, :, None] # (B, L, L)

@@ -18,19 +18,14 @@ import wandb
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
-class MaskingRatioCallback(Callback):
+class SetDataEpochCallback(Callback):
     # @rank_zero_only
     def on_train_epoch_start(self, trainer, pl_module):
         datamodule = trainer.datamodule
         datamodule._train_dataset.set_current_epoch(trainer.current_epoch)
         datamodule._train_dataset.current_epoch = trainer.current_epoch
         datamodule.set_current_epoch(trainer.current_epoch)
-        datamodule.masking_ratio = min(
-            1.0, 
-            datamodule.data_cfg.masking_scheduler.init_rate + 
-            datamodule.data_cfg.masking_scheduler.masking_increase_ratio * trainer.current_epoch
-        )
-        log.info(f"Epoch {trainer.current_epoch}: masking_ratio = {datamodule.masking_ratio}")
+
 
 class Experiment:
 
@@ -50,18 +45,6 @@ class Experiment:
         log.info(f"Training with devices: {self._train_device_ids}")
         self._module: LightningModule = FlowModule(self._cfg)
 
-        if self._exp_cfg.add_modules:
-            # 기존 모델 weight 로드
-            state_dict = torch.load(cfg.experiment.warm_start, map_location='cpu')["state_dict"]
-            # 필요한 부분만 추출해서 로드
-            flow_state_dict = {k.replace("flow.", ""): v for k, v in state_dict.items() if k.startswith("flow.")}
-
-            # FlowModule에만 로드
-            self._module.model.load_state_dict(flow_state_dict, strict=False)
-            for name, param in self._module.model.named_parameters():
-
-                log.info(f"Found prmsd param: {name}")
-
     def _setup_dataset(self):
         if self._data_cfg.dataset == 'scope':
             self._train_dataset, self._valid_dataset = eu.dataset_creation(
@@ -80,7 +63,7 @@ class Experiment:
             logger = None
             self._train_device_ids = [self._train_device_ids[0]]
             self._data_cfg.loader.num_workers = 0
-            callbacks.append(MaskingRatioCallback())
+            callbacks.append(SetDataEpochCallback())
         else:
             logger = WandbLogger(
                 **self._exp_cfg.wandb,
@@ -93,7 +76,7 @@ class Experiment:
             
             # Model checkpoints
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
-            callbacks.append(MaskingRatioCallback())
+            callbacks.append(SetDataEpochCallback())
             # Save config only for main process.
             local_rank = os.environ.get('LOCAL_RANK', 0)
             if local_rank == 0:

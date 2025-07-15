@@ -276,6 +276,7 @@ class Interpolant:
         batch['distogram_logit_pairformer'] = distogram_logit_pairformer
         end_time = time.time()
         print(f"Finished extracting pairformer output. Elapsed time  {end_time-start_time:.2f}초")
+
         # Set-up time
         if num_timesteps is None:
             num_timesteps = self._sample_cfg.num_timesteps
@@ -405,7 +406,7 @@ class Interpolant:
             
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
-        pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
+        pred_positions_14 = model_out['all_atom_preds']['positions']
         plddt_logit = model_out['plddt']
 
         if plddt_logit == None:

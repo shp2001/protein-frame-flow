@@ -149,7 +149,6 @@ class ConditioningModule(nn.Module):
             single_s = single_s + self.transition_s2(single_s)
 
         distogram_logit = self.distogram_head_condition(pair_z)
-
         return single_s, pair_z, distogram_logit
     
 class FlowModel(nn.Module):
@@ -277,7 +276,6 @@ class FlowModel(nn.Module):
                 )
         
         distogram_logit = self.distogram_head_pairformer(z) # (1, N_res, N_res, num_bins)
-
         s_init = s.repeat(B, 1, 1) # (B, N_res, c_s)
         s = s.repeat(B, 1, 1) # (B, N_res, c_s)
         z = z.repeat(B, 1, 1, 1) # (B, N_res, N_res, c_z)

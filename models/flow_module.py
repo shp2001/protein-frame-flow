@@ -94,27 +94,23 @@ class FlowModule(LightningModule):
         
         # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
         self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
-        print("on_train_batch_start에서의 params_before", self._params_before)
 
-    def on_train_batch_end(self, outputs, batch, batch_idx):
-        # Backward 이후 gradient가 계산된 파라미터 추적
-        grads = {}
+    # def on_train_batch_end(self, outputs, batch, batch_idx):
+    #     # Backward 이후 gradient가 계산된 파라미터 추적
+    #     grads = {}
 
-        if not hasattr(self, "_params_before"):
-            print("🚫 Warning: _params_before not set. Skipping unused parameter check.")
-        else:
-            for n, p in self.named_parameters():
-                if p.requires_grad and p.grad is not None:
-                    grads[id(p)] = n
+    #     for n, p in self.named_parameters():
+    #         if p.requires_grad and p.grad is not None:
+    #             grads[id(p)] = n
 
-            # 사용되지 않은 파라미터 찾기
-            unused = [self._params_before[id_p] for id_p in self._params_before 
-                    if id_p not in grads]
-            
-            if unused:
-                print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-            else:
-                print("✅ 모든 파라미터가 사용되었습니다.")
+    #     # 사용되지 않은 파라미터 찾기
+    #     unused = [self._params_before[id_p] for id_p in self._params_before 
+    #             if id_p not in grads]
+        
+    #     if unused:
+    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+    #     else:
+    #         print("✅ 모든 파라미터가 사용되었습니다.")
 
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
@@ -178,21 +174,20 @@ class FlowModule(LightningModule):
         model_output = self.model(noisy_batch, N_cycle)
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
-        pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
+        pred_atom_14 = model_output['all_atom_preds']['positions'].clone()
         distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
         distogram_logit_condition = model_output['distogram_logit_condition'].clone()
 
-        pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
-        pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
+        pred_atom_14 = pred_atom_14 * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
-        if torch.isnan(pred_atom_14_list).any():
-            raise ValueError(f"pred_atom_14_list: {torch.isnan(pred_atom_14_list).any()} \n")
+        if torch.isnan(pred_atom_14).any():
+            raise ValueError(f"pred_atom_14: {torch.isnan(pred_atom_14).any()} \n")
         
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
 
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
-                                                    atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
+                                                    atom14_pred_positions=model_output['all_atom_preds']["positions"])
 
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
@@ -219,7 +214,6 @@ class FlowModule(LightningModule):
         r3_t, torch.tensor(training_cfg.t_normalize_clip)))
 
         if training_cfg.aux_loss_use_local_dist_mat_loss:
-            pred_atom_14 = pred_atom_14_list[-1]
             local_dist_mat_loss, neighbor_indices, cdr_residues = local_distance_loss(
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
@@ -232,49 +226,38 @@ class FlowModule(LightningModule):
         # Backbone atom loss
         bb_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_bb_loss:
-            bb_atom_loss = compute_rmsd(pred_atom_14_list,
-                                    renamed_atom14_gt_positions,
-                                    cdr_mask=noisy_batch['diffuse_mask'],
-                                    atom14_gt_exists=renamed_atom14_gt_exists,
-                                    mode='bb',
-                                    data_mode=noisy_batch['mode'],
-                                    compute_non_cdr=False,
-                                    compute_cdr=True,
-                                    compute_h3=True
-                                    )
+            bb_atom_loss = compute_rmsd(
+                pred_atom_14,
+                renamed_atom14_gt_positions,
+                cdr_mask=noisy_batch['diffuse_mask'],
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='bb',
+                data_mode=noisy_batch['mode'],
+                compute_non_cdr=False,
+                compute_cdr=True,
+                compute_h3=True
+                )
                                 
         # sc atom loss (final layer만 계산)
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
         interface_mask = noisy_batch['diffuse_mask'].clone()
         interface_mask[:, neighbor_indices] = 1
+        noisy_batch['interface_mask'] = interface_mask
 
         if training_cfg.aux_loss_use_sc_atom_loss:
-            sc_atom_loss = compute_rmsd(pred_atom_14_list,
-                                    renamed_atom14_gt_positions,
-                                    cdr_mask=interface_mask,
-                                    atom14_gt_exists=renamed_atom14_gt_exists,
-                                    mode='sc',
-                                    data_mode=noisy_batch['mode'],
-                                    compute_non_cdr=True,
-                                    compute_cdr=True,
-                                    compute_h3=False
-                                    )    
+            sc_atom_loss = compute_rmsd(
+                pred_atom_14,
+                renamed_atom14_gt_positions,
+                cdr_mask=interface_mask,
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='sc',
+                data_mode=noisy_batch['mode'],
+                compute_non_cdr=True,
+                compute_cdr=True,
+                compute_h3=False
+                )    
             
-        # final layer backbone rmsd loss
-        final_bb_rmsd = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
-                                renamed_atom14_gt_positions,
-                                cdr_mask=noisy_batch['diffuse_mask'],
-                                atom14_gt_exists=renamed_atom14_gt_exists,
-                                mode='bb',
-                                data_mode=noisy_batch['mode'],
-                                compute_non_cdr=False,
-                                compute_cdr=True,
-                                compute_h3=True
-                                )
-
-        final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
-        
         # pair head loss 
         batch_size = gt_atom14_pos.shape[0]
         pair_head_loss = torch.zeros(batch_size, device=device)
@@ -294,12 +277,11 @@ class FlowModule(LightningModule):
             pair_head_loss = (pairformer_pair_head_loss + condition_pair_head_loss) / 2
             
         # all atom clash loss 
-        
         all_atom_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.aux_loss_use_all_atom_clash_loss:
             try:
                 all_atom_clash_loss = compute_all_atom_clash_loss(
-                    model_output['all_atom_preds']['positions'][-1],
+                    model_output['all_atom_preds']['positions'],
                     noisy_batch['atom14_gt_exists'],
                     noisy_batch['res_idx'],
                     noisy_batch['residx_atom14_to_atom37'],
@@ -313,10 +295,11 @@ class FlowModule(LightningModule):
         if training_cfg.aux_loss_use_within_clash_loss:
             try:
                 within_clash_loss = compute_within_clash_loss(
-                                                            model_output['all_atom_preds']['positions'][-1],
-                                                            noisy_batch['atom14_gt_exists'],
-                                                            interface_mask,
-                                                            noisy_batch['aatype'])   
+                    model_output['all_atom_preds']['positions'],
+                    noisy_batch['atom14_gt_exists'],
+                    interface_mask,
+                    noisy_batch['aatype']
+                    )   
             except Exception as e:
                 print(f"[Warning] within clash loss skipped due to error: {e}")
                 within_clash_loss = torch.zeros(batch_size).to(device)
@@ -326,19 +309,6 @@ class FlowModule(LightningModule):
         plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_plddt_loss:
             self.mini_rollout.set_device(loss_mask.device)
-
-            cdr_residues, interface_residues = au.get_cdr_and_neighbors(
-                atom14_gt_positions=noisy_batch["atom14_gt_positions"],
-                atom14_gt_exists=noisy_batch["atom14_gt_exists"],
-                original_diffuse_mask=noisy_batch["original_diffuse_mask"][0],
-                mode=noisy_batch['mode'],
-                scale_factor=torch.ones(num_batch)
-                )
-            
-            interface_mask = noisy_batch['diffuse_mask'].clone()
-            interface_mask[:, interface_residues] = 1
-            noisy_batch['interface_mask'] = interface_mask
-
             _, _, mini_pred_positions, _, _, plddt_logit = self.mini_rollout.sample(
                 num_batch,
                 num_res,
@@ -364,7 +334,6 @@ class FlowModule(LightningModule):
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + pair_head_loss * training_cfg.aux_loss_use_pair_head_loss * training_cfg.aux_loss_pair_head_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
-            + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
         )
 
         # calculate violation loss
@@ -692,7 +661,6 @@ class FlowModule(LightningModule):
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )
-        print("parameters", parameters)
         # scheduler = self.get_cosine_scheduler_w_warmup(
         #     optimizer,
         #     self._exp_cfg.optimizer.warmup_steps,
@@ -710,12 +678,6 @@ class FlowModule(LightningModule):
             return
 
         optimizer.step(closure=optimizer_closure) 
-
-    def on_train_batch_start(self, batch, batch_idx):
-        # 첫 번째 optimizer 기준
-        optimizer = self.trainer.optimizers[0]
-        lr = optimizer.param_groups[0]['lr']
-        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
         
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
