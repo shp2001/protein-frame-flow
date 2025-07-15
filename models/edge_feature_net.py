@@ -75,7 +75,6 @@ class EdgeFeatureNet(nn.Module):
                 trans_t, min_bin=2.0, max_bin=32.0, num_bins=self._cfg.num_bins)
             distogram_t = distogram_t * diff_feat[..., None]
             all_edge_feats.append(distogram_t)
-
             if self._cfg.embed_self_condition:
                 distogram_sc = calc_distogram(
                     trans_sc, min_bin=2.0, max_bin=32.0, num_bins=self._cfg.num_bins)

@@ -208,6 +208,9 @@ class Interpolant:
             verbose=False
         ):
 
+        # No gradient to pairformer 
+        model.do_training = False
+        
         # Set-up initial prior samples
         if trans_0 is None:
             trans_0 = _centered_gaussian(

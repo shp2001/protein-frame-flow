@@ -85,7 +85,8 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
                                                                 chain_feats['aatype'],
                                                                 chain_feats['all_atom_positions'],
-                                                                None)
+                                                                None
+                                                                )
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
     res_mask[chain_feats['aatype'] == 20] = 0

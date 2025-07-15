@@ -126,7 +126,6 @@ class ConditioningModule(nn.Module):
             pair_z = pair_z + self.transition_z2(pair_z)
         
         # Single conditioning
-        print(f"timestep shape: {t.shape}")
         single_s = torch.cat(
             tensors=[s_trunk, s_inputs], dim=-1
         )  # [..., N_tokens, c_s + c_s_inputs]
@@ -135,7 +134,7 @@ class ConditioningModule(nn.Module):
         time_embed = get_time_embedding(t[:, 0], 
                                         self.c_noise_embedding,
                                         2056
-                                        ).to(single_s.dtype)
+                                        )[:, None, :].repeat(1, single_s.shape[-2], 1).to(single_s.dtype)
         time_embed = self.linear_no_bias_n(
                     self.layernorm_n(time_embed)
                     )
@@ -148,8 +147,6 @@ class ConditioningModule(nn.Module):
         else:
             single_s = single_s + self.transition_s1(single_s)
             single_s = single_s + self.transition_s2(single_s)
-        if not self.training and pair_z.shape[-2] > 2000:
-            torch.cuda.empty_cache()
 
         distogram_logit = self.distogram_head_condition(pair_z)
 
@@ -159,10 +156,10 @@ class FlowModel(nn.Module):
     def __init__(
             self, 
             model_conf, 
-            training,
+            do_training,
             train_confidence):
         super(FlowModel, self).__init__()
-        self.training = training
+        self.do_training = do_training
         self.train_confidence = train_confidence
         self._model_conf = model_conf
         self._pairformer_conf = model_conf.pairformer
@@ -263,7 +260,7 @@ class FlowModel(nn.Module):
 
         for cycle_no in range(N_cycle):
             with torch.set_grad_enabled(
-                self.training
+                self.do_training
                 and (not self.train_confidence)
                 and cycle_no == (N_cycle - 1)
             ): # training을 하면서 confidence는 훈련하지 않고 마지막 cycle에서만 gradient

@@ -1046,7 +1046,8 @@ def b_carbon_distogram_loss(
         max_bin=32.0,
         num_bins=32
     ) # (B, L, L, 64), one-hot
-
+    
+    print("gt_cb_distogram", torch.any(gt_cb_distogram > 1))
     # 2. Cross entropy
     loss_per_pair = softmax_cross_entropy(gt_cb_distogram, pred_cb_distogram_logit)  # (B, L, L)
 

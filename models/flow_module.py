@@ -36,7 +36,7 @@ class FlowModule(LightningModule):
     
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model, 
-                               training=self._exp_cfg.do_training,
+                               do_training=self._exp_cfg.do_training,
                                train_confidence=self._exp_cfg.train_confidence)
         
         # Set-up interpolant
@@ -94,23 +94,27 @@ class FlowModule(LightningModule):
         
         # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
         self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+        print("on_train_batch_start에서의 params_before", self._params_before)
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         # Backward 이후 gradient가 계산된 파라미터 추적
         grads = {}
-        for n, p in self.named_parameters():
-            if p.requires_grad and p.grad is not None:
-                grads[id(p)] = n
-        
-        # 사용되지 않은 파라미터 찾기
-        unused = [self._params_before[id_p] for id_p in self._params_before 
-                if id_p not in grads]
-        
-        if unused:
-            print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-            raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+
+        if not hasattr(self, "_params_before"):
+            print("🚫 Warning: _params_before not set. Skipping unused parameter check.")
         else:
-            print("✅ 모든 파라미터가 사용되었습니다.")
+            for n, p in self.named_parameters():
+                if p.requires_grad and p.grad is not None:
+                    grads[id(p)] = n
+
+            # 사용되지 않은 파라미터 찾기
+            unused = [self._params_before[id_p] for id_p in self._params_before 
+                    if id_p not in grads]
+            
+            if unused:
+                print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
+            else:
+                print("✅ 모든 파라미터가 사용되었습니다.")
 
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
@@ -128,7 +132,6 @@ class FlowModule(LightningModule):
                    N_cycle: int):
         
         training_cfg = self._exp_cfg.training
-        print("training_cfg", training_cfg)
         loss_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
         if torch.any(torch.sum(loss_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
@@ -277,14 +280,14 @@ class FlowModule(LightningModule):
         pair_head_loss = torch.zeros(batch_size, device=device)
         if training_cfg.aux_loss_use_pair_head_loss:
             pairformer_pair_head_loss = b_carbon_distogram_loss(
-                pred_cb_distogram=distogram_logit_pairformer,
-                gt_pseudo_beta=gt_pseudo_beta,
+                pred_cb_distogram_logit=distogram_logit_pairformer,
+                gt_pseudo_beta=noisy_batch["pseudo_beta"],
                 res_mask=noisy_batch['res_mask'],
                 cdr_residues=cdr_residues
             )
             condition_pair_head_loss = b_carbon_distogram_loss(
-                pred_cb_distogram=distogram_logit_condition,
-                gt_pseudo_beta=gt_pseudo_beta,
+                pred_cb_distogram_logit=distogram_logit_condition,
+                gt_pseudo_beta=noisy_batch["pseudo_beta"],
                 res_mask=noisy_batch['res_mask'],
                 cdr_residues=cdr_residues
             )
@@ -381,22 +384,20 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
         )
     
-        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + plddt_loss * training_cfg.aux_loss_prmsd_loss_weight
+        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + plddt_loss * training_cfg.aux_loss_plddt_loss_weight
         if torch.any(torch.isnan(se3_vf_loss)):
             se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
-        # print({
-        #     "r3_t": r3_t,
-        #     "trans_loss": trans_loss,
-        #     "bb_atom_loss": bb_atom_loss,
-        #     'sc_atom_loss': sc_atom_loss,
-        #     'all_atom_clash_loss': all_atom_clash_loss,
-        #     'within_clash_loss': within_clash_loss,
-        #     'local_dist_mat_loss': local_dist_mat_loss,
-        #     'distogram_loss': distogram_loss,
-        #     'contact_map_loss': contact_map_loss,
-        #     'prmsd_loss': prmsd_loss
-        # })
+        print({
+            "r3_t": r3_t,
+            "trans_loss": trans_loss,
+            "bb_atom_loss": bb_atom_loss,
+            'sc_atom_loss': sc_atom_loss,
+            'all_atom_clash_loss': all_atom_clash_loss,
+            'within_clash_loss': within_clash_loss,
+            'local_dist_mat_loss': local_dist_mat_loss,
+            'distogram_loss': pair_head_loss,
+        })
 
         return {
             "trans_loss": trans_loss,
@@ -408,6 +409,7 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
+            'distogram_loss': pair_head_loss,
             'plddt_loss': plddt_loss
         }
 
@@ -587,7 +589,7 @@ class FlowModule(LightningModule):
         
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
-                self.model.training = False
+                self.model.do_training = False
                 model_sc = self.model(noisy_batch, 
                                       N_cycle)
                 noisy_batch['trans_sc'] = (
@@ -598,7 +600,7 @@ class FlowModule(LightningModule):
                     model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
                     + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
                 )
-                self.model.training = True
+                self.model.do_training = True
 
         batch_losses = self.model_step(noisy_batch,
                                         N_cycle)
@@ -690,6 +692,7 @@ class FlowModule(LightningModule):
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )
+        print("parameters", parameters)
         # scheduler = self.get_cosine_scheduler_w_warmup(
         #     optimizer,
         #     self._exp_cfg.optimizer.warmup_steps,
@@ -706,7 +709,7 @@ class FlowModule(LightningModule):
             optimizer.zero_grad()
             return
 
-        optimizer.step()  # <- AdamW는 closure 필요 없음
+        optimizer.step(closure=optimizer_closure) 
 
     def on_train_batch_start(self, batch, batch_idx):
         # 첫 번째 optimizer 기준
@@ -775,18 +778,30 @@ class FlowModule(LightningModule):
 
             pred_positions = np.stack(pred_positions_37)
 
-            total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
-            total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
-            prmsds = du.to_numpy(total_prmsd)
+
+            for i in range(num_batch):
+                if (plddt_logit[i]==0).all():
+                    b_factor_alt = 1-diffuse_mask
+                    b_factors = torch.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
+                
+                else:
+                    plddt = compute_plddt(plddt_logit[i])
+                    plddt = plddt.cpu().numpy()
+                    b_factors = torch.tile((plddt)[:, None], (1, 37))
+
+            plddt_final = torch.ones(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device) * 100
+            plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors)
+            plddt_final = du.to_numpy(plddt_final)
 
             for i in range(num_batch):
                 sample_dir = sample_dirs[i]
                 pred_position = pred_positions[i]
-                prmsd = prmsds[i]
                 bb_traj = bb_trajs[i]
+                plddt = plddt_final[i]
                 os.makedirs(sample_dir, exist_ok=True)
                 aatype = du.to_numpy(batch['original_aatype'].long())
                 chain_idx = du.to_numpy(batch['original_chain_idx'].long())
+
 
                 # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
                 #                          title=pdb_id.split('_')[0] + '_pred',
@@ -795,12 +810,11 @@ class FlowModule(LightningModule):
                 #                          title=pdb_id.split('_')[0] + '_gt',
                 #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
 
-                print("original_diffuse_mask", batch['original_diffuse_mask'].shape)
                 _ = eu.save_traj(
                     sample=pred_position, # (L, 37, 3)
                     bb_prot_traj=bb_traj, 
                     x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                    b_factors=prmsd,  # 위의 prmsd 집어넣기 
+                    b_factors=plddt,  # 위의 prmsd 집어넣기 
                     diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
                     output_dir=sample_dir,
                     aatype=aatype,

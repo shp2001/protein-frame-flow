@@ -1,11 +1,1 @@
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/1
-----------------------------------------------------------------------------------------------------
-distributed_backend=nccl
-All distributed processes registered. Starting with 1 processes
-----------------------------------------------------------------------------------------------------
-
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+slurmstepd-gpu02: error: *** JOB 793286 ON gpu02 CANCELLED AT 2025-07-14T22:02:29 ***

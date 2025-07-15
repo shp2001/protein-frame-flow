@@ -35,7 +35,7 @@ class MaskingRatioCallback(Callback):
 class Experiment:
 
     def __init__(self, *, cfg: DictConfig):
-        cfg.experiment.training=True
+        cfg.experiment.do_training=True
         self._cfg = cfg
         self._data_cfg = cfg.data
         self._exp_cfg = cfg.experiment
