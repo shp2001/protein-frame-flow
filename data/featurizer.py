@@ -58,7 +58,8 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
 
     aatype = aatype_batch[0]
     res_indices = res_indices_batch[0]
-
+    atom14_mask = atom_14_mask_batch[0]
+    
     for i, restype_int in enumerate(aatype):
         restype1 = residue_constants.restypes_with_x[restype_int]
         restype3 = residue_constants.restype_1to3.get(restype1, "UNK")
@@ -73,7 +74,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         res_idx = res_indices[i]
     
         for j, atom_name in enumerate(atom_names):
-            if atom_name != '':
+            if atom_name != '' and atom14_mask[i, j]==1:
                 ref_space_uid.append(res_idx)
                 
                 atom_list.append(atom_name)
