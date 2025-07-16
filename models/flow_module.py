@@ -677,7 +677,8 @@ class FlowModule(LightningModule):
             optimizer.zero_grad()
             return
 
-        optimizer.step(closure=optimizer_closure) 
+        else:
+            optimizer.step(closure=optimizer_closure) 
         
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
