@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 8
+    num_workers: 0
     prefetch_factor: 10
 
   masking_scheduler: 
@@ -22,7 +22,7 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 80
+    max_batch_size: 40
     max_num_res_squared: 200_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -99,7 +99,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 703
-  num_devices: 1
+  num_devices: 4
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -151,9 +151,9 @@ experiment:
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
-    strategy: auto
+    strategy: ddp
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 4
+    accumulate_grad_batches: 1
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

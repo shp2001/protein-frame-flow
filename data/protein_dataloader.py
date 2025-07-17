@@ -2,14 +2,17 @@
 import torch
 import pandas as pd
 import logging
+
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import embed_relpos
 from data import featurizer
+
 from itertools import accumulate
 import bisect
-
+import math 
 
 class ProteinData(LightningDataModule):
 
@@ -28,22 +31,6 @@ class ProteinData(LightningDataModule):
         if hasattr(self._train_dataset, 'set_current_epoch'):
             self._train_dataset.set_current_epoch(epoch)
 
-    def apply_probabilistic_mask(self, mask: torch.Tensor, masking_ratio: float) -> torch.Tensor:
-        device = mask.device
-        B, L = mask.shape
-        prob_matrix = torch.rand((1, L), device=device)  # 배치 전체에 동일 적용
-        
-        new_mask = torch.where(
-            (mask == 1) & (prob_matrix < masking_ratio),
-            torch.ones_like(mask),
-            torch.zeros_like(mask)
-        )
-
-        for i in range(B): 
-            if torch.all(new_mask[i] == 0):
-                new_mask[i] = mask[i]
-
-        return new_mask
 
     def collate_fn(self, batch):
         cropped_batch = []
@@ -82,6 +69,11 @@ class ProteinData(LightningDataModule):
 
         cropped_batch['mode'] = feat['mode']
         cropped_batch['raw_path'] = feat['raw_path']
+        if cropped_batch['diffuse_mask'][0, 0] == 1:
+            cropped_batch['diffuse_mask'][:, 0] = 0
+        if cropped_batch['diffuse_mask'][0, -1] == 1:
+            cropped_batch['diffuse_mask'][:, -1] = 0
+            
         cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
         
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
@@ -96,44 +88,37 @@ class ProteinData(LightningDataModule):
         }
         return cropped_batch
 
-    def worker_init_fn(self, worker_id):
-        worker_info = torch.utils.data.get_worker_info()
-        dataset = worker_info.dataset
-        if hasattr(dataset, 'set_current_epoch'):
-            dataset.set_current_epoch(self._current_epoch)
     
-    def train_dataloader(self):
+    def train_dataloader(self, rank=None, num_replicas=None):
         return DataLoader(
             self._train_dataset,
             batch_sampler=LengthBatcher(
                 sampler_cfg=self.sampler_cfg,
                 metadata_csv=self._train_dataset.csv,
+                rank=rank,
+                num_replicas=num_replicas
             ),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=False,
-            persistent_workers=self.loader_cfg.num_workers > 0,
-            collate_fn=self.collate_fn,
-            worker_init_fn=self.worker_init_fn,
+            persistent_workers=True if self.loader_cfg.num_workers > 0 else False,
+            collate_fn=self.collate_fn
         )
 
     def val_dataloader(self):
         return DataLoader(
             self._valid_dataset,
-            batch_size=1,
-            shuffle=False,
+            sampler=DistributedSampler(self._valid_dataset, shuffle=False),
             num_workers=2,
             prefetch_factor=2,
             persistent_workers=True,
             collate_fn=self.collate_fn,
-            worker_init_fn=self.worker_init_fn,
         )
 
     def predict_dataloader(self):
         return DataLoader(
             self._predict_dataset,
-            batch_size=1,
-            shuffle=False,
+            sampler=DistributedSampler(self._predict_dataset, shuffle=False),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
             persistent_workers=True,
@@ -142,14 +127,36 @@ class ProteinData(LightningDataModule):
 
 
 class LengthBatcher:
-    def __init__(self, *, sampler_cfg, metadata_csv, seed=123, shuffle=True):
+    def __init__(self, 
+                 *, 
+                 sampler_cfg, 
+                 metadata_csv, 
+                 seed=123, 
+                 shuffle=True,
+                 num_replicas=None,
+                 rank=None):
+        super().__init__()
+        self._log = logging.getLogger(__name__)
+
+        if num_replicas is None:
+            self.num_replicas = dist.get_world_size()
+        else:
+            self.num_replicas = num_replicas
+        
+        if rank is None:
+            self.rank = dist.get_rank()
+        else:
+            self.rank = rank
+        print("self.rank", self.rank)
+        print("num_replicas", self.num_replicas)
+        
         self._sampler_cfg = sampler_cfg
         self._data_csv = metadata_csv
         self.seed = seed
         self.shuffle = shuffle
         self.epoch = 0
         self.max_batch_size = self._sampler_cfg.max_batch_size
-        self._log = logging.getLogger(__name__)
+        
 
     def _sample_indices(self):
         if 'cluster' in self._data_csv.columns:
@@ -178,30 +185,38 @@ class LengthBatcher:
         if self.shuffle:
             new_order = torch.randperm(len(indices), generator=rng).tolist()
             indices = [indices[i] for i in new_order]
-    
-        replica_csv = self._data_csv[self._data_csv['index'].isin(indices)]
+
+        # rank 별로 분할 
+        if len(self._data_csv) > self.num_replicas:
+            replica_csv = self._data_csv.iloc[indices[self.rank::self.num_replicas]]
+        else:
+            replica_csv = self._data_csv
 
         sample_order = []
+
+        # 길이별로 max_batch_size 설정
         for _, row in replica_csv.iterrows():
             seq_len = row['seq_len']
             if row['mode'] in ['ab', 'nanobody'] and seq_len > self._sampler_cfg.ab_max_num_res:
                 seq_len = self._sampler_cfg.ab_max_num_res
             elif row['mode'] in ['general', 'polymer', 'monomer'] and seq_len > self._sampler_cfg.general_max_num_res:
                 seq_len = self._sampler_cfg.general_max_num_res
-
+ 
             max_batch_size = max(1, min(
                 self.max_batch_size,
                 self._sampler_cfg.max_num_res_squared // (seq_len ** 2) + 1
-            ))
+            )) # at least 4 
 
             sample_order.append([row['index']] * max_batch_size)
 
         if self.shuffle:
-            new_order = torch.randperm(len(sample_order), generator=rng).tolist()
+            new_order = torch.randperm(len(sample_order), generator=rng).numpy().tolist()
             return [sample_order[i] for i in new_order]
         return sample_order
 
     def _create_batches(self):
+        # Make sure all replicas have the same number of batches Otherwise leads to bugs.
+        # See bugs with shuffling https://github.com/Lightning-AI/lightning/issues/10947
         self.sample_order = []
         self.sample_order.extend(self._replica_epoch_batches())
 
