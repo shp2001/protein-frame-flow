@@ -1,9 +1,31 @@
 import torch
 import numpy as np 
 
-from data import residue_constants, all_atom
-import data.utils as du
-from openfold.utils.rigid_utils import local_to_global
+from data import residue_constants
+from scipy.spatial.transform import Rotation
+
+def random_transform(
+    points, max_translation=1.0, apply_augmentation=True, centralize=True
+) -> np.ndarray:
+    """
+    Randomly transform a set of 3D points.
+
+    Args:
+        points (numpy.ndarray): The points to be transformed, shape=(N, 3)
+        max_translation (float): The maximum translation value. Default is 1.0.
+        apply_augmentation (bool): Whether to apply random rotation/translation on ref_pos
+
+    Returns:
+        numpy.ndarray: The transformed points.
+    """
+    if centralize:
+        points = points - points.mean(axis=0)
+    if not apply_augmentation:
+        return points
+    translation = np.random.uniform(-max_translation, max_translation, size=3)
+    R = Rotation.random().as_matrix()
+    transformed_points = np.dot(points + translation, R.T)
+    return transformed_points
 
 @staticmethod
 def atom_name_chars_encoded(atom_names: list[str]) -> torch.Tensor:
