@@ -59,7 +59,11 @@ class FlowModel(nn.Module):
             if b < self._model_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
                     self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-
+                    if b != self._model_conf.num_blocks-2:
+                        self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
+                                                                          self._distogram_conf)
+                    else:
+                        self.trunk[f'aa_contact_head_{b}'] = AAContactHead(self._ipa_conf.c_z)
                 else:
                     edge_in = self._model_conf.edge_embed_size
                     self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
@@ -177,7 +181,18 @@ class FlowModel(nn.Module):
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed)
                     edge_embed = edge_embed * edge_mask[..., None]
+                if b < self._model_conf.num_blocks-2:
+                    cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
                 
+                else:
+                    all_atom_contact_map = self.trunk[f'aa_contact_head_{b}'](edge_embed)
+
+            if cb_distogram != None:
+                pair_outputs.append(cb_distogram)
+
+            if all_atom_contact_map != None:
+                pair_outputs.append(all_atom_contact_map)
+
             curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
             local_atom_pos_pred = self.trunk[f"allatom_module_{b}"](node_embed, init_node_embed)
             pred_xyz = local_to_global(curr_rigids_unscaled, local_atom_pos_pred)
@@ -204,6 +219,8 @@ class FlowModel(nn.Module):
             'local_atom_pos': local_atom_pos_pred,
             'all_atom_preds': all_atom_outputs,
             'input_for_confidence': input_for_confidence,
+            'pair_outputs': pair_outputs # b-1개의 pair 기반 output (b-2개는 beta carbon distogram, 마지막은 all atom contact map)
+
         }
     
 
