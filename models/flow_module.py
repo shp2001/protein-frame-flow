@@ -469,11 +469,6 @@ class FlowModule(LightningModule):
                     [saved_path, self.global_step, wandb.Molecule(saved_path)]
                 )
 
-            mdtraj_metrics = metrics.calc_mdtraj_metrics(saved_path)
-            ca_idx = residue_constants.atom_order['CA']
-            ca_ca_metrics = metrics.calc_ca_ca_metrics(final_pos[:, ca_idx])
-            batch_metrics.append((mdtraj_metrics | ca_ca_metrics))
-
             # calculate trans loss (rmsd)
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
@@ -537,6 +532,8 @@ class FlowModule(LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 batch_size=len(val_epoch_metrics),
+                sync_dist=True,
+                rank_zero_only=False
             )
         self.validation_epoch_metrics.clear()
 

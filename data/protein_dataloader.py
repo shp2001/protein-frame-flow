@@ -12,7 +12,6 @@ from data import featurizer
 
 from itertools import accumulate
 import bisect
-import math 
 
 class ProteinData(LightningDataModule):
 
