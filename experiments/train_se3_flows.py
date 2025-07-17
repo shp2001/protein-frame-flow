@@ -18,19 +18,6 @@ import wandb
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
-class MaskingRatioCallback(Callback):
-    # @rank_zero_only
-    def on_train_epoch_start(self, trainer, pl_module):
-        datamodule = trainer.datamodule
-        datamodule._train_dataset.set_current_epoch(trainer.current_epoch)
-        datamodule._train_dataset.current_epoch = trainer.current_epoch
-        datamodule.set_current_epoch(trainer.current_epoch)
-        datamodule.masking_ratio = min(
-            1.0, 
-            datamodule.data_cfg.masking_scheduler.init_rate + 
-            datamodule.data_cfg.masking_scheduler.masking_increase_ratio * trainer.current_epoch
-        )
-        log.info(f"Epoch {trainer.current_epoch}: masking_ratio = {datamodule.masking_ratio}")
 
 class Experiment:
 
@@ -66,7 +53,6 @@ class Experiment:
             logger = None
             self._train_device_ids = [self._train_device_ids[0]]
             self._data_cfg.loader.num_workers = 0
-            callbacks.append(MaskingRatioCallback())
         else:
             logger = WandbLogger(
                 **self._exp_cfg.wandb,
@@ -79,12 +65,9 @@ class Experiment:
             
             # Model checkpoints
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
-            callbacks.append(MaskingRatioCallback())
 
             # Save config only for main process.
             local_rank = os.environ.get('LOCAL_RANK', 0)
-            print("environment", os.environ)
-            print("local_rank", local_rank)
             if local_rank == 0:
                 cfg_path = os.path.join(ckpt_dir, 'config.yaml')
                 with open(cfg_path, 'w') as f:
@@ -94,6 +77,8 @@ class Experiment:
                 if isinstance(logger.experiment.config, wandb.sdk.wandb_config.Config):
                     logger.experiment.config.update(flat_cfg)
 
+        print("self._train_device_ids", self._train_device_ids)
+        
         trainer = Trainer(
             **self._exp_cfg.trainer,
             callbacks=callbacks,
@@ -101,6 +86,7 @@ class Experiment:
             use_distributed_sampler=False,
             enable_progress_bar=True,
             enable_model_summary=True,
+            strategy='ddp',
             devices=self._train_device_ids,
             gradient_clip_val=1.0
         )

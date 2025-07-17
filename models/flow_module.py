@@ -664,9 +664,7 @@ class FlowModule(LightningModule):
         self._log_scalar(
             "train/examples_per_second", num_batch / step_time)
         train_loss = total_losses['se3_vf_loss']
-        if dist.get_rank() == 0:
-            self._log_scalar(
-                "train/loss", train_loss, batch_size=num_batch)
+
         return train_loss
 
     def get_cosine_scheduler_w_warmup(
