@@ -89,8 +89,14 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
             print("There is a UNK in restype")
             continue
 
-        atom_names = residue_constants.restype_name_to_atom14_names[restype3]
-        atom_coords = residue_constants.rigid_group_atom_positions[restype3]
+        atom_names = residue_constants.restype_name_to_atom14_names[restype3] # atom list 
+        atom_coords = residue_constants.rigid_group_atom_positions[restype3] # [
+                                                                            #     ['N', 0, (-0.525, 1.363, 0.000)],
+                                                                            #     ['CA', 0, (0.000, 0.000, 0.000)],
+                                                                            #     ['C', 0, (1.526, -0.000, -0.000)],
+                                                                            #     ['CB', 0, (-0.529, -0.774, -1.205)],
+                                                                            #     ['O', 3, (0.627, 1.062, 0.000)],
+                                                                            # ]
 
         res_idx = res_indices[i]
     
@@ -113,7 +119,16 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
                 atom_to_token_idx.append(i)
 
                 # ref_pos
-                ref_pos.append(atom_coords[j][-1])
+                coord = None
+                for atom in atom_coords:
+                    if atom[0] == atom_name:
+                        coord = atom[-1]  # 좌표 (x, y, z)
+                        break
+
+                if coord is None:
+                    raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
+
+                ref_pos.append(coord)
     
     ref_atom_name_chars = atom_name_chars_encoded(atom_list)
 
