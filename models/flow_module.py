@@ -193,20 +193,36 @@ class FlowModule(LightningModule):
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Translation VF loss
-        loss_denom = torch.sum(loss_mask, dim=-1) * 3
+        loss_denom_cdr = torch.sum(loss_mask, dim=-1) * 3
+        loss_denom_fv = torch.sum(1-loss_mask, dim=-1) * 3
+
         trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
-        trans_loss = training_cfg.translation_loss_weight * torch.sum(
+
+        trans_loss_cdr = training_cfg.translation_loss_weight * torch.sum(
             trans_error ** 2 * loss_mask[..., None],
             dim=(-1, -2)
-        ) / loss_denom
-        trans_loss = torch.clamp(trans_loss, max=5)
+        ) / loss_denom_cdr
+        
+        trans_loss_fv = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * (1-loss_mask[..., None]),
+            dim=(-1, -2)
+        ) / loss_denom_fv
+
+        trans_loss = torch.clamp(trans_loss_cdr + trans_loss_fv, max=5)
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
-        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
+        rots_vf_loss_cdr = training_cfg.rotation_loss_weights * torch.sum(
             rots_vf_error ** 2 * loss_mask[..., None],
             dim=(-1, -2)
-        ) / loss_denom
+        ) / loss_denom_cdr
+
+        rots_vf_loss_fv = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * (1-loss_mask[..., None]),
+            dim=(-1, -2)
+        ) / loss_denom_fv
+
+        rots_vf_loss = rots_vf_loss_cdr + rots_vf_loss_fv
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -233,7 +249,7 @@ class FlowModule(LightningModule):
                 atom14_gt_exists=renamed_atom14_gt_exists,
                 mode='bb',
                 data_mode=noisy_batch['mode'],
-                compute_non_cdr=False,
+                compute_non_cdr=True,
                 compute_cdr=True,
                 compute_h3=True
                 )
