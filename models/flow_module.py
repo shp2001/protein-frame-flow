@@ -706,10 +706,12 @@ class FlowModule(LightningModule):
         def steplr_with_warmup(step):
             if step < warmup_steps:
                 return step / warmup_steps
-            else:
+            elif step <= total_steps:
                 theta = (step - warmup_steps) / (total_steps - warmup_steps) * math.pi
                 cosine_decay = 0.5 * (1 + math.cos(theta))
                 return (min_lr / max_lr) + cosine_decay * (1 - (min_lr / max_lr))
+            else:
+                return min_lr / max_lr  # max_lr 기준의 비율
 
         return torch.optim.lr_scheduler.LambdaLR(optimizer, steplr_with_warmup)
     
@@ -722,22 +724,28 @@ class FlowModule(LightningModule):
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )
-        # scheduler = self.get_cosine_scheduler_w_warmup(
-        #     optimizer,
-        #     self._exp_cfg.optimizer.warmup_steps,
-        #     self._exp_cfg.optimizer.decay_steps,
-        #     self._exp_cfg.optimizer.min_lr,
-        #     self._exp_cfg.optimizer.max_lr,
-        # )
-        # return {"optimizer": optimizer, "lr_scheduler": scheduler}
-        return {"optimizer": optimizer}
+        scheduler = self.get_cosine_scheduler_w_warmup(
+            optimizer,
+            self._exp_cfg.optimizer.warmup_steps,
+            self._exp_cfg.optimizer.decay_steps,
+            self._exp_cfg.optimizer.min_lr,
+            self._exp_cfg.optimizer.max_lr,
+        )
+        return {"optimizer": optimizer, 
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
+                    }
+        }
 
     def on_train_batch_start(self, batch, batch_idx):
         # 첫 번째 optimizer 기준
         optimizer = self.trainer.optimizers[0]
         lr = optimizer.param_groups[0]['lr']
         print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
-        
+        self._log_scalar("lr", lr, prog_bar=True)
+
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
         device = f'cuda:{torch.cuda.current_device()}'
