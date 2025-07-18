@@ -23,6 +23,7 @@ from data import residue_constants
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
+from models import kabsch
 
 class FlowModule(LightningModule):
 
@@ -95,23 +96,6 @@ class FlowModule(LightningModule):
         # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
         self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
-    # def on_train_batch_end(self, outputs, batch, batch_idx):
-    #     # Backward 이후 gradient가 계산된 파라미터 추적
-    #     grads = {}
-
-    #     for n, p in self.named_parameters():
-    #         if p.requires_grad and p.grad is not None:
-    #             grads[id(p)] = n
-
-    #     # 사용되지 않은 파라미터 찾기
-    #     unused = [self._params_before[id_p] for id_p in self._params_before 
-    #             if id_p not in grads]
-        
-    #     if unused:
-    #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-    #     else:
-    #         print("✅ 모든 파라미터가 사용되었습니다.")
-
     def on_train_epoch_end(self):
         epoch_time = (time.time() - self._epoch_start_time) / 60.0
         self.log(
@@ -175,6 +159,12 @@ class FlowModule(LightningModule):
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
         pred_atom_14 = model_output['all_atom_preds']['positions'].clone()
+
+        pred_atom_14_aligned = kabsch.do_kabsch(
+            model_output['all_atom_preds']['positions'].clone().reshape(num_batch, num_res*14, 3),
+            noisy_batch['atom14_gt_positions'].clone(),
+            align_mask=~noisy_batch["atom_diffuse_mask"].bool()
+        )
         distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
         distogram_logit_condition = model_output['distogram_logit_condition'].clone()
 
