@@ -178,12 +178,9 @@ class FlowModule(LightningModule):
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
         # pred_angles_list = model_output['all_atom_preds']['angles'].clone()
         # pred_unnormalized_angles_list = model_output['all_atom_preds']['unnormalized_angles'].clone()
-        pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.num_blocks-2] # (O, B, L, L) <- contact prob
-        pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
 
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
-        pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
 
         if torch.isnan(pred_atom_14_list).any():
             raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_atom_14_list).any()} \n")
@@ -290,28 +287,7 @@ class FlowModule(LightningModule):
                                 )
 
         final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
-
-        # calculate pair feature loss (beta carbon contact prob)
-        distogram_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        if training_cfg.aux_loss_use_local_pair_feat_loss:
-            distogram_loss = b_carbon_distogram_loss(
-                pred_cb_distogram=pred_cb_distogram, # non-scaled 
-                gt_pseudo_beta=noisy_batch['pseudo_beta'],
-                res_mask=noisy_batch['res_mask'],
-                neighbor_indices=neighbor_indices,
-                cdr_residues=cdr_residues
-            )
-            # distogram_loss = distogram_loss * scale_factor.squeeze()
-        # calculate pair feature loss (all atom contact prob)
-        contact_map_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        if training_cfg.aux_loss_use_local_pair_feat_loss:
-            contact_map_loss = aa_contact_map_loss(
-                pred_aa_contact_map=pred_aa_contact_map,
-                renamed_atom14_gt_positions=renamed_dict['renamed_atom14_gt_positions'],
-                renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
-                neighbor_indices=neighbor_indices,
-                cdr_residues=cdr_residues
-            )
+        
 
         # all atom clash loss 
         batch_size = gt_atom14_pos.shape[0]
@@ -384,8 +360,6 @@ class FlowModule(LightningModule):
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
-            + distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
-            + contact_map_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_contact_map_weight
         )
 
         # calculate violation loss
@@ -406,8 +380,6 @@ class FlowModule(LightningModule):
         )
     
         se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + prmsd_loss * training_cfg.aux_loss_prmsd_loss_weight
-        if torch.any(torch.isnan(se3_vf_loss)):
-            se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
         # print({
         #     "r3_t": r3_t,
@@ -432,10 +404,7 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'prmsd_loss': prmsd_loss,
-            'distogram_loss': distogram_loss,
-            'contact_map_loss': contact_map_loss
-
+            'prmsd_loss': prmsd_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
@@ -739,13 +708,32 @@ class FlowModule(LightningModule):
                     }
         }
 
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure, *args, **kwargs):
+    
+        if self.is_loss_nan:
+            self.print(f"❌ NaN in closure at step {self.global_step}")
+            optimizer.zero_grad()
+            return
+
+        # grad 검사
+        nan_in_grad = False
+        for name, param in self.named_parameters():
+            if param.grad is not None and torch.isnan(param.grad).any():
+                self.print(f"⚠️ NaN in grad: {name}")
+                nan_in_grad = True
+
+        if nan_in_grad:
+            optimizer.zero_grad()
+            return
+
+        optimizer.step(closure=optimizer_closure)
+
     def on_train_batch_start(self, batch, batch_idx):
         # 첫 번째 optimizer 기준
         optimizer = self.trainer.optimizers[0]
         lr = optimizer.param_groups[0]['lr']
         print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
-        self._log_scalar("lr", lr, prog_bar=True)
-
+        
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
         device = f'cuda:{torch.cuda.current_device()}'
