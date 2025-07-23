@@ -60,11 +60,6 @@ class ConditioningModule(nn.Module):
         self.transition_s1 = Transition(c_in=self.c_s, n=2)
         self.transition_s2 = Transition(c_in=self.c_s, n=2)
 
-        self.distogram_head_condition = DistogramHead(
-            c_z=self.c_z,
-            num_bins=self.num_bins
-        )
-
     def forward(
         self,
         t: torch.Tensor,
@@ -148,8 +143,7 @@ class ConditioningModule(nn.Module):
             single_s = single_s + self.transition_s1(single_s)
             single_s = single_s + self.transition_s2(single_s)
 
-        distogram_logit = self.distogram_head_condition(pair_z)
-        return single_s, pair_z, distogram_logit
+        return single_s, pair_z
     
 class FlowModel(nn.Module):
     def __init__(
@@ -325,8 +319,8 @@ class FlowModel(nn.Module):
         s = s * node_mask[..., None]
         rigid_update = self.bb_update(
             s * node_mask[..., None])
-        curr_rigids = rigid_update
-
+        curr_rigids = curr_rigids.compose_q_update_vec(rigid_update)
+        
         curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
         allatom_embed = self.allatom_tfmr(s)
         local_atom_pos_pred = self.allatom_proj(allatom_embed)
@@ -431,7 +425,7 @@ class FlowModel(nn.Module):
         else:
             rotmats_sc = input_feats['rotmats_sc']
 
-        s_single, z_pair, distogram_logit_condition = self.condition(
+        s_single, z_pair = self.condition(
             t=input_feats['t'],
             pair_init=input_feats['pair_init'],
             s_inputs=s_init,
@@ -454,7 +448,6 @@ class FlowModel(nn.Module):
             diffuse_mask=diffuse_mask
         )
         structure_output['distogram_logit_pairformer'] = distogram_logit_pairformer
-        structure_output['distogram_logit_condition'] = distogram_logit_condition
 
         # Confidence Head
         plddt_preds = None 

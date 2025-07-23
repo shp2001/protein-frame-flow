@@ -50,6 +50,7 @@ class FlowModule(LightningModule):
         self._checkpoint_dir = None
         self._inference_dir = None
         self.save_file = True
+        self.nan_in_grad = False
 
     @property
     def checkpoint_dir(self):
@@ -176,13 +177,8 @@ class FlowModule(LightningModule):
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
         pred_atom_14 = model_output['all_atom_preds']['positions'].clone()
         distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
-        distogram_logit_condition = model_output['distogram_logit_condition'].clone()
 
-        pred_atom_14 = pred_atom_14 * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-
-        if torch.isnan(pred_atom_14).any():
-            raise ValueError(f"pred_atom_14: {torch.isnan(pred_atom_14).any()} \n")
-        
+        pred_atom_14 = pred_atom_14 * training_cfg.bb_atom_scale / r3_norm_scale[..., None]        
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
 
         # Get the renamed ground truth 
@@ -208,7 +204,7 @@ class FlowModule(LightningModule):
             dim=(-1, -2)
         ) / loss_denom_fv
 
-        trans_loss = torch.clamp(trans_loss_cdr + trans_loss_fv, max=5)
+        trans_loss = torch.clamp((trans_loss_cdr + trans_loss_fv)/2, max=5)
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
@@ -222,7 +218,7 @@ class FlowModule(LightningModule):
             dim=(-1, -2)
         ) / loss_denom_fv
 
-        rots_vf_loss = rots_vf_loss_cdr + rots_vf_loss_fv
+        rots_vf_loss = (rots_vf_loss_cdr + rots_vf_loss_fv) / 2
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -284,13 +280,8 @@ class FlowModule(LightningModule):
                 res_mask=noisy_batch['res_mask'],
                 cdr_residues=cdr_residues
             )
-            condition_pair_head_loss = b_carbon_distogram_loss(
-                pred_cb_distogram_logit=distogram_logit_condition,
-                gt_pseudo_beta=noisy_batch["pseudo_beta"],
-                res_mask=noisy_batch['res_mask'],
-                cdr_residues=cdr_residues
-            )
-            pair_head_loss = (pairformer_pair_head_loss + condition_pair_head_loss) / 2
+
+            pair_head_loss = pairformer_pair_head_loss
             
         # all atom clash loss 
         all_atom_clash_loss = torch.zeros(batch_size, device=device)
@@ -370,8 +361,6 @@ class FlowModule(LightningModule):
         )
     
         se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + plddt_loss * training_cfg.aux_loss_plddt_loss_weight
-        if torch.any(torch.isnan(se3_vf_loss)):
-            se3_vf_loss = torch.nan_to_num(se3_vf_loss, nan=0.0)
             
         print({
             "r3_t": r3_t,

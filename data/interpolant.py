@@ -98,12 +98,9 @@ class Interpolant:
         
     def _corrupt_trans(self, trans_1, t, res_mask, diffuse_mask):
         trans_0 = _centered_gaussian(*res_mask.shape, self._device)
-        masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
         trans_0 = trans_0 * du.NM_TO_ANG_SCALE
 
-        trans_0 = trans_0 + masked_trans
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1
-        trans_t = _trans_diffuse_mask(trans_t, trans_1, diffuse_mask)
         return trans_t * res_mask[..., None]
     
     def _corrupt_rotmats(self, rotmats_1, t, res_mask, diffuse_mask):
@@ -121,7 +118,7 @@ class Interpolant:
             rotmats_t * res_mask[..., None, None]
             + identity[None, None] * (1 - res_mask[..., None, None])
         )
-        return _rots_diffuse_mask(rotmats_t, rotmats_1, diffuse_mask)
+        return rotmats_t
 
     def corrupt_batch(self, batch):
         noisy_batch = copy.deepcopy(batch)
@@ -218,10 +215,6 @@ class Interpolant:
 
             trans_0 *= du.NM_TO_ANG_SCALE
 
-            masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["diffuse_mask"].bool())
-            trans_0 = trans_0 + masked_trans
-            trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], batch["diffuse_mask"])
-
         if rotmats_0 is None:
             rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
 
@@ -238,8 +231,6 @@ class Interpolant:
         if motif_scaffolding and not self._cfg.twisting.use: # amortisation
             diffuse_mask = diffuse_mask.expand(num_batch, -1) # shape = (B, num_residue)
             batch['diffuse_mask'] = diffuse_mask
-            rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
-            trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
             if torch.isnan(trans_0).any():
                 raise ValueError('NaN detected in trans_0')
 
@@ -329,14 +320,8 @@ class Interpolant:
             )
             if self._cfg.self_condition:
                 if motif_scaffolding:
-                    batch['trans_sc'] = (
-                        pred_trans_1 * diffuse_mask[..., None]
-                        + trans_1 * (1 - diffuse_mask[..., None])
-                    )
-                    batch['rotmats_sc'] = (
-                        pred_rotmats_1 * diffuse_mask[..., None, None]
-                        + rotmats_1 * (1 - diffuse_mask[..., None, None])
-                    )
+                    batch['trans_sc'] = pred_trans_1
+                    batch['rotmats_sc'] = pred_rotmats_1
                 else:
                     batch['trans_sc'] = pred_trans_1
                     batch['rotmats_sc'] = pred_rotmats_1
@@ -376,10 +361,6 @@ class Interpolant:
 
             rotmats_t_2 = self._rots_euler_step(
                 d_t, t_1, pred_rotmats_1, rotmats_t_1)
-            
-            if motif_scaffolding and not self._cfg.twisting.use:
-                trans_t_2 = _trans_diffuse_mask(trans_t_2, trans_1, diffuse_mask)
-                rotmats_t_2 = _rots_diffuse_mask(rotmats_t_2, rotmats_1, diffuse_mask)
 
             prot_traj.append((trans_t_2, rotmats_t_2))
             t_1 = t_2

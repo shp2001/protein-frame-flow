@@ -19,7 +19,9 @@ weights/
 **/*.pt
 **/*.csv
 .history/
-
+**/*.cif
+**/*.cif.gz
+**/*.err
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
