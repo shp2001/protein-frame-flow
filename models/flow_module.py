@@ -203,7 +203,7 @@ class FlowModule(LightningModule):
             dim=(-1, -2)
         ) / loss_denom_fv
 
-        trans_loss = torch.clamp((trans_loss_cdr + trans_loss_fv)/2, max=5)
+        trans_loss = torch.clamp((trans_loss_cdr + trans_loss_fv)/2, max=10)
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
@@ -352,7 +352,7 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
         )
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
-        auxiliary_loss = torch.clamp(auxiliary_loss, max=18)
+        auxiliary_loss = torch.clamp(auxiliary_loss, max=22)
 
         violation_loss *= (
             (r3_t[:, 0] > training_cfg.viol_loss_t_pass)
