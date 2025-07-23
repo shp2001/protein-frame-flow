@@ -36,7 +36,6 @@ class FlowModule(LightningModule):
     
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model, 
-                               do_training=self._exp_cfg.do_training,
                                train_confidence=self._exp_cfg.train_confidence)
         
         # Set-up interpolant
@@ -536,7 +535,7 @@ class FlowModule(LightningModule):
             key,
             value,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             batch_size=None,
             sync_dist=False,
@@ -561,11 +560,10 @@ class FlowModule(LightningModule):
         step_start_time = time.time()
         self.interpolant.set_device(batch['res_mask'].device)
         noisy_batch = self.interpolant.corrupt_batch(batch)
-        N_cycle = random.randint(1, self._model_cfg.num_cycles+1)
+        N_cycle = random.randint(1, self._model_cfg.num_cycles)
         
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
-                self.model.do_training = False
                 model_sc = self.model(noisy_batch, 
                                       N_cycle)
                 noisy_batch['trans_sc'] = (
@@ -576,7 +574,6 @@ class FlowModule(LightningModule):
                     model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
                     + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
                 )
-                self.model.do_training = True
 
         batch_losses = self.model_step(noisy_batch,
                                         N_cycle)
@@ -655,10 +652,8 @@ class FlowModule(LightningModule):
     
 
     def configure_optimizers(self):
-        if self.confidence_model != None:
-            parameters = list(self.model.parameters()) + list(self.confidence_model.parameters())
-        else:
-            parameters = self.model.parameters()
+
+        parameters = self.model.parameters()
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )

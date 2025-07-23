@@ -206,7 +206,6 @@ class Interpolant:
         ):
 
         # No gradient to pairformer 
-        model.do_training = False
         
         # Set-up initial prior samples
         if trans_0 is None:

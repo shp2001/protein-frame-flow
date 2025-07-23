@@ -149,10 +149,8 @@ class FlowModel(nn.Module):
     def __init__(
             self, 
             model_conf, 
-            do_training,
             train_confidence):
         super(FlowModel, self).__init__()
-        self.do_training = do_training
         self.train_confidence = train_confidence
         self._model_conf = model_conf
         self._pairformer_conf = model_conf.pairformer
@@ -253,8 +251,7 @@ class FlowModel(nn.Module):
 
         for cycle_no in range(N_cycle):
             with torch.set_grad_enabled(
-                self.do_training
-                and (not self.train_confidence)
+                (not self.train_confidence)
                 and cycle_no == (N_cycle - 1)
             ): # training을 하면서 confidence는 훈련하지 않고 마지막 cycle에서만 gradient
                 z = z_init + self.linear_no_bias_z_cycle(self.layernorm_z_cycle(z))
