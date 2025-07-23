@@ -257,9 +257,10 @@ class Interpolant:
         batch['rotmats_t'] = rotmats_0 
         print("Start to get pairformer output")
         start_time = time.time()
-        s_init, s_trunk, z_trunk, distogram_logit_pairformer = model.preprocess_input(
+        s_init, s_trunk, z_trunk, distogram_logit_pairformer = model(
             batch, 
-            N_cycle
+            N_cycle,
+            mode='pairformer'
         )
         batch['s_init'] = s_init
         batch['s_trunk'] = s_trunk

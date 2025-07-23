@@ -518,6 +518,8 @@ class FlowModule(LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 batch_size=len(val_epoch_metrics),
+                sync_dist=True,
+                rank_zero_only=False
             )
         self.validation_epoch_metrics.clear()
 
@@ -653,16 +655,10 @@ class FlowModule(LightningModule):
     
 
     def configure_optimizers(self):
-        all_params = list(self.model.parameters())
-        pairformer_params = list(self.model.pairformer.parameters())
-        distogram_head_params = list(self.model.distogram_head_pairformer.parameters())
-
-        if self._exp_cfg.train_confidence:
-            parameters = all_params
+        if self.confidence_model != None:
+            parameters = list(self.model.parameters()) + list(self.confidence_model.parameters())
         else:
-            excluded_ids = set(id(p) for p in pairformer_params + distogram_head_params)
-            parameters = [p for p in all_params if id(p) not in excluded_ids]
-            
+            parameters = self.model.parameters()
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )

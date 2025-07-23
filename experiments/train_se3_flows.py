@@ -18,19 +18,10 @@ import wandb
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
-class SetDataEpochCallback(Callback):
-    # @rank_zero_only
-    def on_train_epoch_start(self, trainer, pl_module):
-        datamodule = trainer.datamodule
-        datamodule._train_dataset.set_current_epoch(trainer.current_epoch)
-        datamodule._train_dataset.current_epoch = trainer.current_epoch
-        datamodule.set_current_epoch(trainer.current_epoch)
-
 
 class Experiment:
 
     def __init__(self, *, cfg: DictConfig):
-        cfg.experiment.do_training=True
         self._cfg = cfg
         self._data_cfg = cfg.data
         self._exp_cfg = cfg.experiment
@@ -52,7 +43,6 @@ class Experiment:
         elif self._data_cfg.dataset == 'pdb':
             self._train_dataset, self._valid_dataset = eu.dataset_creation(
                 PdbDataset, self._cfg.pdb_dataset, self._task)
-            
         else:
             raise ValueError(f'Unrecognized dataset {self._data_cfg.dataset}') 
         
@@ -63,7 +53,6 @@ class Experiment:
             logger = None
             self._train_device_ids = [self._train_device_ids[0]]
             self._data_cfg.loader.num_workers = 0
-            callbacks.append(SetDataEpochCallback())
         else:
             logger = WandbLogger(
                 **self._exp_cfg.wandb,
@@ -76,7 +65,7 @@ class Experiment:
             
             # Model checkpoints
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
-            callbacks.append(SetDataEpochCallback())
+
             # Save config only for main process.
             local_rank = os.environ.get('LOCAL_RANK', 0)
             if local_rank == 0:
@@ -94,13 +83,14 @@ class Experiment:
             use_distributed_sampler=False,
             enable_progress_bar=True,
             enable_model_summary=True,
+            strategy='ddp',
             devices=self._train_device_ids,
             gradient_clip_val=1.0
         )
         trainer.fit(
             model=self._module,
             datamodule=self._datamodule,
-            ckpt_path=self._exp_cfg.warm_start,
+            ckpt_path=self._exp_cfg.warm_start
         )
         # trainer.fit(
         #     model=self._module,

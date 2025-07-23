@@ -100,7 +100,7 @@ experiment:
   train_confidence: ${model.confidence_head.use_confidence}
   debug: False
   seed: 703
-  num_devices: 1
+  num_devices: 4
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -149,7 +149,6 @@ experiment:
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
-    strategy: auto
     check_val_every_n_epoch: 4
     accumulate_grad_batches: 1
   checkpointer:

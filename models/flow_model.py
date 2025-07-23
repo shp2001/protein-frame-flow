@@ -396,8 +396,10 @@ class FlowModel(nn.Module):
     def forward(self,
                input_feats,
                N_cycle,
-               do_pairformer=True):
-        
+               do_pairformer=True,
+               mode='structure' # [structure, pairformer]
+               ):
+
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
         diffuse_mask = input_feats['diffuse_mask']
@@ -405,6 +407,9 @@ class FlowModel(nn.Module):
         rotmats_t = input_feats['rotmats_t']
         ref_feature_dict = input_feats['ref_feature_dict']
 
+        if mode == 'pairformer':
+            return self.preprocess_input(input_feats, N_cycle)
+        
         if do_pairformer:
             s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.preprocess_input(input_feats, N_cycle)
         else:
