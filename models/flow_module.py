@@ -211,36 +211,25 @@ class FlowModule(LightningModule):
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Translation VF loss
-        loss_denom_cdr = torch.sum(loss_mask_cdr, dim=-1) * 3
-        loss_denom_fv = torch.sum(loss_mask_fv, dim=-1) * 3
+        loss_denom = torch.sum(loss_mask_cdr, dim=-1) * 3
 
         trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
 
         trans_loss_cdr = training_cfg.translation_loss_weight * torch.sum(
             trans_error ** 2 * loss_mask_cdr[..., None],
             dim=(-1, -2)
-        ) / loss_denom_cdr
-        
-        trans_loss_fv = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_mask_fv[..., None],
-            dim=(-1, -2)
-        ) / loss_denom_fv
+        ) / loss_denom
 
-        trans_loss = torch.clamp((trans_loss_cdr + trans_loss_fv*0.5)/2, max=10)
+        trans_loss = torch.clamp(trans_loss_cdr, max=10)
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
         rots_vf_loss_cdr = training_cfg.rotation_loss_weights * torch.sum(
             rots_vf_error ** 2 * loss_mask_cdr[..., None],
             dim=(-1, -2)
-        ) / loss_denom_cdr
+        ) / loss_denom
 
-        rots_vf_loss_fv = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_mask_fv[..., None],
-            dim=(-1, -2)
-        ) / loss_denom_fv
-
-        rots_vf_loss = (rots_vf_loss_cdr + rots_vf_loss_fv*0.5) / 2
+        rots_vf_loss = rots_vf_loss_cdr
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)

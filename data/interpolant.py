@@ -233,6 +233,13 @@ class Interpolant:
             motif_mask = ~diffuse_mask.bool().squeeze(0)
         else:
             motif_mask = None
+        if motif_scaffolding and not self._cfg.twisting.use: # amortisation
+            diffuse_mask = diffuse_mask.expand(num_batch, -1) # shape = (B, num_residue)
+            batch['diffuse_mask'] = diffuse_mask
+            rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
+            trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
+            if torch.isnan(trans_0).any():
+                raise ValueError('NaN detected in trans_0')
 
         logs_traj = defaultdict(list)
         if motif_scaffolding and self._cfg.twisting.use: # sampling / guidance
@@ -320,8 +327,18 @@ class Interpolant:
                 (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
             )
             if self._cfg.self_condition:
-                batch['trans_sc'] = pred_trans_1
-                batch['rotmats_sc'] = pred_rotmats_1
+                if motif_scaffolding:
+                    batch['trans_sc'] = (
+                        pred_trans_1 * diffuse_mask[..., None]
+                        + trans_1 * (1 - diffuse_mask[..., None])
+                    )
+                    batch['rotmats_sc'] = (
+                        pred_rotmats_1 * diffuse_mask[..., None, None]
+                        + rotmats_1 * (1 - diffuse_mask[..., None, None])
+                    )
+                else:
+                    batch['trans_sc'] = pred_trans_1
+                    batch['rotmats_sc'] = pred_rotmats_1
 
             # Take reverse step
             trans_t_2 = self._trans_euler_step(
@@ -357,6 +374,10 @@ class Interpolant:
 
             rotmats_t_2 = self._rots_euler_step(
                 d_t, t_1, pred_rotmats_1, rotmats_t_1)
+            
+            if motif_scaffolding and not self._cfg.twisting.use:
+                trans_t_2 = _trans_diffuse_mask(trans_t_2, trans_1, diffuse_mask)
+                rotmats_t_2 = _rots_diffuse_mask(rotmats_t_2, rotmats_1, diffuse_mask)
 
             prot_traj.append((trans_t_2, rotmats_t_2))
             t_1 = t_2
