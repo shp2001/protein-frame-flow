@@ -1,9 +1,31 @@
 import torch
 import numpy as np 
 
-from data import residue_constants, all_atom
-import data.utils as du
-from openfold.utils.rigid_utils import local_to_global
+from data import residue_constants
+from scipy.spatial.transform import Rotation
+
+def random_transform(
+    points, max_translation=1.0, apply_augmentation=True, centralize=True
+) -> np.ndarray:
+    """
+    Randomly transform a set of 3D points.
+
+    Args:
+        points (numpy.ndarray): The points to be transformed, shape=(N, 3)
+        max_translation (float): The maximum translation value. Default is 1.0.
+        apply_augmentation (bool): Whether to apply random rotation/translation on ref_pos
+
+    Returns:
+        numpy.ndarray: The transformed points.
+    """
+    if centralize:
+        points = points - points.mean(axis=0)
+    if not apply_augmentation:
+        return points
+    translation = np.random.uniform(-max_translation, max_translation, size=3)
+    R = Rotation.random().as_matrix()
+    transformed_points = np.dot(points + translation, R.T)
+    return transformed_points
 
 @staticmethod
 def atom_name_chars_encoded(atom_names: list[str]) -> torch.Tensor:
@@ -67,8 +89,14 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
             print("There is a UNK in restype")
             continue
 
-        atom_names = residue_constants.restype_name_to_atom14_names[restype3]
-        atom_coords = residue_constants.rigid_group_atom_positions[restype3]
+        atom_names = residue_constants.restype_name_to_atom14_names[restype3] # atom list 
+        atom_coords = residue_constants.rigid_group_atom_positions[restype3] # [
+                                                                            #     ['N', 0, (-0.525, 1.363, 0.000)],
+                                                                            #     ['CA', 0, (0.000, 0.000, 0.000)],
+                                                                            #     ['C', 0, (1.526, -0.000, -0.000)],
+                                                                            #     ['CB', 0, (-0.529, -0.774, -1.205)],
+                                                                            #     ['O', 3, (0.627, 1.062, 0.000)],
+                                                                            # ]
 
         res_idx = res_indices[i]
     
@@ -91,7 +119,16 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
                 atom_to_token_idx.append(i)
 
                 # ref_pos
-                ref_pos.append(atom_coords[j][-1])
+                coord = None
+                for atom in atom_coords:
+                    if atom[0] == atom_name:
+                        coord = atom[-1]  # 좌표 (x, y, z)
+                        break
+
+                if coord is None:
+                    raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
+
+                ref_pos.append(coord)
     
     ref_atom_name_chars = atom_name_chars_encoded(atom_list)
 
