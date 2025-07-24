@@ -98,9 +98,12 @@ class Interpolant:
         
     def _corrupt_trans(self, trans_1, t, res_mask, diffuse_mask):
         trans_0 = _centered_gaussian(*res_mask.shape, self._device)
+        masked_trans = self.manage_missing_batch(trans_1, mask=~diffuse_mask.bool())
         trans_0 = trans_0 * du.NM_TO_ANG_SCALE
 
+        trans_0 = trans_0 + masked_trans
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1
+        trans_t = _trans_diffuse_mask(trans_t, trans_1, diffuse_mask)
         return trans_t * res_mask[..., None]
     
     def _corrupt_rotmats(self, rotmats_1, t, res_mask, diffuse_mask):
@@ -118,7 +121,8 @@ class Interpolant:
             rotmats_t * res_mask[..., None, None]
             + identity[None, None] * (1 - res_mask[..., None, None])
         )
-        return rotmats_t
+        return _rots_diffuse_mask(rotmats_t, rotmats_1, diffuse_mask)
+
 
     def corrupt_batch(self, batch):
         noisy_batch = copy.deepcopy(batch)
@@ -204,8 +208,6 @@ class Interpolant:
             rotmats_0=None,
             verbose=False
         ):
-
-        # No gradient to pairformer 
         
         # Set-up initial prior samples
         if trans_0 is None:
@@ -213,6 +215,10 @@ class Interpolant:
                     num_batch, num_res, self._device)
 
             trans_0 *= du.NM_TO_ANG_SCALE
+
+            masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["diffuse_mask"].bool())
+            trans_0 = trans_0 + masked_trans
+            trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], batch["diffuse_mask"])
 
         if rotmats_0 is None:
             rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
@@ -227,11 +233,6 @@ class Interpolant:
             motif_mask = ~diffuse_mask.bool().squeeze(0)
         else:
             motif_mask = None
-        if motif_scaffolding and not self._cfg.twisting.use: # amortisation
-            diffuse_mask = diffuse_mask.expand(num_batch, -1) # shape = (B, num_residue)
-            batch['diffuse_mask'] = diffuse_mask
-            if torch.isnan(trans_0).any():
-                raise ValueError('NaN detected in trans_0')
 
         logs_traj = defaultdict(list)
         if motif_scaffolding and self._cfg.twisting.use: # sampling / guidance
@@ -319,12 +320,8 @@ class Interpolant:
                 (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
             )
             if self._cfg.self_condition:
-                if motif_scaffolding:
-                    batch['trans_sc'] = pred_trans_1
-                    batch['rotmats_sc'] = pred_rotmats_1
-                else:
-                    batch['trans_sc'] = pred_trans_1
-                    batch['rotmats_sc'] = pred_rotmats_1
+                batch['trans_sc'] = pred_trans_1
+                batch['rotmats_sc'] = pred_rotmats_1
 
             # Take reverse step
             trans_t_2 = self._trans_euler_step(
@@ -342,7 +339,6 @@ class Interpolant:
                         batch
                     )
                     grad = torch.autograd.grad(outputs=clash_energy, inputs=grad_pred_trans_1)[0]
-                    print("grad_mean", torch.mean(grad))
                     # Guidance 적용
                     scale = self._cfg.inference_time_scaling.grad_weight
                     if self._cfg.inference_time_scaling.t_scaling:

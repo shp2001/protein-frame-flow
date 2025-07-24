@@ -132,8 +132,8 @@ experiment:
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_plddt_loss_weight: 0.1 # 4.0 ~ 6.0
     
-    aux_loss_t_pass: 0.3
-    viol_loss_t_pass: 0.6
+    aux_loss_t_pass: 0.2
+    viol_loss_t_pass: 0.4
   wandb:
     name: CDRFlow_v1.4.1
     project: se3-fm
@@ -149,7 +149,7 @@ experiment:
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
-    check_val_every_n_epoch: 4
+    check_val_every_n_epoch: 1
     accumulate_grad_batches: 1
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
