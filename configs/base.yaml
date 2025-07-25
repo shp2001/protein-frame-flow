@@ -100,7 +100,7 @@ experiment:
   train_confidence: ${model.confidence_head.use_confidence}
   debug: False
   seed: 703
-  num_devices: 2
+  num_devices: 4
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -135,13 +135,13 @@ experiment:
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.4
   wandb:
-    name: CDRFlow_v1.4.0
+    name: CDRFlow_v1.4.2
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 4e5
     min_lr: 1e-5
-    max_lr: 1e-4
+    max_lr: 3e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

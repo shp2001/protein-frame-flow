@@ -2,9 +2,10 @@ model:
   node_embed_size: 384
   edge_embed_size: 128
   num_cycles: 3
+  n_blocks: 4 # structure module 
   symmetric: False
   scaling_nm_ang: False 
-  
+
   node_features:
     c_s: ${model.node_embed_size}
     c_pos_emb: 128
@@ -76,7 +77,7 @@ model:
 
   all_atom:
     n_blocks: 2
-    d_single: 256
+    d_single: 384
     d_hidden: 128
     atom_num: 14
 
