@@ -20,7 +20,6 @@ from data import utils as du
 from data import all_atom
 from data import so3_utils
 from data import residue_constants
-from data.kabsch import do_kabsch 
 from openfold.utils.rigid_utils import Rigid
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
@@ -175,29 +174,9 @@ class FlowModule(LightningModule):
 
         # Model output predictions.
         model_output = self.model(noisy_batch, N_cycle)
-        pred_atom_14 = model_output['all_atom_preds']['positions'].clone()
-
-        # do align (B, L, 14) * (B, L)
-        bb_mask = torch.zeros_like(noisy_batch['atom14_gt_exists'])
-        bb_mask[:, :, :3] = 1
-        align_mask = bb_mask * (1-noisy_batch['diffuse_mask'][..., None]) # backbone이고 diffuse를 하지 않는 atom만 align
-        align_mask = align_mask.reshape(num_batch, -1).bool()
-        
-        aligned_pred_atom_14 = do_kabsch(
-            mobile=model_output['all_atom_preds']['positions'].reshape(num_batch, num_res*14, 3),
-            stationary=noisy_batch['atom14_gt_positions'].reshape(num_batch, num_res*14, 3),
-            align_mask=align_mask
-        ).reshape(num_batch, num_res, 14, 3)
-
-        pred_atom_14 = aligned_pred_atom_14.clone()
-        pred_rigids = Rigid.from_3_points(
-            pred_atom_14[:, :, 0],
-            pred_atom_14[:, :, 1],
-            pred_atom_14[:, :, 2],)
-        
-        pred_trans_1 = pred_rigids.get_trans()
-        pred_rotmats_1 = pred_rigids.get_rots().get_rot_mats()
-        
+        pred_trans_1 = model_output['pred_trans'].clone()
+        pred_rotmats_1 = model_output['pred_rotmats'].clone()
+        pred_atom_14 = model_output['all_atom_preds']['positions'].clone()        
         distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
 
         pred_atom_14 = pred_atom_14 * training_cfg.bb_atom_scale / r3_norm_scale[..., None]        
@@ -205,7 +184,7 @@ class FlowModule(LightningModule):
 
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(noisy_batch,
-                                                    atom14_pred_positions=aligned_pred_atom_14)
+                                                    atom14_pred_positions=model_output['all_atom_preds']["positions"])
 
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
@@ -468,24 +447,6 @@ class FlowModule(LightningModule):
 
             # calculate trans loss (rmsd)
             # do align (B, L, 14) * (B, L)
-            bb_mask = torch.zeros_like(batch['atom14_gt_exists'])
-            bb_mask[:, :, :3] = 1
-            align_mask = bb_mask * (1-batch['diffuse_mask'][..., None]) # backbone이고 diffuse를 하지 않는 atom만 align
-            align_mask = align_mask.reshape(num_batch, -1).bool()
-
-            aligned_pred_atom_14 = do_kabsch(
-                mobile=pred_positions.reshape(num_batch, num_res*14, 3),
-                stationary=batch['atom14_gt_positions'].reshape(num_batch, num_res*14, 3),
-                align_mask=align_mask
-            ).reshape(num_batch, num_res, 14, 3)
-
-            pred_atom_14 = aligned_pred_atom_14.clone()
-            pred_rigids = Rigid.from_3_points(
-                pred_atom_14[:, :, 0],
-                pred_atom_14[:, :, 1],
-                pred_atom_14[:, :, 2],)
-            
-            pred_trans_1 = pred_rigids.get_trans()
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
             trans_loss = torch.sum(
@@ -702,6 +663,7 @@ class FlowModule(LightningModule):
         if self.nan_in_grad:
             self.print(f"⚠️ Skipping optimizer step at step {self.global_step} due to NaN in gradient.")
             optimizer.zero_grad()
+            self.nan_in_grad = False
             return
 
         else:
@@ -772,15 +734,19 @@ class FlowModule(LightningModule):
             for i in range(num_batch):
                 if (plddt_logit[i]==0).all():
                     b_factor_alt = 1-diffuse_mask
-                    b_factors = torch.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
+                    b_factors = b_factor_alt
                 
                 else:
                     plddt = compute_plddt(plddt_logit[i])
                     plddt = plddt.cpu().numpy()
-                    b_factors = torch.tile((plddt)[:, None], (1, 37))
+                    b_factors = plddt
 
-            plddt_final = torch.ones(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device) * 100
-            plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors)
+            plddt_final = torch.ones(pred_positions.shape[0], 
+                                     gt_positions.shape[0], 
+                                     dtype=batch['res_idx'].dtype,
+                                     device=batch['res_idx'].device) * 100
+            plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors.to(batch['res_idx'].dtype))
+
             plddt_final = du.to_numpy(plddt_final)
 
             for i in range(num_batch):

@@ -68,8 +68,8 @@ class Experiment:
 
             # Save config only for main process.
             local_rank = os.environ.get('LOCAL_RANK', 0)
-            if local_rank == 0:
-                cfg_path = os.path.join(ckpt_dir, 'config.yaml')
+            cfg_path = os.path.join(ckpt_dir, 'config.yaml')
+            if local_rank == 0 or not os.path.exists(cfg_path):
                 with open(cfg_path, 'w') as f:
                     OmegaConf.save(config=self._cfg, f=f.name)
                 cfg_dict = OmegaConf.to_container(self._cfg, resolve=True)

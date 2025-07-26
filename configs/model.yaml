@@ -36,7 +36,7 @@ model:
     n_heads: 16
     c_z: 128
     c_s: 384
-    blocks_per_ckpt: 1
+    blocks_per_ckpt: null
     dropout: 0.2
     
   aa_enc:
@@ -50,7 +50,7 @@ model:
     n_heads: 4
     n_queries: 32
     n_keys: 128
-    blocks_per_ckpt: 2
+    blocks_per_ckpt: null
 
   ipa:
     c_s: ${model.node_embed_size}
@@ -100,4 +100,4 @@ model:
     min_bins: 2.0
     max_bins: 32.0
     num_bins: 32
-    blocks_per_ckpt: 3
+    blocks_per_ckpt: null

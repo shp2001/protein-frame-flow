@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:A6000:4
 #SBATCH --mem=128g
 #SBATCH -c 24
-#SBATCH -w gpu01
+#SBATCH -w gpu05
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
 
