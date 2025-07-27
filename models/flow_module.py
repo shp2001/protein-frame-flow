@@ -20,7 +20,6 @@ from data import utils as du
 from data import all_atom
 from data import so3_utils
 from data import residue_constants
-from openfold.utils.rigid_utils import Rigid
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
@@ -176,7 +175,7 @@ class FlowModule(LightningModule):
         model_output = self.model(noisy_batch, N_cycle)
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
-        pred_atom_14 = model_output['all_atom_preds']['positions'].clone()        
+        pred_atom_14 = model_output['all_atom_preds']['positions'].clone()          
         distogram_logit_pairformer = model_output['distogram_logit_pairformer'].clone()
 
         pred_atom_14 = pred_atom_14 * training_cfg.bb_atom_scale / r3_norm_scale[..., None]        
@@ -190,25 +189,36 @@ class FlowModule(LightningModule):
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Translation VF loss
-        loss_denom = torch.sum(loss_mask_cdr, dim=-1) * 3
+        loss_denom_cdr = torch.sum(loss_mask_cdr, dim=-1) * 3
+        loss_denom_fv = torch.sum(loss_mask_fv, dim=-1) * 3
 
         trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
 
         trans_loss_cdr = training_cfg.translation_loss_weight * torch.sum(
             trans_error ** 2 * loss_mask_cdr[..., None],
             dim=(-1, -2)
-        ) / loss_denom
+        ) / loss_denom_cdr
+        
+        trans_loss_fv = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * loss_mask_fv[..., None],
+            dim=(-1, -2)
+        ) / loss_denom_fv
 
-        trans_loss = torch.clamp(trans_loss_cdr, max=10)
+        trans_loss = torch.clamp(trans_loss_cdr + trans_loss_fv*0.3, max=10)
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
         rots_vf_loss_cdr = training_cfg.rotation_loss_weights * torch.sum(
             rots_vf_error ** 2 * loss_mask_cdr[..., None],
             dim=(-1, -2)
-        ) / loss_denom
+        ) / loss_denom_cdr
 
-        rots_vf_loss = rots_vf_loss_cdr
+        rots_vf_loss_fv = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * loss_mask_fv[..., None],
+            dim=(-1, -2)
+        ) / loss_denom_fv
+
+        rots_vf_loss = rots_vf_loss_cdr + rots_vf_loss_fv*0.3
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -446,7 +456,6 @@ class FlowModule(LightningModule):
             batch_metrics.append((mdtraj_metrics | ca_ca_metrics))
 
             # calculate trans loss (rmsd)
-            # do align (B, L, 14) * (B, L)
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
             trans_loss = torch.sum(
@@ -667,7 +676,8 @@ class FlowModule(LightningModule):
             return
 
         else:
-            optimizer.step(closure=optimizer_closure) 
+            optimizer_closure()  # ← 직접 실행
+            optimizer.step() 
         
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused

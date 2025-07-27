@@ -76,8 +76,7 @@ class StructureModuleBlock(nn.Module):
         s = s * node_mask[..., None]
         rigid_update = self.bb_update(
             s * node_mask[..., None])
-        curr_rigids = curr_rigids.compose_q_update_vec(
-            rigid_update, (node_mask * diffuse_mask)[..., None])
+        curr_rigids = curr_rigids.compose_q_update_vec(rigid_update)
         
         return curr_rigids, s
 

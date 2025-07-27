@@ -7,7 +7,6 @@ from models.conditioning_module import ConditioningModule
 from models.structure_module import StructureModule
 from models.all_atom import AllAtomModule
 
-from models import ipa_pytorch
 from models.heads import DistogramHead, ConfidenceHead
 from data import utils as du
 from openfold.utils.rigid_utils import local_to_global
