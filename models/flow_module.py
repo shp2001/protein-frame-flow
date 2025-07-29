@@ -316,7 +316,7 @@ class FlowModule(LightningModule):
         plddt_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_plddt_loss:
             self.mini_rollout.set_device(loss_mask_cdr.device)
-            _, _, mini_pred_positions, _, _, plddt_logit = self.mini_rollout.sample(
+            _, _, mini_pred_positions, _, _, _, plddt_logit = self.mini_rollout.sample(
                 num_batch,
                 num_res,
                 self.model,
@@ -396,7 +396,7 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
-        atom37_traj, clean_atom37_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = self.interpolant.sample(
+        atom37_traj, clean_atom37_traj, pred_positions, pred_trans_1, pred_rotmats_1, distogram_logit_pairformer, plddt_logit = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
@@ -500,7 +500,7 @@ class FlowModule(LightningModule):
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
-        
+
     def on_validation_epoch_end(self):
         if len(self.validation_epoch_samples) > 0:
             self.logger.log_table(
@@ -708,116 +708,106 @@ class FlowModule(LightningModule):
             diffuse_mask = torch.ones(1, sample_length, device=device)
 
         # Sample batch
-        if self.save_file:
-            sample_dirs = [os.path.join(
-                self.inference_dir, pdb_id, f'sample_{sample_id}')
-                for sample_id in sample_ids]
+        sample_dirs = [os.path.join(
+            self.inference_dir, pdb_id, f'sample_{sample_id}')
+            for sample_id in sample_ids]
 
-            atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = interpolant.sample(
-                num_batch, 
-                sample_length, 
-                self.model,
-                batch,
-                N_cycle=self._model_cfg.num_cycles
-            )
+        atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, distogram_logit_pairformer, plddt_logit = interpolant.sample(
+            num_batch, 
+            sample_length, 
+            self.model,
+            batch,
+            N_cycle=self._model_cfg.num_cycles
+        )
+        
+        bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
+        pred_positions_37 = []
+
+        pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
+        gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
+
+        for i in range(pred_positions.shape[0]):
+            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
+            gt_batch = {
+                'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
+                'atom37_atom_exists': batch['original_atom37_atom_exists']
+            }
+            gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
+            gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
+            pred_positions_37.append(gt_position_37)
+
+
+        pred_positions = np.stack(pred_positions_37)
+
+
+        for i in range(num_batch):
+            if (plddt_logit[i]==0).all():
+                b_factor_alt = 1-diffuse_mask
+                b_factors = b_factor_alt
             
-            bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
-            pred_positions_37 = []
+            else:
+                plddt = compute_plddt(plddt_logit[i])
+                plddt = plddt.cpu().numpy()
+                b_factors = plddt
 
-            pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
-            gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
+        plddt_final = torch.ones(pred_positions.shape[0], 
+                                    gt_positions.shape[0], 
+                                    dtype=batch['res_idx'].dtype,
+                                    device=batch['res_idx'].device) * 100
+        plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors.to(batch['res_idx'].dtype))
 
-            for i in range(pred_positions.shape[0]):
-                pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
-                gt_batch = {
-                    'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
-                    'atom37_atom_exists': batch['original_atom37_atom_exists']
-                }
-                gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
-                gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
-                pred_positions_37.append(gt_position_37)
+        plddt_final = du.to_numpy(plddt_final)
 
-
-            pred_positions = np.stack(pred_positions_37)
-
-
-            for i in range(num_batch):
-                if (plddt_logit[i]==0).all():
-                    b_factor_alt = 1-diffuse_mask
-                    b_factors = b_factor_alt
-                
-                else:
-                    plddt = compute_plddt(plddt_logit[i])
-                    plddt = plddt.cpu().numpy()
-                    b_factors = plddt
-
-            plddt_final = torch.ones(pred_positions.shape[0], 
-                                     gt_positions.shape[0], 
-                                     dtype=batch['res_idx'].dtype,
-                                     device=batch['res_idx'].device) * 100
-            plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors.to(batch['res_idx'].dtype))
-
-            plddt_final = du.to_numpy(plddt_final)
-
-            for i in range(num_batch):
-                sample_dir = sample_dirs[i]
-                pred_position = pred_positions[i]
-                bb_traj = bb_trajs[i]
-                plddt = plddt_final[i]
-                os.makedirs(sample_dir, exist_ok=True)
-                aatype = du.to_numpy(batch['original_aatype'].long())
-                chain_idx = du.to_numpy(batch['original_chain_idx'].long())
+        for i in range(num_batch):
+            sample_dir = sample_dirs[i]
+            pred_position = pred_positions[i]
+            bb_traj = bb_trajs[i]
+            plddt = plddt_final[i]
+            os.makedirs(sample_dir, exist_ok=True)
+            aatype = du.to_numpy(batch['original_aatype'].long())
+            chain_idx = du.to_numpy(batch['original_chain_idx'].long())
 
 
-                # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
-                #                          title=pdb_id.split('_')[0] + '_pred',
-                #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
-                # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
-                #                          title=pdb_id.split('_')[0] + '_gt',
-                #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
+            # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_pred',
+            #                          output_path=os.path.join(sample_dir, 'pred_contact_map.png'))
+            # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
+            #                          title=pdb_id.split('_')[0] + '_gt',
+            #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
 
-                _ = eu.save_traj(
-                    sample=pred_position, # (L, 37, 3)
-                    bb_prot_traj=bb_traj, 
-                    x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                    b_factors=plddt,  # 위의 prmsd 집어넣기 
-                    diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
-                    output_dir=sample_dir,
-                    aatype=aatype,
-                    chain_index=chain_idx,
-                    save_traj_bool=False
-                )
-
-        else:
-            if not os.path.exists('/home/psh/protein-frame-flow/train_conf'):
-                os.makedirs('/home/psh/protein-frame-flow/train_conf', exist_ok=True)
-
-            sample_files = [os.path.join(
-                '/home/psh/protein-frame-flow/train_conf', f'{pdb_id}_sample_{sample_id}.pt')
-                for sample_id in sample_ids]
-            atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, plddt_logit = interpolant.sample(
-                num_batch, 
-                sample_length, 
-                self.model,
-                batch,
-                N_cycle=self._model_cfg.num_cycles,
+            _ = eu.save_traj(
+                sample=pred_position, # (L, 37, 3)
+                bb_prot_traj=bb_traj, 
+                x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
+                b_factors=plddt,  # 위의 prmsd 집어넣기 
+                diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
+                output_dir=sample_dir,
+                aatype=aatype,
+                chain_index=chain_idx,
+                save_traj_bool=False
             )
-            def extract_i(all_input_for_confidence, i):
-                out = {}
 
-                for key, value in all_input_for_confidence.items():
-                    if key == "input_for_confidence":
-                        # 내부 딕셔너리 처리
-                        sub_dict = {}
-                        for subkey, subval in value.items():
-                            sub_dict[subkey] = subval[i]
-                        out[key] = sub_dict
-                    else:
-                        out[key] = value[i]
+            # pairformer distogram 시각화 
+            # Softmax
+            probs = torch.softmax(distogram_logit_pairformer, dim=-1)  # 마지막 차원 (num_bins)에 대해 softmax
 
-                return out
-            
-            for i in range(num_batch):
-                sample_file = sample_files[i]
-                input_for_confidence = extract_i(input_for_confidence, i)
-                eu.save_conf_repr(input_for_confidence, sample_file)
+            # 거리 bin의 중심값 계산
+            num_bins = distogram_logit_pairformer.shape[-1]  # 32
+            min_bin = 2.0
+            max_bin = 32.0
+            bin_edges = torch.linspace(min_bin, max_bin, num_bins + 1)  # (33,)
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
+
+            # expected distance 계산: (B, N, N)
+            expected_dmap = torch.sum(probs * bin_centers.view(1, 1, 1, -1), dim=-1)
+            save_path = os.path.join(sample_dir, 'distogram_pairformer.png')
+            plt.figure(figsize=(6, 5))
+            plt.imshow(expected_dmap[0].detach().cpu().numpy(), cmap='viridis')
+            plt.colorbar(label='Expected Distance (Å)')
+            plt.title('Expected Distance Map')
+            plt.xlabel('Residue Index')
+            plt.ylabel('Residue Index')
+            plt.tight_layout()
+
+            # 이미지 저장
+            plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능

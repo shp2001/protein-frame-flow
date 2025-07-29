@@ -412,7 +412,7 @@ class Interpolant:
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, batch["res_mask"])
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, batch["res_mask"])
 
-        return atom37_traj, clean_atom37_traj, pred_positions_14, pred_trans_1, pred_rotmats_1, plddt_logit
+        return atom37_traj, clean_atom37_traj, pred_positions_14, pred_trans_1, pred_rotmats_1, distogram_logit_pairformer, plddt_logit
     
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

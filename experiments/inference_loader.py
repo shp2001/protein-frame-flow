@@ -199,13 +199,6 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
-
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=None)
-            scaffold_idx[f'loop_start'] = loop_start
-            scaffold_idx[f'loop_end'] = loop_end
-
-        if csv_row['mode'] == 'general':
-            loop_info_file = csv_row['loop_info_dir']
             loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=123)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
@@ -319,9 +312,9 @@ def collate_fn(batch):
             cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=300,
+                                                    max_len=400,
                                                     seq_list=feat['chain_seq_list'],
-                                                    crop_ab=True
+                                                    crop_ab=False
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
