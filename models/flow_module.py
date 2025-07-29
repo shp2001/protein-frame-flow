@@ -719,44 +719,37 @@ class FlowModule(LightningModule):
             batch,
             N_cycle=self._model_cfg.num_cycles
         )
-        
+        # pairformer distogram 시각화 
+        eu.visualize_distogram(distogram_logit_pairformer, os.path.join(self.inference_dir, pdb_id))
+
+        # gt distogram 시각화 
+        # ground truth 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         pred_positions_37 = []
 
         pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
-        gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
 
         for i in range(pred_positions.shape[0]):
             pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
-            gt_batch = {
-                'residx_atom37_to_atom14': batch['original_residx_atom37_to_atom14'],
-                'atom37_atom_exists': batch['original_atom37_atom_exists']
-            }
-            gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
-            gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
-            pred_positions_37.append(gt_position_37)
-
+            pred_positions_37.append(pred_position_37)
 
         pred_positions = np.stack(pred_positions_37)
 
-
+        plddt_final = []
         for i in range(num_batch):
             if (plddt_logit[i]==0).all():
-                b_factor_alt = 1-diffuse_mask
-                b_factors = b_factor_alt
-            
+                b_factor_alt = (1-diffuse_mask).cpu().numpy()
+                b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
+                plddt_final.append(b_factors)
+                print("b_factors", b_factors.shape)
             else:
                 plddt = compute_plddt(plddt_logit[i])
                 plddt = plddt.cpu().numpy()
-                b_factors = plddt
+                b_factors = np.tile((plddt)[:, None], (1, 37))
+                plddt_final.append(b_factors)
+                print("b_factors", b_factors.shape)
 
-        plddt_final = torch.ones(pred_positions.shape[0], 
-                                    gt_positions.shape[0], 
-                                    dtype=batch['res_idx'].dtype,
-                                    device=batch['res_idx'].device) * 100
-        plddt_final.scatter_(dim=1, index=batch['res_idx'], src=b_factors.to(batch['res_idx'].dtype))
-
-        plddt_final = du.to_numpy(plddt_final)
+        plddt_final = np.stack(plddt_final, axis=0)
 
         for i in range(num_batch):
             sample_dir = sample_dirs[i]
@@ -764,8 +757,8 @@ class FlowModule(LightningModule):
             bb_traj = bb_trajs[i]
             plddt = plddt_final[i]
             os.makedirs(sample_dir, exist_ok=True)
-            aatype = du.to_numpy(batch['original_aatype'].long())
-            chain_idx = du.to_numpy(batch['original_chain_idx'].long())
+            aatype = du.to_numpy(batch['aatype'].long())
+            chain_idx = du.to_numpy(batch['chain_idx'].long())
 
 
             # au.visualize_contact_map(contact_map[i, :, :, 50] * cb_mask[i], cdr_residues, neighbor_indices,
@@ -774,40 +767,16 @@ class FlowModule(LightningModule):
             # au.visualize_contact_map(gt_cb_contact_map[i], cdr_residues, neighbor_indices,
             #                          title=pdb_id.split('_')[0] + '_gt',
             #                          output_path=os.path.join(sample_dir, 'gt_contact_map.png'))
-
+ 
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
                 bb_prot_traj=bb_traj, 
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
                 b_factors=plddt,  # 위의 prmsd 집어넣기 
-                diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
+                diffuse_mask=batch['diffuse_mask'].cpu().numpy(),
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
                 save_traj_bool=False
             )
 
-            # pairformer distogram 시각화 
-            # Softmax
-            probs = torch.softmax(distogram_logit_pairformer, dim=-1)  # 마지막 차원 (num_bins)에 대해 softmax
-
-            # 거리 bin의 중심값 계산
-            num_bins = distogram_logit_pairformer.shape[-1]  # 32
-            min_bin = 2.0
-            max_bin = 32.0
-            bin_edges = torch.linspace(min_bin, max_bin, num_bins + 1)  # (33,)
-            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
-
-            # expected distance 계산: (B, N, N)
-            expected_dmap = torch.sum(probs * bin_centers.view(1, 1, 1, -1), dim=-1)
-            save_path = os.path.join(sample_dir, 'distogram_pairformer.png')
-            plt.figure(figsize=(6, 5))
-            plt.imshow(expected_dmap[0].detach().cpu().numpy(), cmap='viridis')
-            plt.colorbar(label='Expected Distance (Å)')
-            plt.title('Expected Distance Map')
-            plt.xlabel('Residue Index')
-            plt.ylabel('Residue Index')
-            plt.tight_layout()
-
-            # 이미지 저장
-            plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능

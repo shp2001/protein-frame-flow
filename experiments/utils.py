@@ -10,7 +10,7 @@ from analysis import utils as au
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from motif_scaffolding import save_motif_segments
 from openfold.utils import rigid_utils as ru
-
+import matplotlib.pyplot as plt
 
 class LengthDataset(torch.utils.data.Dataset):
     def __init__(self, samples_cfg):
@@ -233,13 +233,7 @@ def save_traj(
     prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
 
-    # Use b-factors to specify which residues are diffused.
-    if all(b_factors==0) == True:
-        b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
-    
-    else:
-        b_factors = np.tile((b_factors)[:, None], (1, 37))
-    
+    # Use b-factors to specify which residues are diffused.    
     sample_path = au.write_prot_to_pdb(
         sample,
         sample_path,
@@ -303,3 +297,28 @@ def flatten_dict(raw_dict):
         else:
             flattened.append((k, v))
     return flattened
+
+def visualize_distogram(distogram_logit, saved_dir):
+    probs = torch.softmax(distogram_logit, dim=-1).detach().cpu().numpy()  # shape: (B, N, N, 32)
+
+    num_bins = distogram_logit.shape[-1]  # 32
+    min_bin = 2.0
+    max_bin = 32.0
+    bin_edges = np.linspace(min_bin, max_bin, num_bins + 1)  # (33,)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
+
+    bin_centers = bin_centers.reshape(1, 1, 1, -1)  # shape: (1, 1, 1, 32)
+    
+    # expected distance 계산
+    expected_dmap = np.sum(probs * bin_centers, axis=-1)  # shape: (B, N, N)
+    save_path = os.path.join(saved_dir, 'distogram_pairformer.png')
+    plt.figure(figsize=(6, 5))
+    plt.imshow(expected_dmap[0], cmap='viridis')
+    plt.colorbar(label='Expected Distance (Å)')
+    plt.title('Expected Distance Map')
+    plt.xlabel('Residue Index')
+    plt.ylabel('Residue Index')
+    plt.tight_layout()
+
+    # 이미지 저장
+    plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능

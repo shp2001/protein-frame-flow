@@ -198,6 +198,7 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
       atom_index += 1  # Atom index increases at the TER symbol.
 
     res_name_3 = res_1to3(aatype[i])
+
     for atom_name, pos, mask, b_factor in zip(
         atom_types, atom_positions[i], atom_mask[i], b_factors[i]):
 
