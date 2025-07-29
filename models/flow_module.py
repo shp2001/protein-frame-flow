@@ -689,7 +689,6 @@ class FlowModule(LightningModule):
         sample_ids = [sample_ids] if isinstance(sample_ids, int) else sample_ids
         num_batch = len(sample_ids)
 
-
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
         print("pdb_id", pdb_id)
         if 'diffuse_mask' in batch: # motif-scaffolding
@@ -719,10 +718,50 @@ class FlowModule(LightningModule):
             batch,
             N_cycle=self._model_cfg.num_cycles
         )
-        # pairformer distogram 시각화 
-        eu.visualize_distogram(distogram_logit_pairformer, os.path.join(self.inference_dir, pdb_id))
+        # find cdr_residues to mark cdr on the distogram 
+        cdr_residues = find_anchor(diffuse_mask[0], only_h3=False)
+        cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
+
+        pdb_dir = os.path.join(self.inference_dir, pdb_id)
+        os.makedirs(pdb_dir, exist_ok=True)
+
+        # pairformer distogram 시각화
+        dist_map_pairformer = eu.dist_map_from_distogram(distogram_logit_pairformer)[0].squeeze()
+        eu.visualize_dist_map(
+            dist_map_pairformer, 
+            os.path.join(pdb_dir, "pairformer_dist_cb.png"), 
+            title=f"{pdb_id.upper()} Pairformer Cβ Distogram",
+            cdr_residues=cdr_residues,
+            mark_cdr=True
+            )
 
         # gt distogram 시각화 
+        gt_cb_distogram = calc_distogram(  
+            batch['pseudo_beta'],
+            min_bin=2.0,
+            max_bin=32.0,
+            num_bins=32
+        ) # (B, L, L, 32), one-hot
+        gt_cb_dist = eu.dist_map_from_distogram(gt_cb_distogram, do_softmax=False)[0].squeeze()
+        eu.visualize_dist_map(
+            gt_cb_dist, 
+            os.path.join(pdb_dir, "gt_dist_cb.png"), 
+            title=f"{pdb_id.upper()} True Cβ Distogram",
+            cdr_residues=cdr_residues,
+            mark_cdr=True
+            )
+
+        # gt distogram과 pairformer distogram 차이 
+        diff_distance_map = np.abs(gt_cb_dist - dist_map_pairformer)
+
+        eu.visualize_dist_map(
+            diff_distance_map, 
+            os.path.join(pdb_dir, "diff_dist_cb.png"), 
+            title=f"{pdb_id.upper()} |True - Pairformer|",
+            cdr_residues=cdr_residues,
+            mark_cdr=True,
+            cmap='hot'
+            )
         # ground truth 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
         pred_positions_37 = []

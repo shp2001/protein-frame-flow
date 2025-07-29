@@ -219,6 +219,9 @@ def group_numbers(numbers, nan_mask):
     return groups
 
 def find_anchor(pattern, only_h3=True):
+    '''
+    pattern: 1-dim List
+    '''
     anchor = []
 
     # 문자열의 길이를 확인
