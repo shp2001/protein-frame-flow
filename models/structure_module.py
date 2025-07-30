@@ -4,12 +4,15 @@ from torch import nn
 from models import ipa_pytorch
 from Protenix.protenix.model.modules import transformer
 from Protenix.protenix.model.modules.primitives import LayerNorm
+from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 
 class StructureModuleBlock(nn.Module):
-    def __init__(self, model_conf):
+    def __init__(self, model_conf, update_pair):
         super().__init__()
         self._aa_enc_conf = model_conf.aa_enc
         self._ipa_conf = model_conf.ipa
+        self.update_pair = update_pair
+        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
 
         self.atom_attention_encoder = transformer.AtomAttentionEncoder(self._aa_enc_conf)
         self.ipa = ipa_pytorch.IPABlocks(self._ipa_conf,
@@ -35,6 +38,8 @@ class StructureModuleBlock(nn.Module):
             tfmr_in, self._ipa_conf.c_s, init="final")
         self.node_transition = ipa_pytorch.StructureModuleTransition(
             c=self._ipa_conf.c_s)
+        if self.update_pair:
+            self.edge_update = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
         self.bb_update = ipa_pytorch.BackboneUpdate(
             self._ipa_conf.c_s, use_rot_updates=True)
     
@@ -45,7 +50,7 @@ class StructureModuleBlock(nn.Module):
         curr_rigids,
         ref_feature_dict,
         node_mask: torch.Tensor,
-        diffuse_mask: torch.Tensor
+        diffuse_mask: torch.Tensor,
     ):
 
         a_token, q_skip, c_skip, p_skip = self.atom_attention_encoder(
@@ -77,15 +82,28 @@ class StructureModuleBlock(nn.Module):
         rigid_update = self.bb_update(
             s * node_mask[..., None])
         curr_rigids = curr_rigids.compose_q_update_vec(rigid_update)
-        
-        return curr_rigids, s
+
+        # pair update 
+        if self.update_pair:
+            edge_mask = node_mask[:, None] * node_mask[:, :, None]
+            z_pair = self.edge_update(
+                s, z_pair, curr_rigids, edge_mask
+            )
+            z_pair = z_pair * edge_mask[..., None]
+
+        return curr_rigids, s, z_pair
 
 class StructureModule(nn.Module):
     def __init__(self, model_conf):
         super().__init__()
 
         self.blocks = nn.ModuleList(
-            [StructureModuleBlock(model_conf) for _ in range(model_conf.n_blocks)]
+            [
+                StructureModuleBlock(model_conf, pair_update=True)
+                for _ in range(model_conf.n_blocks - 1)
+            ] + [
+                StructureModuleBlock(model_conf, pair_update=False)
+            ]
         )
 
     def forward(
@@ -98,10 +116,12 @@ class StructureModule(nn.Module):
         diffuse_mask: torch.Tensor
     ):
         for block in self.blocks:
-            curr_rigids, s_single = block(s_single, 
-                                          z_pair, 
-                                          curr_rigids, 
-                                          ref_feature_dict, 
-                                          node_mask, 
-                                          diffuse_mask)
+            curr_rigids, s_single, z_pair = block(
+                s_single, 
+                z_pair, 
+                curr_rigids, 
+                ref_feature_dict, 
+                node_mask, 
+                diffuse_mask
+                )
         return curr_rigids, s_single
