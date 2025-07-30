@@ -24,6 +24,8 @@ from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
 
+from collections import defaultdict
+
 class FlowModule(LightningModule):
 
     def __init__(self, cfg):
@@ -33,7 +35,7 @@ class FlowModule(LightningModule):
         self._model_cfg = cfg.model
         self._data_cfg = cfg.data
         self._interpolant_cfg = cfg.interpolant
-    
+
         # Set-up vector field prediction model
         self.model = FlowModel(cfg.model, 
                                train_confidence=self._exp_cfg.train_confidence)
@@ -50,6 +52,9 @@ class FlowModule(LightningModule):
         self._inference_dir = None
         self.save_file = True
         self.nan_in_grad = False
+
+        self.pairformer_cache = {} # {pdb_id: (outputs)}
+        self.pairformer_usage_counter = defaultdict(int)
 
     @property
     def checkpoint_dir(self):
@@ -396,6 +401,29 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
+        # get pairformer output 
+        trans_0, rotmats_0 = self.interpolant.setup_prior(
+            batch,
+            num_batch,
+            num_res
+        )
+        batch['trans_t'] = trans_0
+        batch['rotmats_t'] = rotmats_0 
+        print("Start to get pairformer output")
+        start_time = time.time()
+        s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.model(
+            batch, 
+            self._model_cfg.num_cycles,
+            mode='pairformer'
+        )
+        batch['s_init'] = s_init
+        batch['s_trunk'] = s_trunk
+        batch['z_trunk'] = z_trunk
+        batch['distogram_logit_pairformer'] = distogram_logit_pairformer
+        end_time = time.time()
+        print(f"Finished extracting pairformer output. Elapsed time  {end_time-start_time:.2f}초")
+
+        # get structure output
         atom37_traj, clean_atom37_traj, pred_positions, pred_trans_1, pred_rotmats_1, distogram_logit_pairformer, plddt_logit = self.interpolant.sample(
             num_batch,
             num_res,
@@ -687,7 +715,6 @@ class FlowModule(LightningModule):
 
         sample_ids = batch['sample_id'].squeeze().tolist()
         sample_ids = [sample_ids] if isinstance(sample_ids, int) else sample_ids
-        num_batch = len(sample_ids)
 
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
         print("pdb_id", pdb_id)
@@ -698,7 +725,7 @@ class FlowModule(LightningModule):
 
             true_bb_pos = all_atom.atom37_from_trans_rot(trans_1, rotmats_1, 1 - diffuse_mask)
             true_bb_pos = true_bb_pos[..., :3, :].reshape(-1, 3).cpu().numpy()
-            _, sample_length, _ = trans_1.shape
+            num_batch, num_res, _ = trans_1.shape
 
         else: # unconditional
             sample_length = batch['num_res'].item()
@@ -711,9 +738,44 @@ class FlowModule(LightningModule):
             self.inference_dir, pdb_id, f'sample_{sample_id}')
             for sample_id in sample_ids]
 
+        # get pairformer output 
+        if pdb_id in self.pairformer_cache:
+            print(f"[CACHE] Using cached pairformer output for {pdb_id}")
+            s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.pairformer_cache[pdb_id]
+
+        else:
+            print("[RUN] Start to get pairformer output")
+            trans_0, rotmats_0 = interpolant.setup_prior(batch, num_batch, num_res)
+            batch['trans_t'] = trans_0
+            batch['rotmats_t'] = rotmats_0
+
+            start_time = time.time()
+            s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.model(
+                batch, self._model_cfg.num_cycles, mode='pairformer'
+            )
+            end_time = time.time()
+            print(f"[DONE] Finished extracting pairformer output. Elapsed {end_time - start_time:.2f}초")
+
+            # ✅ 캐시에 저장
+            self.pairformer_cache[pdb_id] = (s_init, s_trunk, z_trunk, distogram_logit_pairformer)
+
+        # ✅ 사용 횟수 업데이트
+        self.pairformer_usage_counter[pdb_id] += num_batch
+
+        if self.pairformer_usage_counter[pdb_id] >= self._infer_cfg.samples.samples_per_target:
+            print(f"[CLEAR] Done using pairformer output for {pdb_id}, clearing cache.")
+            del self.pairformer_cache[pdb_id]
+            del self.pairformer_usage_counter[pdb_id]
+
+        batch['s_init'] = s_init
+        batch['s_trunk'] = s_trunk
+        batch['z_trunk'] = z_trunk
+        batch['distogram_logit_pairformer'] = distogram_logit_pairformer
+
+        # get structure output 
         atom37_traj, model_traj, pred_positions, pred_trans_1, pred_rotmats_1, distogram_logit_pairformer, plddt_logit = interpolant.sample(
             num_batch, 
-            sample_length, 
+            num_res, 
             self.model,
             batch,
             N_cycle=self._model_cfg.num_cycles

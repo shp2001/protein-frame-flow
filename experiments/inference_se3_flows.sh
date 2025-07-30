@@ -2,8 +2,8 @@
 #SBATCH -J CDRFlow_guidance_5.0
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=15g
-#SBATCH -c 4
+#SBATCH --mem=70g
+#SBATCH -c 16
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/inf.err
 

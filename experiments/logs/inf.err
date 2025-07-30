@@ -9,5 +9,3 @@ All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-/var/spool/slurmd/job794537/slurm_script: line 12: 1058336 Killed                  python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/guidance_5.0.log
-slurmstepd-gpu02: error: Detected 1 oom_kill event in StepId=794537.batch. Some of the step tasks have been OOM Killed.

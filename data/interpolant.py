@@ -195,6 +195,25 @@ class Interpolant:
         return so3_utils.geodesic_t(
             scaling * d_t, rotmats_1, rotmats_t)
 
+    def setup_prior(
+            self,
+            batch,
+            num_batch,
+            num_res
+    ):
+        # Set-up initial prior samples
+        trans_0 = _centered_gaussian(
+                num_batch, num_res, self._device)
+        trans_0 *= du.NM_TO_ANG_SCALE
+        masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["diffuse_mask"].bool())
+        trans_0 = trans_0 + masked_trans
+        trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], batch["diffuse_mask"])
+
+        rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
+        rotmats_0 = _rots_diffuse_mask(rotmats_0, batch["rotmats_1"], batch["diffuse_mask"])
+
+        return trans_0, rotmats_0
+    
     def sample(
             self,
             num_batch,
@@ -210,19 +229,8 @@ class Interpolant:
         ):
         
         # Set-up initial prior samples
-        if trans_0 is None:
-            trans_0 = _centered_gaussian(
-                    num_batch, num_res, self._device)
-
-            trans_0 *= du.NM_TO_ANG_SCALE
-
-            masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["diffuse_mask"].bool())
-            trans_0 = trans_0 + masked_trans
-            trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], batch["diffuse_mask"])
-
-        if rotmats_0 is None:
-            rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
-
+        trans_0, rotmats_0 = self.setup_prior(batch, num_batch, num_res)
+            
         motif_scaffolding = False
         diffuse_mask = batch['diffuse_mask']
         trans_1 = batch['trans_1']
@@ -231,15 +239,9 @@ class Interpolant:
         if diffuse_mask is not None and trans_1 is not None and rotmats_1 is not None:
             motif_scaffolding = True
             motif_mask = ~diffuse_mask.bool().squeeze(0)
-        else:
-            motif_mask = None
-        if motif_scaffolding and not self._cfg.twisting.use: # amortisation
-            diffuse_mask = diffuse_mask.expand(num_batch, -1) # shape = (B, num_residue)
-            batch['diffuse_mask'] = diffuse_mask
-            rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
-            trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
-            if torch.isnan(trans_0).any():
-                raise ValueError('NaN detected in trans_0')
+
+        if torch.isnan(trans_0).any():
+            raise ValueError('NaN detected in trans_0')
 
         logs_traj = defaultdict(list)
         if motif_scaffolding and self._cfg.twisting.use: # sampling / guidance
@@ -258,23 +260,6 @@ class Interpolant:
 
         if motif_mask is not None and len(motif_mask.shape) == 1:
             motif_mask = motif_mask[None].expand((num_batch, -1))
-
-        # get pairformer output 
-        batch['trans_t'] = trans_0
-        batch['rotmats_t'] = rotmats_0 
-        print("Start to get pairformer output")
-        start_time = time.time()
-        s_init, s_trunk, z_trunk, distogram_logit_pairformer = model(
-            batch, 
-            N_cycle,
-            mode='pairformer'
-        )
-        batch['s_init'] = s_init
-        batch['s_trunk'] = s_trunk
-        batch['z_trunk'] = z_trunk
-        batch['distogram_logit_pairformer'] = distogram_logit_pairformer
-        end_time = time.time()
-        print(f"Finished extracting pairformer output. Elapsed time  {end_time-start_time:.2f}초")
 
         # Set-up time
         if num_timesteps is None:
@@ -398,7 +383,8 @@ class Interpolant:
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_positions_14 = model_out['all_atom_preds']['positions']
         plddt_logit = model_out['plddt']
-
+        distogram_logit_pairformer = model_out['distogram_logit_pairformer']
+        
         if plddt_logit == None:
             plddt_logit = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
 

@@ -101,6 +101,8 @@ def main(args):
             
             for sample in os.listdir(pred_subdir):
                 
+                if not os.path.isdir(os.path.join(pred_subdir, sample)):
+                    continue
                 predicted_filepath = os.path.join(pred_subdir, sample, 'sample_1.pdb')
                 only_ab_filepath = os.path.join(pred_subdir, sample, 'only_ab.pdb')
                 output_file = os.path.join(pred_subdir, sample, 'cdr_rmsd.json')
