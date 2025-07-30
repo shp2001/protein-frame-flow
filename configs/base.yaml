@@ -99,7 +99,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 4
+  num_devices: 2
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -137,7 +137,7 @@ experiment:
     aux_loss_t_pass: 0.1
     viol_loss_t_pass: 0.2
   wandb:
-    name: CDRFlow_v1.2.2_ddp
+    name: CDRFlow_v1.2.2_ddp_ref_pos_debug
     project: se3-fm
   optimizer:
     warmup_steps: 0
@@ -151,7 +151,7 @@ experiment:
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
-    check_val_every_n_epoch: 1
+    check_val_every_n_epoch: 2
     accumulate_grad_batches: 1
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}

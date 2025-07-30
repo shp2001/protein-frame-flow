@@ -32,8 +32,7 @@ class Experiment:
             train_dataset=self._train_dataset,
             valid_dataset=self._valid_dataset
         )
-        self._train_device_ids = eu.get_available_device(self._exp_cfg.num_devices)
-        log.info(f"Training with devices: {self._train_device_ids}")
+
         self._module: LightningModule = FlowModule(self._cfg)
 
     def _setup_dataset(self):
@@ -51,7 +50,6 @@ class Experiment:
         if self._exp_cfg.debug:
             log.info("Debug mode.")
             logger = None
-            self._train_device_ids = [self._train_device_ids[0]]
             self._data_cfg.loader.num_workers = 0
         else:
             logger = WandbLogger(
@@ -76,8 +74,6 @@ class Experiment:
                 flat_cfg = dict(eu.flatten_dict(cfg_dict))
                 if isinstance(logger.experiment.config, wandb.sdk.wandb_config.Config):
                     logger.experiment.config.update(flat_cfg)
-
-        print("self._train_device_ids", self._train_device_ids)
         
         trainer = Trainer(
             **self._exp_cfg.trainer,
@@ -87,7 +83,7 @@ class Experiment:
             enable_progress_bar=True,
             enable_model_summary=True,
             strategy='ddp',
-            devices=self._train_device_ids,
+            devices=self._exp_cfg.num_devices,
             gradient_clip_val=1.0
         )
         trainer.fit(
