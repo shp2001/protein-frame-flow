@@ -22,6 +22,7 @@ class EdgeFeatureNet(nn.Module):
         # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
         total_edge_feats = 0
         if self._cfg.ref_pos_dim: 
+            self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
             total_edge_feats += self._cfg.ref_pos_dim
         if self._cfg.embed_chain:
             total_edge_feats += 1
@@ -33,8 +34,6 @@ class EdgeFeatureNet(nn.Module):
             total_edge_feats += 3 
         if self._cfg.embed_self_condition:
             total_edge_feats += self._cfg.num_bins + 3
-            
-        self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
 
         self.edge_embedder = nn.Sequential(
             nn.Linear(total_edge_feats, self.c_z),
