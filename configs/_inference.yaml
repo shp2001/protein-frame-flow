@@ -79,7 +79,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
+    csv_path: /home/psh/protein-frame-flow/tmp_metadata.csv
 
     # Number of scaffolds to sample per target.
     samples_per_target: 100

@@ -1057,7 +1057,7 @@ def b_carbon_distogram_loss(
     local_masked_loss = local_loss_per_pair * local_mask
     local_loss = torch.sum(local_masked_loss, dim=(-1,-2)) / (torch.sum(local_mask, dim=(-1,-2)) + eps)
 
-    return local_loss + loss
+    return local_loss + loss * 0.1
     
 
 def aa_contact_map_loss(

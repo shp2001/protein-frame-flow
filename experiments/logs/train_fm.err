@@ -1,133 +1,37 @@
-W0727 14:26:56.963000 140405566998336 torch/distributed/run.py:757] 
-W0727 14:26:56.963000 140405566998336 torch/distributed/run.py:757] *****************************************
-W0727 14:26:56.963000 140405566998336 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W0727 14:26:56.963000 140405566998336 torch/distributed/run.py:757] *****************************************
-Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/2
-wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.21.0 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250727_142713-lmqlw2k1
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run CDRFlow_v1.4.3
-wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/se3-fm
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/se3-fm/runs/lmqlw2k1
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/plugins/environments/slurm.py:168: PossibleUserWarning: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /home/psh/protein-frame-flow/experiments/train_s ...
-  rank_zero_warn(
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/2
-----------------------------------------------------------------------------------------------------
-distributed_backend=nccl
-All distributed processes registered. Starting with 2 processes
-----------------------------------------------------------------------------------------------------
-
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.4.3/2025-07-27_14-27-06 exists and is not empty.
-  rank_zero_warn(f"Checkpoint directory {dirpath} exists and is not empty.")
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1]
-LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
-
-  | Name  | Type      | Params
-------------------------------------
-0 | model | FlowModel | 52.7 M
-------------------------------------
-52.7 M    Trainable params
-0         Non-trainable params
-52.7 M    Total params
-210.653   Total estimated model params size (MB)
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:438: PossibleUserWarning: The dataloader, val_dataloader, does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` (try 80 which is the number of cpus on this machine) in the `DataLoader` init to improve performance.
-  rank_zero_warn(
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:212: UserWarning: You called `self.log('train/length', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 3. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:212: UserWarning: You called `self.log('train/batch_size', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 5. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 4. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 10. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
+W0730 21:02:52.647000 140631897745216 torch/distributed/run.py:757] 
+W0730 21:02:52.647000 140631897745216 torch/distributed/run.py:757] *****************************************
+W0730 21:02:52.647000 140631897745216 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0730 21:02:52.647000 140631897745216 torch/distributed/run.py:757] *****************************************
+[W socket.cpp:464] [c10d] The server socket has failed to bind to [::]:29500 (errno: 98 - Address already in use).
+[W socket.cpp:464] [c10d] The server socket has failed to bind to 0.0.0.0:29500 (errno: 98 - Address already in use).
+[E socket.cpp:500] [c10d] The server socket has failed to listen on any local network address.
+Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 347, in wrapper
+    return f(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/run.py", line 879, in main
+    run(args)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/run.py", line 870, in run
+    elastic_launch(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 132, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 254, in launch_agent
+    result = agent.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 123, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 733, in run
+    result = self._invoke_run(role)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 870, in _invoke_run
+    self._initialize_workers(self._worker_group)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 123, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 705, in _initialize_workers
+    self._rendezvous(worker_group)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 123, in wrapper
+    result = f(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 548, in _rendezvous
+    store, group_rank, group_world_size = spec.rdzv_handler.next_rendezvous()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/rendezvous/static_tcp_rendezvous.py", line 55, in next_rendezvous
+    self._store = TCPStore(  # type: ignore[call-arg]
+torch.distributed.DistNetworkError: The server socket has failed to listen on any local network address. The server socket has failed to bind to [::]:29500 (errno: 98 - Address already in use). The server socket has failed to bind to 0.0.0.0:29500 (errno: 98 - Address already in use).

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_guidance_5.0
+#SBATCH -J CDRFlow_inf
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A5000:1
 #SBATCH --mem=70g
