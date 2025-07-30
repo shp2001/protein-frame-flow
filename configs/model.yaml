@@ -24,7 +24,7 @@ model:
     feat_dim: ${model.edge_embed_size}
     num_bins: 32
     self_condition: True
-    embed_ref_pos: True
+    embed_ref_pos: False
     embed_chain: False
     embed_diffuse_mask: True
     embed_unit_vector: True
@@ -63,7 +63,22 @@ model:
 
     seq_tfmr_num_heads: 8
     seq_tfmr_num_layers: 4
-    
+
+  local_triangle_attention_new:
+    enable: True # true
+    c_s: ${model.node_embed_size}
+    c_z: ${model.edge_embed_size}
+    c_rbf: 64
+    c_gate_s: 16
+    c_hidden: 128
+    c_hidden_mul: 128
+    no_heads: 4
+    transition_n: 2
+    k_neighbour: 32
+    k_linear: 0 # residue index 상에서 앞뒤로 존재하는 얘들을 강제로 포함
+    inf: 1e9
+    pair_dropout: 0.25
+
   distogram_head: 
     c_z: ${model.edge_embed_size}
     num_bins: 32
