@@ -32,7 +32,7 @@ model:
     embed_self_condition: False
 
   pairformer: 
-    n_blocks: 3
+    n_blocks: 6
     n_heads: 16
     c_z: 128
     c_s: 384
