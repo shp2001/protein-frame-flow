@@ -153,3 +153,66 @@ def atom14_flat(pred_xyz, atom14_mask):
     ref_pos = pred_xyz[valid_mask]
     ref_pos = ref_pos.view(B, -1, 3)
     return ref_pos
+
+def get_ref_pos(aatype):
+    '''
+    Input:
+        aatype_batch: [N, 14, 3]
+    Output:
+        ref_pos: [[N_atom] * N_res]
+    '''
+
+    ref_pos = []
+
+    for i, restype_int in enumerate(aatype):
+        restype1 = residue_constants.restypes_with_x[restype_int]
+        restype3 = residue_constants.restype_1to3.get(restype1, "UNK")
+        
+        if restype3 == "UNK":
+            print("There is a UNK in restype")
+            continue
+
+        atom_names = residue_constants.restype_name_to_atom14_names[restype3] # atom list 
+        atom_coords = residue_constants.atom_positions_ideal[restype3] # [
+                                                                            #     ['N', 0, (-0.525, 1.363, 0.000)],
+                                                                            #     ['CA', 0, (0.000, 0.000, 0.000)],
+                                                                            #     ['C', 0, (1.526, -0.000, -0.000)],
+                                                                            #     ['CB', 0, (-0.529, -0.774, -1.205)],
+                                                                            #     ['O', 3, (0.627, 1.062, 0.000)],
+                                                                            # ]
+        residue_atom_pos = []
+        for j, atom_name in enumerate(atom_names):
+            if atom_name != '':
+                # ref_pos
+                coord = None
+                for atom in atom_coords:
+                    if atom[0] == atom_name:
+                        coord = atom[-1]  # 좌표 (x, y, z)
+                        break
+                    
+                if coord is None:
+                    raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
+
+                residue_atom_pos.append(coord)
+            
+            if atom_name == '':
+                residue_atom_pos.append((0.,0.,0.))    
+        ref_pos.append(residue_atom_pos)
+    
+    ref_pos = torch.stack(ref_pos, axis=0)
+    return ref_pos
+
+def compute_residue_side_chain_distance(coords: torch.Tensor):
+    """
+    coords: (N_res, 14, 3) - padded atom positions
+    return: (N_res, 14, 14) - distance maps with masked positions as nan
+    """
+    mask = (coords != 0).any(dim=-1)  # True = 존재하는 원자
+
+    diff = coords.unsqueeze(2) - coords.unsqueeze(1)  # (N_res, 14, 14, 3)
+    dist = torch.norm(diff, dim=-1)  # (N_res, 14, 14)
+
+    valid_mask = mask.unsqueeze(2) & mask.unsqueeze(1)
+    dist[~valid_mask] = -1.0
+
+    return dist
