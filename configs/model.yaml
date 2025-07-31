@@ -2,7 +2,7 @@ model:
   node_embed_size: 384
   edge_embed_size: 128
   num_cycles: 3
-  n_blocks: 4 # structure module 
+  n_blocks: 3 # structure module 
   symmetric: False
   scaling_nm_ang: False 
 
@@ -24,7 +24,7 @@ model:
     feat_dim: ${model.edge_embed_size}
     num_bins: 32
     self_condition: True
-    embed_ref_pos: False
+    embed_ref_pos: True
     embed_chain: False
     embed_diffuse_mask: True
     embed_unit_vector: True
@@ -32,7 +32,7 @@ model:
     embed_self_condition: False
 
   pairformer: 
-    n_blocks: 6
+    n_blocks: 3
     n_heads: 16
     c_z: 128
     c_s: 384

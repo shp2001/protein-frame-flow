@@ -99,10 +99,10 @@ class StructureModule(nn.Module):
 
         self.blocks = nn.ModuleList(
             [
-                StructureModuleBlock(model_conf, pair_update=True)
+                StructureModuleBlock(model_conf, update_pair=True)
                 for _ in range(model_conf.n_blocks - 1)
             ] + [
-                StructureModuleBlock(model_conf, pair_update=False)
+                StructureModuleBlock(model_conf, update_pair=False)
             ]
         )
 

@@ -90,7 +90,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
             continue
 
         atom_names = residue_constants.restype_name_to_atom14_names[restype3] # atom list 
-        atom_coords = residue_constants.atom_positions_ideal[restype3] # [
+        atom_coords = residue_constants.rigid_group_atom_positions[restype3] # [
                                                                             #     ['N', 0, (-0.525, 1.363, 0.000)],
                                                                             #     ['CA', 0, (0.000, 0.000, 0.000)],
                                                                             #     ['C', 0, (1.526, -0.000, -0.000)],
@@ -99,7 +99,6 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
                                                                             # ]
 
         res_idx = res_indices[i]
-    
         for j, atom_name in enumerate(atom_names):
             if atom_name != '':
                 ref_space_uid.append(res_idx)
@@ -119,24 +118,18 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
                 atom_to_token_idx.append(i)
 
                 # ref_pos
-                res_coords = []
                 coord = None
                 for atom in atom_coords:
                     if atom[0] == atom_name:
                         coord = atom[-1]  # 좌표 (x, y, z)
                         break
-
+                    
                 if coord is None:
                     raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
-                
-                res_coords.append(coord)
-                
-        res_coords = np.array(res_coords)
-        transformed_res_coords = random_transform(res_coords)
-        ref_pos.extend(transformed_res_coords)
+
+                ref_pos.append(coord)
     
     ref_atom_name_chars = atom_name_chars_encoded(atom_list)
-
     ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1)
     ref_element = torch.tensor(ref_element).unsqueeze(0).repeat(B,1,1)
     ref_charge = torch.tensor(ref_charge).unsqueeze(0).repeat(B,1) 

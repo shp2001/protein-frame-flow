@@ -99,8 +99,8 @@ experiment:
   do_training: True 
   train_confidence: ${model.confidence_head.use_confidence}
   debug: False
-  seed: 703
-  num_devices: 2
+  seed: 123
+  num_devices: 4
   warm_start: null
   warm_start_cfg_override: False
   training:

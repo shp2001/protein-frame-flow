@@ -21,7 +21,7 @@ class EdgeFeatureNet(nn.Module):
 
         # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
         total_edge_feats = 0
-        if self._cfg.ref_pos_dim: 
+        if self._cfg.embed_ref_pos: 
             self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
             total_edge_feats += self._cfg.ref_pos_dim
         if self._cfg.embed_chain:
