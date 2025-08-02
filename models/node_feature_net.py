@@ -23,15 +23,15 @@ class NodeFeatureNet(nn.Module):
         single = torch.nn.functional.one_hot(aatype, 21).float()
 
         # side chain conformation embedding 
-        B = aatype.shape[0]
+        B, N = aatype.shape
         aatype_one = aatype[0]
         ref_pos = get_ref_pos(aatype_one)
         sc_dist = compute_residue_side_chain_distance(ref_pos)
         sc_dists = sc_dist.unsqueeze(0).expand(B, -1, -1, -1).clone()
-        single_dist = self.linear_sc_dist(sc_dists.reshape(B, -1))
+        sc_dists = sc_dists.reshape(B, N, -1).to(aatype.device)
+        single_dist = self.linear_sc_dist(sc_dists)
         single_dist = self.ln_sc_dist(single_dist)
 
-        # [b, n_res, c_timestep_emb]
         input_feats = [
             single,
             single_dist,

@@ -193,11 +193,11 @@ def get_ref_pos(aatype):
                 if coord is None:
                     raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
 
-                residue_atom_pos.append(coord)
+                residue_atom_pos.append(torch.tensor(coord))
             
             if atom_name == '':
-                residue_atom_pos.append((0.,0.,0.))    
-        ref_pos.append(residue_atom_pos)
+                residue_atom_pos.append(torch.tensor([0.0, 0.0, 0.0]))
+        ref_pos.append(torch.stack(residue_atom_pos, axis=0))
     
     ref_pos = torch.stack(ref_pos, axis=0)
     return ref_pos

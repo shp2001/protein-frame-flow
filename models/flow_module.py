@@ -91,14 +91,14 @@ class FlowModule(LightningModule):
     def on_train_start(self):
         self._epoch_start_time = time.time()
 
-    def on_train_batch_start(self, batch, batch_idx):
-        # 모든 학습 가능한 파라미터 초기화
-        for p in self.parameters():
-            if p.requires_grad:
-                p.grad = None
+    # def on_train_batch_start(self, batch, batch_idx):
+    #     # 모든 학습 가능한 파라미터 초기화
+    #     for p in self.parameters():
+    #         if p.requires_grad:
+    #             p.grad = None
         
-        # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
-        self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
+    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
     # def on_train_batch_end(self, outputs, batch, batch_idx):
     #     # Backward 이후 gradient가 계산된 파라미터 추적
@@ -340,11 +340,10 @@ class FlowModule(LightningModule):
             # print(f"prmsd_max: {torch.max(final_prmsd[0])}")
 
         # calculate auxiliary loss 
-        se3_vf_loss = trans_loss + rots_vf_loss
+        se3_vf_loss = trans_loss + rots_vf_loss + pair_head_loss * training_cfg.aux_loss_use_pair_head_loss * training_cfg.aux_loss_pair_head_weight
         auxiliary_loss = (
             bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
-            + pair_head_loss * training_cfg.aux_loss_use_pair_head_loss * training_cfg.aux_loss_pair_head_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
         )
 
@@ -672,13 +671,14 @@ class FlowModule(LightningModule):
         def steplr_with_warmup(step):
             if step < warmup_steps:
                 return step / warmup_steps
-            else:
+            elif step <= total_steps:
                 theta = (step - warmup_steps) / (total_steps - warmup_steps) * math.pi
                 cosine_decay = 0.5 * (1 + math.cos(theta))
                 return (min_lr / max_lr) + cosine_decay * (1 - (min_lr / max_lr))
+            else:
+                return min_lr / max_lr  # max_lr 기준의 비율
 
         return torch.optim.lr_scheduler.LambdaLR(optimizer, steplr_with_warmup)
-    
 
     def configure_optimizers(self):
 
@@ -686,15 +686,20 @@ class FlowModule(LightningModule):
         optimizer = torch.optim.AdamW(
             parameters, self.learning_rate, weight_decay=0.01
         )
-        # scheduler = self.get_cosine_scheduler_w_warmup(
-        #     optimizer,
-        #     self._exp_cfg.optimizer.warmup_steps,
-        #     self._exp_cfg.optimizer.decay_steps,
-        #     self._exp_cfg.optimizer.min_lr,
-        #     self._exp_cfg.optimizer.max_lr,
-        # )
-        # return {"optimizer": optimizer, "lr_scheduler": scheduler}
-        return {"optimizer": optimizer}
+        scheduler = self.get_cosine_scheduler_w_warmup(
+            optimizer,
+            self._exp_cfg.optimizer.warmup_steps,
+            self._exp_cfg.optimizer.decay_steps,
+            self._exp_cfg.optimizer.min_lr,
+            self._exp_cfg.optimizer.max_lr,
+        )
+        return {"optimizer": optimizer, 
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": "step",
+                    "frequency": 1,
+                    }
+        }
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure, *args, **kwargs):
         if self.nan_in_grad:
@@ -706,7 +711,14 @@ class FlowModule(LightningModule):
         else:
             optimizer_closure()  # ← 직접 실행
             optimizer.step() 
-        
+
+    def on_train_batch_start(self, batch, batch_idx):
+        # 첫 번째 optimizer 기준
+        optimizer = self.trainer.optimizers[0]
+        lr = optimizer.param_groups[0]['lr']
+        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
+        self._log_scalar("lr", lr, prog_bar=True)
+
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused
         device = f'cuda:{torch.cuda.current_device()}'

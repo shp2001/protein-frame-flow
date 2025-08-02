@@ -124,23 +124,23 @@ experiment:
     aux_loss_use_bond_angle_loss: False
     aux_loss_use_local_dist_mat_loss: True 
     # total 0.5
-    aux_loss_bb_atom_loss_weight: 2.0 # 1.0 ~ 2.0 -> 0.05 / 0.1 
+    aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.05 / 0.1 
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.15 / 0.35
     aux_loss_pair_head_weight: 0.1 # 6.0 -> 1.0 / 1.0
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.06 / 0.2  
-    aux_loss_all_atom_clash_loss_weight: 2.0 # 0.2 ~ 0.3 -> 0.002 / 0.001
-    aux_loss_within_clash_loss_weight: 1.0 # 1.5 ~ 3.0 -> 0.003 / 0.003
+    aux_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.002 / 0.001
+    aux_loss_within_clash_loss_weight: 0.5 # 1.5 ~ 3.0 -> 0.003 / 0.003
     aux_loss_plddt_loss_weight: 0.1 # 4.0 ~ 6.0
     
     aux_loss_t_pass: 0.2
     viol_loss_t_pass: 0.4
     
   wandb:
-    name: CDRFlow_v1.4.4
+    name: CDRFlow_v1.4.5
     project: CDRFlow_v1.4
   optimizer:
     warmup_steps: 0
-    decay_steps: 4e5
+    decay_steps: 64_530
     min_lr: 1e-5
     max_lr: 1e-4
   trainer:
