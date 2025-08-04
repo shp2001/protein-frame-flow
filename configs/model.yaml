@@ -23,7 +23,7 @@ model:
     feat_dim: 64
     num_bins: 32
     self_condition: True
-    embed_ref_pos: False
+    embed_ref_pos: True
     embed_chain: False
     embed_diffuse_mask: True
     embed_unit_vector: True
