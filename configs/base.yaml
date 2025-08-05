@@ -29,7 +29,7 @@ data:
     
 interpolant:
   min_t: 1e-2
-
+  sample_t_mode: beta_mixed # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
   twisting:
     use: False
 
@@ -53,6 +53,7 @@ interpolant:
 
   inference_time_scaling:
     use: False
+
   sampling:
     num_timesteps: 20
     do_sde: False
@@ -137,13 +138,13 @@ experiment:
     aux_loss_t_pass: 0.1
     viol_loss_t_pass: 0.2
   wandb:
-    name: CDRFlow_v1.2.2_ddp_ref_pos_debug
+    name: CDRFlow_v1.2.2_beta_mixed
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-5
-    max_lr: 1e-3
+    min_lr: 1e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

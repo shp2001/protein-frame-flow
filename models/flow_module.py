@@ -91,13 +91,23 @@ class FlowModule(LightningModule):
         self._epoch_start_time = time.time()
 
     def on_train_batch_start(self, batch, batch_idx):
-        # 모든 학습 가능한 파라미터 초기화
-        for p in self.parameters():
-            if p.requires_grad:
-                p.grad = None
+        optimizer = self.trainer.optimizers[0]
+        current_lr = optimizer.param_groups[0]['lr']
+        self.log(
+            'lr',
+            current_lr,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False
+        )
+    # def on_train_batch_start(self, batch, batch_idx):
+    #     # 모든 학습 가능한 파라미터 초기화
+    #     for p in self.parameters():
+    #         if p.requires_grad:
+    #             p.grad = None
         
-        # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
-        self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
+    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
+    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
     # def on_train_batch_end(self, outputs, batch, batch_idx):
     #     # Backward 이후 gradient가 계산된 파라미터 추적

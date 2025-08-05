@@ -7,7 +7,7 @@ from data import all_atom
 import copy
 from torch import autograd
 from motif_scaffolding import twisting
-from models.loss import compute_all_atom_clash_loss, compute_within_clash_loss, clash_potential
+from models.loss import clash_potential
 
 from openfold.utils import rigid_utils
 
@@ -52,9 +52,40 @@ class Interpolant:
     def set_device(self, device):
         self._device = device
 
-    def sample_t(self, num_batch):
-        t = torch.rand(num_batch, device=self._device)
-        return t * (1 - 2*self._cfg.min_t) + self._cfg.min_t
+    def sample_t(self, num_batch, mode):
+        if mode not in ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]:
+            raise ValueError(f'mode ({mode}) should be one of uniform, beta_mixed, beta_revese_mixed or logit_normal')
+        
+        if mode == 'uniform':
+            t = torch.rand(num_batch, device=self._device)
+            return t * (1 - 2*self._cfg.min_t) + self._cfg.min_t
+        
+        if mode == 'beta_mixed':
+            probs = torch.rand(num_batch, device=self._device)
+            unif_mask = probs < 0.02
+            beta_mask = ~unif_mask
+
+            samples = torch.empty(num_batch, device=self._device)
+            samples[unif_mask] = torch.rand(unif_mask.sum(), device=self._device) * (1 - 2 * self._cfg.min_t) + self._cfg.min_t
+            beta_samples = torch.distributions.Beta(1.9, 1.0).sample((beta_mask.sum(),)).to(self._device)
+            samples[beta_mask] = torch.clamp(beta_samples, min=self._cfg.min_t, max=1 - self._cfg.min_t)
+            return samples 
+
+        if mode == 'beta_revese_mixed':
+            probs = torch.rand(num_batch, device=self._device)
+            unif_mask = probs < 0.02
+            beta_mask = ~unif_mask
+
+            samples = torch.empty(num_batch, device=self._device)
+            samples[unif_mask] = torch.rand(unif_mask.sum(), device=self._device) * (1 - 2 * self._cfg.min_t) + self._cfg.min_t
+            beta_samples = torch.distributions.Beta(1.0, 1.9).sample((beta_mask.sum(),)).to(self._device)
+            samples[beta_mask] = torch.clamp(beta_samples, min=self._cfg.min_t, max=1 - self._cfg.min_t)
+            return samples 
+
+        if mode == 'logit_normal':
+            z = torch.randn(num_batch, device=self._device)
+            z = torch.sigmoid(z)
+            return torch.clamp(z, min=self._cfg.min_t)
 
     def manage_missing_batch(self, xyz, mask):
         """for missing residues, get the closest residue coordinate (batch version)
@@ -137,7 +168,7 @@ class Interpolant:
         num_batch, _ = diffuse_mask.shape
 
         # [B, 1]
-        t = self.sample_t(num_batch)[:, None]
+        t = self.sample_t(num_batch, self._cfg.sample_t_mode)[:, None]
         so3_t = t
         r3_t = t
         noisy_batch['so3_t'] = so3_t
