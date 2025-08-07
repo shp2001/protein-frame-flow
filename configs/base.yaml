@@ -101,7 +101,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.2_beta_mixed/2025-08-05_16-20-35/last.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
