@@ -65,15 +65,14 @@ class Experiment:
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
 
             # Save config only for main process.
-            local_rank = os.environ.get('LOCAL_RANK', 0)
-            if local_rank == 0:
-                cfg_path = os.path.join(ckpt_dir, 'config.yaml')
-                with open(cfg_path, 'w') as f:
-                    OmegaConf.save(config=self._cfg, f=f.name)
-                cfg_dict = OmegaConf.to_container(self._cfg, resolve=True)
-                flat_cfg = dict(eu.flatten_dict(cfg_dict))
-                if isinstance(logger.experiment.config, wandb.sdk.wandb_config.Config):
-                    logger.experiment.config.update(flat_cfg)
+
+            cfg_path = os.path.join(ckpt_dir, 'config.yaml')
+            with open(cfg_path, 'w') as f:
+                OmegaConf.save(config=self._cfg, f=f.name)
+            cfg_dict = OmegaConf.to_container(self._cfg, resolve=True)
+            flat_cfg = dict(eu.flatten_dict(cfg_dict))
+            if isinstance(logger.experiment.config, wandb.sdk.wandb_config.Config):
+                logger.experiment.config.update(flat_cfg)
         
         trainer = Trainer(
             **self._exp_cfg.trainer,
@@ -84,8 +83,9 @@ class Experiment:
             enable_model_summary=True,
             strategy='ddp',
             devices=self._exp_cfg.num_devices,
-            gradient_clip_val=0.1
+            gradient_clip_val=0.2
         )
+
         trainer.fit(
             model=self._module,
             datamodule=self._datamodule,

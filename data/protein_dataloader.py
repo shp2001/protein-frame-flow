@@ -12,6 +12,7 @@ from data import featurizer
 
 from itertools import accumulate
 import bisect
+import math 
 
 class ProteinData(LightningDataModule):
 
@@ -75,7 +76,7 @@ class ProteinData(LightningDataModule):
             
         cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
         
-        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
+        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
         cropped_batch['ref_feature_dict'] = {
             'ref_space_uid': ref_space_uid,
@@ -83,7 +84,8 @@ class ProteinData(LightningDataModule):
             'ref_pos': ref_pos,
             'ref_element': ref_element,
             'ref_charge': ref_charge,
-            'ref_atom_name_chars': ref_atom_name_chars
+            'ref_atom_name_chars': ref_atom_name_chars,
+            'ref_rigid_frame': ref_rigid_frame
         }
         return cropped_batch
 
@@ -146,8 +148,6 @@ class LengthBatcher:
             self.rank = dist.get_rank()
         else:
             self.rank = rank
-        print("self.rank", self.rank)
-        print("num_replicas", self.num_replicas)
         
         self._sampler_cfg = sampler_cfg
         self._data_csv = metadata_csv
@@ -160,12 +160,23 @@ class LengthBatcher:
     def _sample_indices(self):
         if 'cluster' in self._data_csv.columns:
             random_seed = self.seed + self.epoch
-            cluster_sample = self._data_csv[self._data_csv['mode'].isin(['ab', 'nanobody', 'monomer', 'polymer'])].groupby('cluster').sample(
+            cluster_sample = self._data_csv[self._data_csv['mode'].isin(['ab', 'nanobody', 'polymer'])].groupby('cluster').sample(
                 1, random_state=random_seed
             )
-            general_df = self._data_csv[self._data_csv['mode'] == 'general']
-            
-            # stage 2 
+            # stage 1 
+            monomer_df = self._data_csv[self._data_csv['mode'] == 'monomer'] 
+            monomer_sample = monomer_df.groupby('cluster').sample(
+                1, random_state=random_seed
+            )
+            if len(monomer_df) > cluster_sample.shape[0]:
+                monomer_sample = monomer_sample.sample(
+                    len(cluster_sample), random_state=random_seed, replace=False
+                )
+                print(f"sampled_monomer", len(monomer_sample['cluster']))
+                cluster_sample = pd.concat([cluster_sample, monomer_sample])
+                 
+            # stage 2
+            general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
             if len(general_df) > cluster_sample.shape[0]: 
                 general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
                     cluster_sample.shape[0], random_state=random_seed, replace=False

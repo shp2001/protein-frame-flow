@@ -23,7 +23,7 @@ from data import residue_constants
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
-
+from openfold.utils.loss import between_residue_bond_loss
 import sys 
 sys.stdout.flush()
 
@@ -187,11 +187,12 @@ class FlowModule(LightningModule):
         pred_trans_1 = model_output['pred_trans'].clone()
         pred_rotmats_1 = model_output['pred_rotmats'].clone()
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
-        # pred_angles_list = model_output['all_atom_preds']['angles'].clone()
-        # pred_unnormalized_angles_list = model_output['all_atom_preds']['unnormalized_angles'].clone()
+        pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.num_blocks-2] # (O, B, L, L) <- contact prob
+        pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
 
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
+        pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
 
         if torch.isnan(pred_atom_14_list).any():
             raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_atom_14_list).any()} \n")
@@ -271,19 +272,28 @@ class FlowModule(LightningModule):
                                     compute_cdr=True,
                                     compute_h3=False
                                     )    
-        # torsion angle loss 
-        # chi_loss = torch.zeros(gt_atom14_pos.shape[0], device=gt_atom14_pos.device)
-        # if training_cfg.aux_loss_use_chi_loss:
-        #     chi_loss = supervised_chi_loss(pred_angles_list,
-        #                                 pred_unnormalized_angles_list,
-        #                                 noisy_batch['aatype'],
-        #                                 noisy_batch['res_mask'],
-        #                                 noisy_batch['chi_mask'],
-        #                                 gt_chi_angle,
-        #                                 chi_weight=0.5,
-        #                                 angle_norm_weight=0.02,
-        #                                 cdr_mask=interface_mask
-        #                                 )
+            
+        # calculate pair feature loss (beta carbon contact prob)
+        distogram_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        if training_cfg.aux_loss_use_local_pair_feat_loss:
+            distogram_loss = b_carbon_distogram_loss(
+                pred_cb_distogram=pred_cb_distogram, # non-scaled 
+                gt_pseudo_beta=noisy_batch['pseudo_beta'],
+                res_mask=noisy_batch['res_mask'],
+                neighbor_indices=neighbor_indices,
+                cdr_residues=cdr_residues
+            )
+            # distogram_loss = distogram_loss * scale_factor.squeeze()
+        # calculate pair feature loss (all atom contact prob)
+        contact_map_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        if training_cfg.aux_loss_use_local_pair_feat_loss:
+            contact_map_loss = aa_contact_map_loss(
+                pred_aa_contact_map=pred_aa_contact_map,
+                renamed_atom14_gt_positions=renamed_dict['renamed_atom14_gt_positions'],
+                renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
+                neighbor_indices=neighbor_indices,
+                cdr_residues=cdr_residues
+            )
             
         # final layer backbone rmsd loss
         final_bb_rmsd = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
@@ -303,7 +313,7 @@ class FlowModule(LightningModule):
         # all atom clash loss 
         batch_size = gt_atom14_pos.shape[0]
         all_atom_clash_loss = torch.zeros(batch_size, device=device)
-        if training_cfg.aux_loss_use_all_atom_clash_loss:
+        if training_cfg.viol_loss_use_all_atom_clash_loss:
             try:
                 all_atom_clash_loss = compute_all_atom_clash_loss(
                     model_output['all_atom_preds']['positions'][-1],
@@ -317,16 +327,32 @@ class FlowModule(LightningModule):
                 all_atom_clash_loss = torch.zeros(batch_size).to(device)
 
         within_clash_loss = torch.zeros(batch_size, device=device)
-        if training_cfg.aux_loss_use_within_clash_loss:
+        if training_cfg.viol_loss_use_within_clash_loss:
             try:
                 within_clash_loss = compute_within_clash_loss(
-                                                            model_output['all_atom_preds']['positions'][-1],
-                                                            noisy_batch['atom14_gt_exists'],
-                                                            interface_mask,
-                                                            noisy_batch['aatype'])   
+                    model_output['all_atom_preds']['positions'][-1],
+                    noisy_batch['atom14_gt_exists'],
+                    interface_mask,
+                    noisy_batch['aatype']
+                    )   
             except Exception as e:
                 print(f"[Warning] within clash loss skipped due to error: {e}")
                 within_clash_loss = torch.zeros(batch_size).to(device)
+
+        # bond loss 
+        bond_length_loss = torch.zeros(batch_size, device=device)
+        ca_c_n_loss = torch.zeros(batch_size, device=device)
+        c_n_ca_loss = torch.zeros(batch_size, device=device)
+        if training_cfg.viol_loss_use_bond_loss:
+            bond_loss_info = between_residue_bond_loss(
+                pred_atom_positions=model_output['all_atom_preds']['positions'][-1],
+                pred_atom_mask=noisy_batch['atom14_gt_exists'],
+                residue_index=noisy_batch['res_idx'],
+                aatype=noisy_batch['aatype']
+            )
+            bond_length_loss = bond_loss_info['c_n_loss_mean']
+            ca_c_n_loss = bond_loss_info['ca_c_n_loss_mean']
+            c_n_ca_loss = bond_loss_info['c_n_ca_loss_mean']
 
 
         # calculate prmsd (perform mini rollout with 10 timesteps)
@@ -371,13 +397,20 @@ class FlowModule(LightningModule):
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
+            + distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
+            + contact_map_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_contact_map_weight
+
         )
 
         # calculate violation loss
         violation_loss = (
-            all_atom_clash_loss * training_cfg.aux_loss_use_all_atom_clash_loss * training_cfg.aux_loss_all_atom_clash_loss_weight
-            + within_clash_loss * training_cfg.aux_loss_use_within_clash_loss * training_cfg.aux_loss_within_clash_loss_weight
+            all_atom_clash_loss * training_cfg.viol_loss_use_all_atom_clash_loss * training_cfg.viol_loss_all_atom_clash_loss_weight
+            + within_clash_loss * training_cfg.viol_loss_use_within_clash_loss * training_cfg.viol_loss_within_clash_loss_weight
+            + bond_length_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_bond_length_weight
+            + ca_c_n_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_ca_c_n_weight 
+            + c_n_ca_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_c_n_ca_weight
         )
+
         auxiliary_loss *= (
             (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
@@ -415,7 +448,10 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'prmsd_loss': prmsd_loss
+            'prmsd_loss': prmsd_loss,
+            'distogram_loss': distogram_loss,
+            'contact_map_loss': contact_map_loss,
+            'bond_length_loss': bond_length_loss,
         }
 
     def validation_step(self, batch: Any, batch_idx: int):

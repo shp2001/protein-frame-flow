@@ -1,31 +1,9 @@
 import torch
 import numpy as np 
 
-from data import residue_constants
-from scipy.spatial.transform import Rotation
-
-def random_transform(
-    points, max_translation=1.0, apply_augmentation=True, centralize=True
-) -> np.ndarray:
-    """
-    Randomly transform a set of 3D points.
-
-    Args:
-        points (numpy.ndarray): The points to be transformed, shape=(N, 3)
-        max_translation (float): The maximum translation value. Default is 1.0.
-        apply_augmentation (bool): Whether to apply random rotation/translation on ref_pos
-
-    Returns:
-        numpy.ndarray: The transformed points.
-    """
-    if centralize:
-        points = points - points.mean(axis=0)
-    if not apply_augmentation:
-        return points
-    translation = np.random.uniform(-max_translation, max_translation, size=3)
-    R = Rotation.random().as_matrix()
-    transformed_points = np.dot(points + translation, R.T)
-    return transformed_points
+from data import residue_constants, all_atom
+import data.utils as du
+from openfold.utils.rigid_utils import local_to_global
 
 @staticmethod
 def atom_name_chars_encoded(atom_names: list[str]) -> torch.Tensor:
@@ -64,10 +42,11 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     res_indices: (B, N)
 
     return 
-    ref_space_uid: list[tuple] (N, 2)    (chain_id, residue_index)
-    ref_element: list (N, 5)
-    ref_charge: list (N)
-    ref_atom_name_chars: list (N, 4, 64)
+    ref_space_uid: tensor[tuple] (N, 2)    (chain_id, residue_index)
+    ref_element: tensor (N, 5)
+    ref_charge: tensor (N)
+    ref_atom_name_chars: tensor (N, 4, 64)
+    ref_pos: tensor (B, N, 3) 
     """
     B = aatype_batch.shape[0]
 
@@ -77,6 +56,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     ref_charge = []
     atom_to_token_idx = [] # residue number를 고려하지 않고 res idx 상에서 몇 번째인지 
     ref_pos = []
+    ref_rigid_frame = []
 
     aatype = aatype_batch[0]
     res_indices = res_indices_batch[0]
@@ -118,20 +98,21 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
                 # atom_to_token_idx
                 atom_to_token_idx.append(i)
 
-                # ref_pos
+                # ref_pos & ref_rigid_frame
                 coord = None
                 for atom in atom_coords:
                     if atom[0] == atom_name:
                         coord = atom[-1]  # 좌표 (x, y, z)
+                        rigid_frame = torch.nn.functional.one_hot(torch.tensor(atom[1], device=aatype_batch.device), num_classes=8)
                         break
 
                 if coord is None:
                     raise ValueError(f"atom_name '{atom_name}' not found in atom_coords.")
 
                 ref_pos.append(coord)
-    
-    ref_atom_name_chars = atom_name_chars_encoded(atom_list)
+                ref_rigid_frame.append(rigid_frame)
 
+    ref_atom_name_chars = atom_name_chars_encoded(atom_list)
     ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1)
     ref_element = torch.tensor(ref_element).unsqueeze(0).repeat(B,1,1)
     ref_charge = torch.tensor(ref_charge).unsqueeze(0).repeat(B,1) 
@@ -139,8 +120,10 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     atom_to_token_idx = torch.tensor(atom_to_token_idx)
 
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
+    ref_rigid_frame = torch.stack(ref_rigid_frame, axis=0).unsqueeze(0).repeat(B, 1, 1)
+    
+    return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame
 
-    return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos
 
 def atom14_flat(pred_xyz, atom14_mask):
     """
