@@ -1,4 +1,5 @@
 import torch 
+import torch.nn as nn 
 from typing import Optional, Dict
 
 from data import residue_constants as rc
@@ -11,8 +12,6 @@ from data.motif_index import find_anchor
 import analysis.utils as au
 
 from itertools import combinations_with_replacement
-
-import torch
 
 import os 
 import matplotlib.pyplot as plt 
@@ -240,7 +239,7 @@ def supervised_chi_loss(
     """
 
     pred_angles = angles_sin_cos[..., 3:, :] # (O, B, L, 4, 2)
-    residue_type_one_hot = torch.nn.functional.one_hot(
+    residue_type_one_hot = nn.functional.one_hot(
         aatype,
         rc.restype_num + 1,
     )
@@ -320,7 +319,7 @@ def compute_rmsd(
     if data_mode in ['general', 'monomer', 'polymer'] and mode != 'bb':
         compute_cdr = False
     
-    mse = torch.nn.functional.mse_loss(
+    mse = nn.functional.mse_loss(
         pred,
         aligned_target[None, ...],
         reduction='none',
@@ -673,7 +672,7 @@ def sidechain_fape_loss(
 
 def softmax_cross_entropy(logits, labels):
     loss = -1 * torch.sum(
-        labels * torch.nn.functional.log_softmax(logits, dim=-1),
+        labels * nn.functional.log_softmax(logits, dim=-1),
         dim=-1,
     )
     return loss
@@ -689,7 +688,7 @@ def compute_prmsd(prmsd: torch.Tensor,
     Returns:
         torch.Tensor: (B, n) plddt scores
     """
-    pdf = torch.nn.functional.softmax(prmsd, dim=-1)
+    pdf = nn.functional.softmax(prmsd, dim=-1)
     vbins = torch.linspace(0, 15, steps=50).to(prmsd.device).float()
     output = pdf @ vbins  # (B, n)
     if cdr_mask is not None:
@@ -719,7 +718,7 @@ def compute_prmsd_loss(
     # bin 경계: [0.0, 0.2, 0.4, ..., 10.0]
     bin_width = cutoff / (no_bins-1)
     bin_index = torch.floor(torch.minimum(dev, torch.tensor(cutoff)) / bin_width).long()
-    dev_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
+    dev_one_hot = nn.functional.one_hot(bin_index, num_classes=no_bins)
     errors = softmax_cross_entropy(logits, dev_one_hot) # (B, L)
 
 
@@ -736,7 +735,7 @@ def compute_plddt(logits: torch.Tensor, # (b, L, 50)
     bounds = torch.arange(
         start=0.5 * bin_width, end=1.0, step=bin_width, device=logits.device
     )
-    probs = torch.nn.functional.softmax(logits, dim=-1) # (b, L)
+    probs = nn.functional.softmax(logits, dim=-1) # (b, L)
     pred_lddt_ca = torch.sum(
         probs * bounds.view(*((1,) * len(probs.shape[:-1])), *bounds.shape),
         dim=-1,
@@ -821,7 +820,7 @@ def lddt_loss(
 
     bin_index = torch.floor(score * no_bins).long()
     bin_index = torch.clamp(bin_index, max=(no_bins - 1))
-    lddt_ca_one_hot = torch.nn.functional.one_hot(bin_index, num_classes=no_bins)
+    lddt_ca_one_hot = nn.functional.one_hot(bin_index, num_classes=no_bins)
     # if len(torch.nonzero(cdr_mask[0])) > 20:
     #     print(f'lddt_ca_one_hot: {torch.nonzero(lddt_ca_one_hot[0])}')
     errors = softmax_cross_entropy(logits, lddt_ca_one_hot) # (..., L)
@@ -837,6 +836,48 @@ def lddt_loss(
 
     loss = cdr_loss + total_loss
     return loss
+
+def pde_loss(pde: torch.Tensor, gt_coord: torch.Tensor, pred_coord: torch.Tensor):
+    """
+    Args:
+        pde: predicted distogram error, softmax 확률 분포, shape (B, L, L, 64)
+        gt_coord: ground truth coordinates, shape (B, L, 3)
+        pred_coord: predicted coordinates, shape (B, L, 3)
+        
+    Returns:
+        loss: tensor of shape (B,), 배치별 loss
+    """
+    B, L, _, num_bins = pde.shape
+    device = pde.device
+
+    # 1) residue pair별 L2 distance error 계산
+    diff = pred_coord.unsqueeze(2) - gt_coord.unsqueeze(1)  # (B, L, L, 3)
+    dist_error = torch.norm(diff, dim=-1)  # (B, L, L)
+
+    # 2) bin 경계 생성
+    bin_edges = torch.linspace(0, 32, num_bins + 1, device=device)  # 65 edges for 64 bins
+
+    # 3) bin index 계산
+    bin_indices = torch.bucketize(dist_error, bin_edges) - 1  # 0-based bin index, shape (B, L, L)
+    bin_indices = bin_indices.clamp(min=0, max=num_bins - 1)
+
+    # 4) one-hot encoding
+    gt_distogram = nn.functional.one_hot(bin_indices, num_classes=num_bins).float()  # (B, L, L, 64)
+
+    # 5) log pde 계산
+    log_pde = torch.log(pde + 1e-8)  # (B, L, L, 64)
+
+    # 6) per-element loss
+    loss_per_element = -(gt_distogram * log_pde).sum(dim=-1)  # (B, L, L)
+
+    # 7) mask로 대각 성분 제외
+    mask = 1 - torch.eye(L, device=device).unsqueeze(0)  # (1, L, L)
+    loss_per_element = loss_per_element * mask
+
+    # 8) 배치별 평균 loss 계산
+    loss_per_batch = loss_per_element.sum(dim=(1, 2)) / mask.sum()
+
+    return loss_per_batch  # (B,)
 
 def compute_all_atom_clash_loss(
         atom14_pred_positions,
@@ -1116,7 +1157,7 @@ def aa_contact_map_loss(
     edge_mask = mask_i * mask_j  # (B, L, L, 105)
 
     # calculate BCE
-    loss_per_pair = torch.nn.functional.binary_cross_entropy(
+    loss_per_pair = nn.functional.binary_cross_entropy(
         pred_aa_contact_map,
         gt_contact_map,
         reduction="none"

@@ -90,8 +90,6 @@ model:
     use_confidence: True
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
-    first_break: 2
-    last_break: 22
     num_bins: 64
 
   initialization:

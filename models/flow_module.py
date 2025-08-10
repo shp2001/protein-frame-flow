@@ -357,6 +357,8 @@ class FlowModule(LightningModule):
 
         # calculate prmsd (perform mini rollout with 10 timesteps)
         prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        pae_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+
         if training_cfg.aux_loss_use_prmsd_loss:
             self.mini_rollout.set_device(loss_mask.device)
 
@@ -380,13 +382,15 @@ class FlowModule(LightningModule):
                 rollout=True
             )
 
-            mini_prmsd = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
-            prmsd_loss = lddt_loss(logits=mini_prmsd,
-                                    all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
-                                    all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-                                    all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
-                                    cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
+            plddt_logit, pde = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
+            prmsd_loss = lddt_loss(
+                logits=plddt_logit,
+                all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
+                all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
+                all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
+                cdr_mask=noisy_batch['diffuse_mask']) # (b, l)
 
+            pde_loss 
             # final_prmsd = compute_prmsd(pred_rmsd, cdr_mask=noisy_batch['diffuse_mask'])
             # print(f"prmsd_max: {torch.max(final_prmsd[0])}")
 

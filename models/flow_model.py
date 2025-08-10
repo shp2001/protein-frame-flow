@@ -229,38 +229,70 @@ class ConfidenceModel(nn.Module):
     def __init__(self, model_conf):
         super(ConfidenceModel, self).__init__()
         self._model_conf = model_conf
-        self._confidence_conf = model_conf.confidence_head
+        self._aa_enc_conf = model_conf.aa_enc
+        self._ipa_conf = model_conf.ipa
         self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
+        self._all_atom_conf = model_conf.all_atom
+        self._distogram_conf = model_conf.distogram_head
+        self._confidence_head = model_conf.confidence_head
+        self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
+        self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
 
-        self.local_triangle = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-        self.distogram_head = DistogramHead(self._confidence_conf.c_z, self._confidence_conf)
-        self.plddt_head = pLDDTHead(
-            c=self._confidence_conf.c_s, num_bins=self._confidence_conf.num_bins
+        self.ipa = ipa_pytorch.InvariantPointAttention(self._ipa_conf)
+
+        tfmr_in = self._ipa_conf.c_s
+        tfmr_layer = torch.nn.TransformerEncoderLayer(
+            d_model=tfmr_in,
+            nhead=self._ipa_conf.seq_tfmr_num_heads,
+            dim_feedforward=tfmr_in,
+            batch_first=True,
+            dropout=0.0,
+            norm_first=False
         )
+        self.seq_tfmr = torch.nn.TransformerEncoder(
+            tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
+        self.post_tfmr = ipa_pytorch.Linear(
+            tfmr_in, self._ipa_conf.c_s, init="final")
+        self.plddt_head = pLDDTHead(
+            c=self._confidence_head.c_s,
+            num_bins=self._confidence_head.num_bins
+            )
+
+        self.edge_transition = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
+        self.distogram_error_head = DistogramHead(
+            self._confidence_head.c_z,
+            self._confidence_head.num_bins
+            )
+
     
 
-    def forward(self, input_feats, node_mask): 
-    # input feats is a dictionary which includes node_embed, edge_embed, curr_rigids, node_mask
+    def forward(self, input_feats, node_mask):
+        edge_mask = node_mask[:, None] * node_mask[:, :, None]
+
+        # Initialize node and edge embeddings
         node_embed = input_feats['node_embed']
         edge_embed = input_feats['edge_embed']
         curr_rigids = input_feats['curr_rigids']
-        prmsd_node = self.prmsd_node_transform(node_embed) 
-        prmsd_edge = self.prmsd_edge_transform(edge_embed)
 
-        for b in range(self._prmsd_conf.num_blocks):
-            prmsd_ipa_embed = self.prmsd[f'ipa_{b}'](
-                prmsd_node,
-                prmsd_edge,
-                curr_rigids,
-                node_mask
-            )
-            # prmsd_ipa_embed *= node_mask[..., None]
-            prmsd_node = self.prmsd[f'ipa_ln_{b}'](prmsd_node + prmsd_ipa_embed)
-            
-            if b < self._prmsd_conf.num_blocks - 1:
-                prmsd_node = self.prmsd[f'node_transition_{b}'](prmsd_node)
-                prmsd_node = prmsd_node * node_mask[..., None]
-            else:
-                prmsd_node = self.prmsd[f'prmsd_transition_{b}'](prmsd_node)
+        # distogram difference 
+        node_embed = node_embed * node_mask[..., None]
+        edge_embed = self.edge_transition(
+            node_embed, edge_embed, curr_rigids, edge_mask
+        )
+        distogram_error = self.distogram_error_head(edge_embed) # softmax 적용
 
-        return prmsd_node 
+        # plddt 
+        curr_rigids_scaled = self.rigids_ang_to_nm(curr_rigids)
+        node_embed = self.ipa(
+            node_embed,
+            edge_embed,
+            curr_rigids_scaled,
+            node_mask)
+        node_embed = node_embed * node_mask[..., None]
+        
+        seq_tfmr_out = self.seq_tfmr(
+            node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
+        node_embed = node_embed + self.post_tfmr(seq_tfmr_out)
+        plddt_logit = self.plddt_head(node_embed) # softmax 미적용
+
+        return plddt_logit, distogram_error

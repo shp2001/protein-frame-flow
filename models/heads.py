@@ -45,7 +45,7 @@ class AAContactHead(nn.Module):
 
 class DistogramHead(nn.Module):
 
-    def __init__(self, c_z, config):
+    def __init__(self, c_z, num_bins):
         """
         Args:
             c_z:
@@ -55,10 +55,7 @@ class DistogramHead(nn.Module):
         """
         super(DistogramHead, self).__init__()
 
-        self.c_z = c_z
-        self.config = config 
-        
-        self.linear = ipa_pytorch.Linear(self.c_z, self.config.num_bins, init="glorot")
+        self.linear = ipa_pytorch.Linear(c_z, num_bins, init="glorot")
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, z):  
@@ -75,24 +72,12 @@ class DistogramHead(nn.Module):
 
         # [*, N, N, no_bins]
         # keep symmetry 
+
         left_half = self.linear(z)
         right_half = left_half.transpose(-2, -3)
         logits = left_half + right_half # (*, N, N, 14)
         probs = self.softmax(logits) 
-
-        # breaks = np.linspace(self.config.first_break,
-        #                         self.config.last_break,
-        #                         self.config.num_bins-1)
         
-        # bin_tops = np.append(breaks, breaks[-1] + (breaks[-1] + breaks[-2]))
-        # bin_tops = torch.tensor(bin_tops)
-        # threshold = 8 + 1e-3 # _CONTACT_THRESHOLD + _CONTACT_EPSILON
-        # is_contact_bin = 1.0 * (bin_tops <= threshold)
-        
-        # contact_probs = torch.einsum(
-        #     'ijk,k->ij', probs, is_contact_bin
-        # )
-
         return probs
     
 class AngleResnetBlock(nn.Module):
