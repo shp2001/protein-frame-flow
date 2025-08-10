@@ -120,7 +120,7 @@ experiment:
     aux_loss_use_final_layer_rmsd: True
     aux_loss_use_prmsd_loss: ${model.prmsd.use_prmsd}
     aux_loss_use_local_dist_mat_loss: True 
-    aux_loss_use_local_pair_feat_loss: True
+    aux_loss_use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
 
     viol_loss_use_all_atom_clash_loss: True
     viol_loss_use_within_clash_loss: True

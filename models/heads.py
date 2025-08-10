@@ -44,9 +44,6 @@ class AAContactHead(nn.Module):
         return logits
 
 class DistogramHead(nn.Module):
-    """
-    Computes an all-atom contact map.
-    """
 
     def __init__(self, c_z, config):
         """
@@ -262,3 +259,24 @@ class AllAtomModule(nn.Module):
 
         local_atom_pos = single.view(single.shape[:-1] + (-1, 3))
         return local_atom_pos
+
+class pLDDTHead(nn.Module):
+    def __init__(self, c, num_bins):
+        super(pLDDTHead, self).__init__()
+
+        self.c = c
+        self.num_bins = num_bins
+
+        self.linear_1 = ipa_pytorch.Linear(self.c, self.c, init="relu")
+        self.linear_2 = ipa_pytorch.Linear(self.c, self.c, init="relu")
+        self.linear_3 = ipa_pytorch.Linear(self.c, self.num_bins)
+        self.relu = nn.ReLU()
+
+    def forward(self, s):
+        s = self.linear_1(s)
+        s = self.relu(s)
+        s = self.linear_2(s)
+        s = self.relu(s)
+        s = self.linear_3(s)
+
+        return s

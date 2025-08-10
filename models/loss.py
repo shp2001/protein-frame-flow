@@ -1047,6 +1047,9 @@ def b_carbon_distogram_loss(
     cdr_residues: torch.Tensor, # (N)
     eps: float = 1e-10
 ):
+    '''
+    pred_cb_distogram: softmax를 취한 결과 
+    '''
     # 1. Ground truth distogram 계산 (one-hot 인코딩 포함)
     gt_cb_distogram = calc_distogram(  
         gt_pseudo_beta,
@@ -1056,7 +1059,7 @@ def b_carbon_distogram_loss(
     ).unsqueeze(0) # (B, L, L, 64), one-hot
 
     # 2. Cross entropy: - sum y * log p
-    loss_per_pair = -torch.sum(gt_cb_distogram * torch.log(pred_cb_distogram), dim=-1)  # (O-2, B, L, L)
+    loss_per_pair = -torch.sum(gt_cb_distogram * torch.log(pred_cb_distogram + eps), dim=-1)  # (O-2, B, L, L)
     loss_per_pair = torch.mean(loss_per_pair, dim=0) # (B, L, L)
 
     # total loss 

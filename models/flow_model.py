@@ -9,7 +9,7 @@ from data import utils as du
 from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-from models.heads import AAContactHead, DistogramHead, AllAtomModule
+from models.heads import AAContactHead, DistogramHead, AllAtomModule, pLDDTHead
 from Protenix.protenix.model.modules import transformer
 
 class FlowModel(nn.Module):
@@ -59,11 +59,12 @@ class FlowModel(nn.Module):
             if b < self._model_conf.num_blocks-1:
                 if self._local_triangle_attention_new_conf.enable:
                     self.trunk[f'edge_transition_{b}'] = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-                    if b != self._model_conf.num_blocks-2:
-                        self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
-                                                                          self._distogram_conf)
-                    else:
-                        self.trunk[f'aa_contact_head_{b}'] = AAContactHead(self._ipa_conf.c_z)
+                    if self._distogram_conf.use_pair_head:
+                        if b != self._model_conf.num_blocks-2:
+                            self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
+                                                                            self._distogram_conf)
+                        else:
+                            self.trunk[f'aa_contact_head_{b}'] = AAContactHead(self._ipa_conf.c_z)
                 else:
                     edge_in = self._model_conf.edge_embed_size
                     self.trunk[f'edge_transition_{b}'] = ipa_pytorch.EdgeTransition(
@@ -228,28 +229,16 @@ class ConfidenceModel(nn.Module):
     def __init__(self, model_conf):
         super(ConfidenceModel, self).__init__()
         self._model_conf = model_conf
-        self._prmsd_conf = model_conf.prmsd
+        self._confidence_conf = model_conf.confidence_head
+        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
 
-        self.prmsd = nn.ModuleDict()
-  
-        self.prmsd_node_transform = ipa_pytorch.Linear(self._prmsd_conf.c_s, self._prmsd_conf.c_s)
-        self.prmsd_edge_transform = ipa_pytorch.Linear(
-                self._prmsd_conf.c_z,
-                self._prmsd_conf.c_z
-            )
-
-        for b in range(self._prmsd_conf.num_blocks):
-            self.prmsd[f'ipa_{b}'] = ipa_pytorch.InvariantPointAttention(self._prmsd_conf)
-            self.prmsd[f'ipa_ln_{b}'] = nn.LayerNorm(self._prmsd_conf.c_s)
-            
-            if b < self._prmsd_conf.num_blocks - 1:
-                self.prmsd[f'node_transition_{b}'] = ipa_pytorch.StructureModuleTransition(
-                    c=self._prmsd_conf.c_s)
-            else:
-                self.prmsd[f'prmsd_transition_{b}'] = ipa_pytorch.pRMSDTransition(
-                    c=self._prmsd_conf.c_s, num_bins=self._prmsd_conf.num_bins
-                )
+        self.local_triangle = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
+        self.distogram_head = DistogramHead(self._confidence_conf.c_z, self._confidence_conf)
+        self.plddt_head = pLDDTHead(
+            c=self._confidence_conf.c_s, num_bins=self._confidence_conf.num_bins
+        )
     
+
     def forward(self, input_feats, node_mask): 
     # input feats is a dictionary which includes node_embed, edge_embed, curr_rigids, node_mask
         node_embed = input_feats['node_embed']

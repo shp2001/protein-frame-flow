@@ -68,6 +68,7 @@ model:
     pair_dropout: 0.25
     
   distogram_head: 
+    use_pair_head: False
     first_break: 2
     last_break: 22
     num_bins: 64
@@ -85,18 +86,13 @@ model:
     d_hidden: 128
     atom_num: 14
     
-  prmsd:
-    use_prmsd: False
+  confidence_head:
+    use_confidence: True
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
-    c_hidden: 16
-    no_heads: 8
-    no_qk_points: 8
-    no_v_points: 12
-    seq_tfmr_num_heads: 4
-    seq_tfmr_num_layers: 2
-    num_blocks: 3
-    num_bins: 50
+    first_break: 2
+    last_break: 22
+    num_bins: 64
 
   initialization:
     zero_init_condition_transition: False
