@@ -68,7 +68,7 @@ model:
     pair_dropout: 0.25
     
   distogram_head: 
-    use_pair_head: False
+    use_pair_head: True
     first_break: 2
     last_break: 22
     num_bins: 64
@@ -87,7 +87,7 @@ model:
     atom_num: 14
     
   confidence_head:
-    use_confidence: True
+    use_confidence: False
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
     num_bins: 64

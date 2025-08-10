@@ -62,7 +62,7 @@ class FlowModel(nn.Module):
                     if self._distogram_conf.use_pair_head:
                         if b != self._model_conf.num_blocks-2:
                             self.trunk[f'distogram_head_{b}'] = DistogramHead(self._ipa_conf.c_z,
-                                                                            self._distogram_conf)
+                                                                            self._distogram_conf.num_bins)
                         else:
                             self.trunk[f'aa_contact_head_{b}'] = AAContactHead(self._ipa_conf.c_z)
                 else:
