@@ -4,12 +4,14 @@ from torch import nn
 
 from models.node_feature_net import NodeFeatureNet
 from models.edge_feature_net import EdgeFeatureNet
+from models.heads import AAContactHead, DistogramHead, AllAtomModule
+from models.utils import calc_distogram, calc_unit_vector
 from models import ipa_pytorch
 from data import utils as du
 from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
 from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-from models.heads import AAContactHead, DistogramHead, AllAtomModule, pLDDTHead
+
 from Protenix.protenix.model.modules import transformer
 
 class FlowModel(nn.Module):
@@ -183,11 +185,12 @@ class FlowModel(nn.Module):
                     edge_embed = self.trunk[f'edge_transition_{b}'](
                         node_embed, edge_embed)
                     edge_embed = edge_embed * edge_mask[..., None]
-                if b < self._model_conf.num_blocks-2:
-                    cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
-                
-                else:
-                    all_atom_contact_map = self.trunk[f'aa_contact_head_{b}'](edge_embed)
+                if self._distogram_conf.use_pair_head:
+                    if b < self._model_conf.num_blocks-2:
+                        cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
+                    
+                    else:
+                        all_atom_contact_map = self.trunk[f'aa_contact_head_{b}'](edge_embed)
 
             if cb_distogram != None:
                 pair_outputs.append(cb_distogram)
@@ -238,25 +241,8 @@ class ConfidenceModel(nn.Module):
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
 
-        self.ipa = ipa_pytorch.InvariantPointAttention(self._ipa_conf)
-
-        tfmr_in = self._ipa_conf.c_s
-        tfmr_layer = torch.nn.TransformerEncoderLayer(
-            d_model=tfmr_in,
-            nhead=self._ipa_conf.seq_tfmr_num_heads,
-            dim_feedforward=tfmr_in,
-            batch_first=True,
-            dropout=0.0,
-            norm_first=False
-        )
-        self.seq_tfmr = torch.nn.TransformerEncoder(
-            tfmr_layer, self._ipa_conf.seq_tfmr_num_layers, enable_nested_tensor=False)
-        self.post_tfmr = ipa_pytorch.Linear(
-            tfmr_in, self._ipa_conf.c_s, init="final")
-        self.plddt_head = pLDDTHead(
-            c=self._confidence_head.c_s,
-            num_bins=self._confidence_head.num_bins
-            )
+        # self.s_transform = ipa_pytorch.Linear(self._confidence_head.c_s, self._confidence_head.c_s)
+        # self.str_2_pair = ipa_pytorch.Linear(self._distogram_conf.num_bins + 3, self._confidence_head.c_z)
 
         self.edge_transition = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
         self.distogram_error_head = DistogramHead(
@@ -264,7 +250,6 @@ class ConfidenceModel(nn.Module):
             self._confidence_head.num_bins
             )
 
-    
 
     def forward(self, input_feats, node_mask):
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
@@ -274,25 +259,42 @@ class ConfidenceModel(nn.Module):
         edge_embed = input_feats['edge_embed']
         curr_rigids = input_feats['curr_rigids']
 
-        # distogram difference 
-        node_embed = node_embed * node_mask[..., None]
+        # # transform single feature 
+        # node_embed = self.s_transform(node_embed)
+        
+        # # transform pair feature
+        # pred_trans = curr_rigids.get_trans()
+        # pred_distogram = calc_distogram(
+        #     pos=pred_trans, 
+        #     min_bin=self._distogram_conf.min_bin,
+        #     max_bin=self._distogram_conf.max_bin,
+        #     num_bins=self._distogram_conf.num_bins
+        #     )
+        # pred_unit_vector = calc_unit_vector(
+        #     rigids=curr_rigids
+        # )
+        # edge_embed = edge_embed + self.str_2_pair(torch.concat([pred_distogram, pred_unit_vector], dim=-1))
+
+        # apply local triangle 
         edge_embed = self.edge_transition(
             node_embed, edge_embed, curr_rigids, edge_mask
         )
-        distogram_error = self.distogram_error_head(edge_embed) # softmax 적용
-
-        # plddt 
-        curr_rigids_scaled = self.rigids_ang_to_nm(curr_rigids)
-        node_embed = self.ipa(
-            node_embed,
-            edge_embed,
-            curr_rigids_scaled,
-            node_mask)
-        node_embed = node_embed * node_mask[..., None]
         
-        seq_tfmr_out = self.seq_tfmr(
-            node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
-        node_embed = node_embed + self.post_tfmr(seq_tfmr_out)
-        plddt_logit = self.plddt_head(node_embed) # softmax 미적용
+        pde = self.distogram_error_head(edge_embed) # softmax 적용
 
-        return plddt_logit, distogram_error
+        plddt_logit = None
+        # # plddt 
+        # curr_rigids_scaled = self.rigids_ang_to_nm(curr_rigids)
+        # node_embed = self.ipa(
+        #     node_embed,
+        #     edge_embed,
+        #     curr_rigids_scaled,
+        #     node_mask)
+        # node_embed = node_embed * node_mask[..., None]
+        
+        # seq_tfmr_out = self.seq_tfmr(
+        #     node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
+        # node_embed = node_embed + self.post_tfmr(seq_tfmr_out)
+        # plddt_logit = self.plddt_head(node_embed) # softmax 미적용
+
+        return plddt_logit, pde

@@ -748,7 +748,6 @@ def lddt(
     all_atom_pred_pos: torch.Tensor,
     all_atom_positions: torch.Tensor,
     all_atom_mask: torch.Tensor,
-    cdr_mask: torch.Tensor,
     cutoff: float = 15.0,
     eps: float = 1e-10,
     per_residue: bool = True,
@@ -794,88 +793,110 @@ def lddt(
 
     return score
 
-def lddt_loss(
+def h3_lddt_loss(
     logits: torch.Tensor,
     all_atom_pred_pos: torch.Tensor,
     all_atom_positions: torch.Tensor,
-    all_atom_mask: torch.Tensor, # (b, L, 14)
-    cdr_mask: torch.Tensor, # (b, L)
+    all_atom_mask: torch.Tensor,  # (B, L, 14)
+    cdr_residues: list,  # CDR residue index list
     cutoff: float = 15.0,
-    no_bins: int = 50,
+    no_bins: int = 64,
     eps: float = 1e-10,
     **kwargs,
 ) -> torch.Tensor:
-    n = all_atom_mask.shape[-2]
+    device = all_atom_mask.device
+    B, L, _ = all_atom_mask.shape
 
     ca_pos = rc.atom_order["CA"]
     all_atom_pred_pos = all_atom_pred_pos[..., ca_pos, :]
     all_atom_positions = all_atom_positions[..., ca_pos, :]
     all_atom_mask = all_atom_mask[..., ca_pos : (ca_pos + 1)]  # keep dim
 
+    # lDDT score 계산 (B, L)
     score = lddt(
-        all_atom_pred_pos, all_atom_positions, all_atom_mask, cutoff=cutoff, eps=eps, cdr_mask=cdr_mask
+        all_atom_pred_pos, all_atom_positions, all_atom_mask,
+        cutoff=cutoff, eps=eps
     )
-
     score = score.detach()
 
+    # bin 인덱스 변환
     bin_index = torch.floor(score * no_bins).long()
     bin_index = torch.clamp(bin_index, max=(no_bins - 1))
     lddt_ca_one_hot = nn.functional.one_hot(bin_index, num_classes=no_bins)
-    # if len(torch.nonzero(cdr_mask[0])) > 20:
-    #     print(f'lddt_ca_one_hot: {torch.nonzero(lddt_ca_one_hot[0])}')
-    errors = softmax_cross_entropy(logits, lddt_ca_one_hot) # (..., L)
-    all_atom_mask = all_atom_mask.squeeze(-1)
 
-    all_atom_cdr_mask = all_atom_mask * cdr_mask # (..., L)
-    total_loss = torch.sum(errors * all_atom_mask, dim=-1) / (
-        eps + torch.sum(all_atom_mask, dim=-1)
-    )
+    # Cross entropy loss per residue
+    errors = softmax_cross_entropy(logits, lddt_ca_one_hot)  # (B, L)
+    all_atom_mask = all_atom_mask.squeeze(-1)  # (B, L)
+
+    # --- cdr_residues 기반 마스크 ---
+    cdr_mask = torch.zeros(L, device=device)
+    cdr_mask[cdr_residues] = 1.0
+    cdr_mask = cdr_mask.unsqueeze(0)  # (1, L) → 브로드캐스트 가능
+
+    all_atom_cdr_mask = all_atom_mask * cdr_mask  # (B, L)
+
+    # cdr loss
     cdr_loss = torch.sum(errors * all_atom_cdr_mask, dim=-1) / (
         eps + torch.sum(all_atom_cdr_mask, dim=-1)
     )
 
-    loss = cdr_loss + total_loss
-    return loss
+    return cdr_loss
 
-def pde_loss(pde: torch.Tensor, gt_coord: torch.Tensor, pred_coord: torch.Tensor):
+def h3_pde_loss(
+    pde: torch.Tensor, 
+    gt_coord: torch.Tensor, 
+    pred_coord: torch.Tensor,
+    cdr_residues: list,
+    min_bin=0,
+    max_bin=10
+    ):
     """
     Args:
         pde: predicted distogram error, softmax 확률 분포, shape (B, L, L, 64)
         gt_coord: ground truth coordinates, shape (B, L, 3)
         pred_coord: predicted coordinates, shape (B, L, 3)
-        
-    Returns:
-        loss: tensor of shape (B,), 배치별 loss
+        cdr_residues: 행 방향에서 볼 residue 인덱스 리스트
     """
+
     B, L, _, num_bins = pde.shape
     device = pde.device
 
-    # 1) residue pair별 L2 distance error 계산
-    diff = pred_coord.unsqueeze(2) - gt_coord.unsqueeze(1)  # (B, L, L, 3)
-    dist_error = torch.norm(diff, dim=-1)  # (B, L, L)
+    # 1) true dist_error 구하기 
+    gt_diff = gt_coord.unsqueeze(2) - gt_coord.unsqueeze(1)  # (B, L, L, 3)
+    gt_dist = torch.norm(gt_diff, dim=-1)  # (B, L, L)
+
+    pred_diff = pred_coord.unsqueeze(2) - pred_coord.unsqueeze(1)  # (B, L, L, 3)
+    pred_dist = torch.norm(pred_diff, dim=-1)  # (B, L, L)
+
+    dist_error = torch.abs(pred_dist - gt_dist)  # (B, L, L)
 
     # 2) bin 경계 생성
-    bin_edges = torch.linspace(0, 32, num_bins + 1, device=device)  # 65 edges for 64 bins
+    bin_edges = torch.linspace(min_bin, max_bin, num_bins + 1, device=device)
 
     # 3) bin index 계산
-    bin_indices = torch.bucketize(dist_error, bin_edges) - 1  # 0-based bin index, shape (B, L, L)
+    bin_indices = torch.bucketize(dist_error, bin_edges) - 1
     bin_indices = bin_indices.clamp(min=0, max=num_bins - 1)
 
     # 4) one-hot encoding
-    gt_distogram = nn.functional.one_hot(bin_indices, num_classes=num_bins).float()  # (B, L, L, 64)
+    gt_error_distogram = nn.functional.one_hot(bin_indices, num_classes=num_bins).float()  # (B, L, L, 64)
 
     # 5) log pde 계산
-    log_pde = torch.log(pde + 1e-8)  # (B, L, L, 64)
+    log_pde = torch.log(pde + 1e-8)
 
     # 6) per-element loss
-    loss_per_element = -(gt_distogram * log_pde).sum(dim=-1)  # (B, L, L)
+    loss_per_element = -(gt_error_distogram * log_pde).sum(dim=-1)  # (B, L, L)
 
-    # 7) mask로 대각 성분 제외
-    mask = 1 - torch.eye(L, device=device).unsqueeze(0)  # (1, L, L)
-    loss_per_element = loss_per_element * mask
+    # 7) CDR 행 마스크 적용 (열은 전부 포함)
+    row_mask = torch.zeros(L, device=device)
+    row_mask[cdr_residues] = 1
+    cdr_mask = row_mask.unsqueeze(1).expand(L, L).clone()  # (L, L)
+    cdr_mask = cdr_mask.unsqueeze(0)               # (1, L, L)
+
+    loss_per_element = loss_per_element * cdr_mask
 
     # 8) 배치별 평균 loss 계산
-    loss_per_batch = loss_per_element.sum(dim=(1, 2)) / mask.sum()
+    valid_pairs = cdr_mask.sum()
+    loss_per_batch = loss_per_element.sum(dim=(1, 2)) / valid_pairs
 
     return loss_per_batch  # (B,)
 
@@ -1084,9 +1105,12 @@ def b_carbon_distogram_loss(
     pred_cb_distogram: torch.Tensor,  # (O-2, B, L, L, 64)
     gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
     res_mask: torch.Tensor,
-    neighbor_indices, 
+    neighbor_indices,
     cdr_residues: torch.Tensor, # (N)
-    eps: float = 1e-10
+    eps: float = 1e-10,
+    min_bin=2.0,
+    max_bin=22.0,
+    num_bins=64
 ):
     '''
     pred_cb_distogram: softmax를 취한 결과 
@@ -1094,9 +1118,9 @@ def b_carbon_distogram_loss(
     # 1. Ground truth distogram 계산 (one-hot 인코딩 포함)
     gt_cb_distogram = calc_distogram(  
         gt_pseudo_beta,
-        min_bin=2.0,
-        max_bin=22.0,
-        num_bins=64
+        min_bin=min_bin,
+        max_bin=max_bin,
+        num_bins=num_bins
     ).unsqueeze(0) # (B, L, L, 64), one-hot
 
     # 2. Cross entropy: - sum y * log p

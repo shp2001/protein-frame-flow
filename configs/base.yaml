@@ -23,7 +23,7 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 40
-    max_num_res_squared: 200_000
+    max_num_res_squared: 150_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
     
@@ -61,7 +61,7 @@ interpolant:
   self_condition: ${model.edge_features.self_condition}
   save_traj: True 
   scaling_nm_ang: ${model.scaling_nm_ang}
-  use_prmsd: ${model.prmsd.use_prmsd}
+  use_prmsd: ${model.confidence_head.use_confidence}
 
 mini_rollout:
   min_t: 1e-2
@@ -87,11 +87,13 @@ mini_rollout:
       weight: 10.0
       cutoff: 5.0
 
+  inference_time_scaling:
+    use: False
   sampling:
     num_timesteps: 8
     do_sde: False
 
-  use_prmsd: ${model.prmsd.use_prmsd}
+  use_prmsd: ${model.confidence_head.use_confidence}
   self_condition: ${model.edge_features.self_condition}
   save_traj: True 
   scaling_nm_ang: ${model.scaling_nm_ang}
@@ -101,7 +103,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol/2025-08-10_12-44-22/epoch=54-step=186505_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -111,14 +113,13 @@ experiment:
     translation_loss_weight: 2.0 # 1.0~1.5 -> 2.0~3.0
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
-    aux_loss_weight: 1.0
 
+    aux_loss_weight: 1.0
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False
     aux_loss_use_chi_loss: False
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_prmsd_loss: ${model.prmsd.use_prmsd}
     aux_loss_use_local_dist_mat_loss: True 
     aux_loss_use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
 
@@ -126,12 +127,16 @@ experiment:
     viol_loss_use_within_clash_loss: True
     viol_loss_use_bond_loss: True 
 
+    aux_loss_use_confidence_loss: ${model.confidence_head.use_confidence}
+    min_bin: 0
+    max_bin: 10 
+
     aux_loss_chi_loss_weight: 0.3 # 1.2 -> 0.7 ~ 0.8 
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_prmsd_loss_weight: 0.1 # 4.0 ~ 6.0
+    aux_loss_pde_loss_weight: 0.1 # 4.0 ~ 6.0
     aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
     aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
 
@@ -145,13 +150,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.5
+    name: CDRFlow_v1.2.4_biomol_stage2
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-4
-    max_lr: 1e-4
+    min_lr: 1e-5
+    max_lr: 1e-5
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

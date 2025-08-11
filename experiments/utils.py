@@ -10,7 +10,7 @@ from analysis import utils as au
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from motif_scaffolding import save_motif_segments
 from openfold.utils import rigid_utils as ru
-
+import matplotlib.pyplot as plt
 
 class LengthDataset(torch.utils.data.Dataset):
     def __init__(self, samples_cfg):
@@ -303,3 +303,17 @@ def flatten_dict(raw_dict):
         else:
             flattened.append((k, v))
     return flattened
+
+def visualize_distogram(distance_map, save_path):
+    distance_map = distance_map.detach().cpu().numpy()
+    plt.figure(figsize=(6, 5))
+    plt.imshow(distance_map, cmap='viridis')
+    plt.colorbar(label='Predicted Distance Error(Å)')
+    plt.title('H3 CDR Predicted Distance Error')
+    plt.suptitle(f'Average PDE: {np.mean(distance_map):.4f} Å', fontsize=10, y=0.92)
+    plt.xlabel('Residue Index')
+    plt.ylabel('Residue Index')
+    plt.tight_layout()
+
+    # 이미지 저장
+    plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능

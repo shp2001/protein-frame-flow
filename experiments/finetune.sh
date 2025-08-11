@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v1.2.1
+#SBATCH -J CDRFlow_v1.2.4_biomol_stage2
 #SBATCH -p gpu
-#SBATCH --gres=gpu:A6000:1
-#SBATCH --mem=48g
-#SBATCH -c 12
+#SBATCH -w gpu04
+#SBATCH --gres=gpu:A6000:2
+#SBATCH --mem=128g
+#SBATCH -c 24
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
-#SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
+#SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm2.err
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/finetune.py > /home/psh/protein-frame-flow/experiments/logs/debug.log
+torchrun --standalone --nnodes=1 --nproc_per_node=2 /home/psh/protein-frame-flow/experiments/finetune.py > /home/psh/protein-frame-flow/experiments/logs/CDRFlow_v1.2.4_biomol_stage2.log
