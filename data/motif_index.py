@@ -351,23 +351,33 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)
     residue_indices = None
-    
+
+    anchor = find_anchor(loop_mask, only_h3=False)
+    start = anchor[0] ; end = anchor[1]
+    loop_indices = [i for i in range(start+1, end) if nan_mask[i] == 1]
+
+    if len(loop_indices) < 10:
+        max_len = max_len // 2
+    elif len(loop_indices) < 15:
+        max_len = (max_len * 3) // 5
+    elif len(loop_indices) < 20:
+        max_len = (max_len * 4) // 5
+    else:
+        max_len = max_len
+        
     if torch.sum(nan_mask) <= max_len:
         residue_indices = [i for i in range(L) if nan_mask[i]==1]
 
     else:
         distance_map = get_distance_map(trans_1)
-        anchor = find_anchor(loop_mask, only_h3=False)
-        start = anchor[0] ; end = anchor[1]
-        
         distance_vectors = []
-        loop_indices = [i for i in range(start+1, end) if nan_mask[i] == 1]
-        for i in anchor:
+        
+        for i in loop_indices:
             distance_vectors.append(distance_map[i])
 
         distance_vectors = torch.stack(distance_vectors)
         distance_vector, _ = torch.min(distance_vectors, dim=0)
-        values, indices = torch.topk(distance_vector, max_len - len(loop_indices), largest=False)
+        values, indices = torch.topk(distance_vector, max_len, largest=False)
 
         residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
         residue_indices = [i for i in residue_indices if nan_mask[i] == 1]
