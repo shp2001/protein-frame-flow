@@ -236,7 +236,6 @@ class Interpolant:
             rotmats_0=None,
             verbose=False,
             save_all_repr=False,
-            rollout=False
         ):
 
         # Set-up initial prior samples
@@ -392,12 +391,9 @@ class Interpolant:
             batch['rotmats_t'] = rotmats_1
         batch['t'] = torch.ones((num_batch, 1), device=self._device) * t_1
         
-        if rollout:
-            with torch.inference_mode(False):
-                model_out = model(batch)
-        else:
-            with torch.no_grad():
-                model_out = model(batch)
+
+        with torch.no_grad():
+            model_out = model(batch)
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
