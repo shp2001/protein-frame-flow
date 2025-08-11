@@ -241,8 +241,8 @@ class ConfidenceModel(nn.Module):
         self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
         self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
 
-        # self.s_transform = ipa_pytorch.Linear(self._confidence_head.c_s, self._confidence_head.c_s)
-        # self.str_2_pair = ipa_pytorch.Linear(self._distogram_conf.num_bins + 3, self._confidence_head.c_z)
+        self.s_transform = ipa_pytorch.Linear(self._confidence_head.c_s, self._confidence_head.c_s)
+        self.str_2_pair = ipa_pytorch.Linear(self._distogram_conf.num_bins + 3, self._confidence_head.c_z)
 
         self.edge_transition = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
         self.distogram_error_head = DistogramHead(
@@ -259,21 +259,21 @@ class ConfidenceModel(nn.Module):
         edge_embed = input_feats['edge_embed']
         curr_rigids = input_feats['curr_rigids']
 
-        # # transform single feature 
-        # node_embed = self.s_transform(node_embed)
+        # transform single feature 
+        node_embed = self.s_transform(node_embed)
         
-        # # transform pair feature
-        # pred_trans = curr_rigids.get_trans()
-        # pred_distogram = calc_distogram(
-        #     pos=pred_trans, 
-        #     min_bin=self._distogram_conf.min_bin,
-        #     max_bin=self._distogram_conf.max_bin,
-        #     num_bins=self._distogram_conf.num_bins
-        #     )
-        # pred_unit_vector = calc_unit_vector(
-        #     rigids=curr_rigids
-        # )
-        # edge_embed = edge_embed + self.str_2_pair(torch.concat([pred_distogram, pred_unit_vector], dim=-1))
+        # transform pair feature
+        pred_trans = curr_rigids.get_trans()
+        pred_distogram = calc_distogram(
+            pos=pred_trans, 
+            min_bin=self._distogram_conf.min_bin,
+            max_bin=self._distogram_conf.max_bin,
+            num_bins=self._distogram_conf.num_bins
+            )
+        pred_unit_vector = calc_unit_vector(
+            rigids=curr_rigids
+        )
+        edge_embed = edge_embed + self.str_2_pair(torch.concat([pred_distogram, pred_unit_vector], dim=-1))
 
         # apply local triangle 
         edge_embed = self.edge_transition(
