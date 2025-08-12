@@ -84,12 +84,7 @@ class EvalRunner:
             order='memory', limit = 8)[:self._infer_cfg.num_gpus]
         log.info(f"Using devices: {devices}")
         log.info(f'Evaluating {self._infer_cfg.task}')
-        if self._infer_cfg.task == 'unconditional':
-            eval_dataset = eu.LengthDataset(self._samples_cfg)
-        elif self._infer_cfg.task == 'inpainting' or self._infer_cfg.task == 'scaffolding':
-            eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
-        else:
-            raise ValueError(f'Unknown task {self._infer_cfg.task}')
+        eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
             
         dataloader = predict_dataloader(
             dataset=eval_dataset,
@@ -98,7 +93,7 @@ class EvalRunner:
         
         trainer = Trainer(
             accelerator="gpu",
-            strategy="ddp",
+            # strategy="single",
             devices=devices,
         )
 

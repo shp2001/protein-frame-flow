@@ -780,9 +780,7 @@ class FlowModule(LightningModule):
         interpolant = Interpolant(self._infer_cfg.interpolant) 
         interpolant.set_device(device)
 
-        sample_ids = batch['sample_id'].tolist()       
         num_batch = batch['sample_id'].shape[0]
-        print("sample_ids", sample_ids)
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
         if 'diffuse_mask' in batch: # motif-scaffolding
             trans_1 = batch['trans_1']
@@ -792,12 +790,10 @@ class FlowModule(LightningModule):
             sample_length = batch['num_res'].item()
             trans_1 = rotmats_1 = diffuse_mask = None
 
-        # Sample batch
+        sample_root_dir = os.path.join(self.inference_dir, pdb_id)
+        if not os.path.exists(sample_root_dir):
+            os.makedirs(sample_root_dir, exist_ok=True)
         if self.save_file:
-            sample_dirs = [os.path.join(
-                self.inference_dir, pdb_id, f'sample_{sample_id}')
-                for sample_id in sample_ids]
-
             atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
                 num_batch, 
                 sample_length, 
@@ -860,8 +856,16 @@ class FlowModule(LightningModule):
             total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
             prmsds = du.to_numpy(total_prmsd)
 
+            samples = os.listdir(sample_root_dir)
+            sample_nums = samples 
+            next_sample_num = -1
+            if samples != []:
+                sample_nums = sorted([int(sample.replace("sample_", "")) for sample in samples])
+                next_sample_num = sample_nums[-1]
+
             for i in range(num_batch):
-                sample_dir = sample_dirs[i]
+                next_sample_num += 1
+                sample_dir = os.path.join(sample_root_dir, f"sample_{next_sample_num}")
                 pred_position = pred_positions[i]
                 prmsd = prmsds[i]
                 bb_traj = bb_trajs[i]
@@ -897,3 +901,4 @@ class FlowModule(LightningModule):
                     chain_index=chain_idx,
                     save_traj_bool=False
                 )
+                

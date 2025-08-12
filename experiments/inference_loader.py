@@ -20,37 +20,8 @@ from itertools import accumulate
 import bisect
 
 from data import featurizer
-# def _rog_filter(df, quantile):
-#     y_quant = pd.pivot_table(
-#         df,
-#         values='radius_gyration', 
-#         index='modeled_seq_len',
-#         aggfunc=lambda x: np.quantile(x, quantile)
-#     )
-#     x_quant = y_quant.index.to_numpy()
-#     y_quant = y_quant.radius_gyration.to_numpy()
 
-#     # Fit polynomial regressor
-#     poly = PolynomialFeatures(degree=4, include_bias=True)
-#     poly_features = poly.fit_transform(x_quant[:, None])
-#     poly_reg_model = LinearRegression()
-#     poly_reg_model.fit(poly_features, y_quant)
-
-#     # Calculate cutoff for all sequence lengths
-#     max_len = df.modeled_seq_len.max()
-#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
-#     # Add a little more.
-#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
-
-#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
-#     return df[df.radius_gyration < row_rog_cutoffs]
-
-
-def _length_filter(data_csv, min_res, max_res):
-    return data_csv[
-        (data_csv.seq_len >= min_res)
-        & (data_csv.seq_len <= max_res)
-    ]
+from torch.utils.data import SequentialSampler
 
 
 def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
@@ -133,7 +104,7 @@ class BaseDataset(Dataset):
         self.n_samples = self._inference_cfg.samples.samples_per_target
 
         self.raw_csv = pd.read_csv(self._inference_cfg.samples.csv_path)
-        
+
         metadata_csv = self.raw_csv
         self._create_split(metadata_csv)
         self._cache = {}
@@ -148,7 +119,6 @@ class BaseDataset(Dataset):
 
         self._all_sample_ids = all_sample_ids
         
-
     @property
     def is_training(self):
         return self._is_training
@@ -264,7 +234,7 @@ class BaseDataset(Dataset):
             feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
 
-            rng = self._rng if self.is_training else np.random.default_rng(seed=123)
+            rng = np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
             feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
                                                    feats['res_mask'], 
@@ -288,6 +258,7 @@ class BaseDataset(Dataset):
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
         feats['sample_id'] = sample_id
+
         return feats
 
 
@@ -313,8 +284,6 @@ def collate_fn(batch):
                             max_len=256,
                             seq_list=feat['chain_seq_list']
                             )
-        # del feat['masked_chain']
-        # del feat['first_chain_len']
 
         not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
 
@@ -381,9 +350,10 @@ def predict_dataloader(dataset,
                        loader_cfg):
     return DataLoader(
         dataset,
-        batch_size=20,
+        batch_size=loader_cfg.batch_size,
         shuffle=False,
         num_workers=loader_cfg.num_workers,
+        sampler=SequentialSampler(dataset),
         prefetch_factor=None if loader_cfg.num_workers == 0 else loader_cfg.prefetch_factor,
         pin_memory=False,
         persistent_workers=True if loader_cfg.num_workers > 0 else False,
