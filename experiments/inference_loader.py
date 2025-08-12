@@ -5,7 +5,7 @@ import logging
 import torch
 from collections import defaultdict
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from data import utils as du
 
 
@@ -117,23 +117,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     }
 
 
-def _add_plddt_mask(feats, plddt_threshold):
-    feats['plddt_mask'] = torch.tensor(
-        feats['res_plddt'] > plddt_threshold).int()
-
-
-def _read_clusters(cluster_path):
-    with open(cluster_path, 'r') as f:
-        cluster_dict = json.load(f)
-    
-    pdb_to_cluster = {}
-    for cluster_id, pdb_ids in cluster_dict.items():
-        for pdb_id in pdb_ids:
-            pdb_to_cluster[pdb_id] = cluster_id
-    
-    return pdb_to_cluster
-
-
 class BaseDataset(Dataset):
     def __init__(
             self,
@@ -147,8 +130,7 @@ class BaseDataset(Dataset):
         self._inference_cfg = inf_cfg.inference
         self.task = task
 
-        num_batch = self._inference_cfg.samples.num_batch
-        self.n_samples = self._inference_cfg.samples.samples_per_target // num_batch
+        self.n_samples = self._inference_cfg.samples.samples_per_target
 
         self.raw_csv = pd.read_csv(self._inference_cfg.samples.csv_path)
         
@@ -161,10 +143,11 @@ class BaseDataset(Dataset):
         for row_id in range(self.csv.shape[0]):
             target_row = self.csv.iloc[row_id]
             for sample_id in range(self.n_samples):
-                sample_ids = torch.tensor([num_batch * sample_id + i for i in range(num_batch)])
-                all_sample_ids.append((target_row, sample_ids))
+                sample_id = torch.tensor(sample_id)
+                all_sample_ids.append((target_row, sample_id))
 
         self._all_sample_ids = all_sample_ids
+        
 
     @property
     def is_training(self):
@@ -319,7 +302,7 @@ def collate_fn(batch):
             cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=300,
+                                                    max_len=256,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=True
                                                     )
@@ -359,8 +342,7 @@ def collate_fn(batch):
         cropped_feat['pair_init'] = relpos_emb
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
-        cropped_feat['sample_id'] = feat['sample_id']
-        
+        cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
         del cropped_feat['chain_seq_list']
 
         cropped_batch.append(cropped_feat)
@@ -393,3 +375,17 @@ def collate_fn(batch):
         }
 
     return cropped_batch
+
+
+def predict_dataloader(dataset,
+                       loader_cfg):
+    return DataLoader(
+        dataset,
+        batch_size=20,
+        shuffle=False,
+        num_workers=loader_cfg.num_workers,
+        prefetch_factor=None if loader_cfg.num_workers == 0 else loader_cfg.prefetch_factor,
+        pin_memory=False,
+        persistent_workers=True if loader_cfg.num_workers > 0 else False,
+        collate_fn=collate_fn
+    )

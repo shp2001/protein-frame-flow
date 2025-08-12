@@ -9,3 +9,4 @@ All distributed processes registered. Starting with 1 processes
 ----------------------------------------------------------------------------------------------------
 
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+slurmstepd-gpu01: error: *** JOB 795653 ON gpu01 CANCELLED AT 2025-08-12T12:51:20 ***

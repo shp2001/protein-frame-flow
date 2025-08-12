@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from omegaconf import DictConfig, OmegaConf
 from experiments import utils as eu
-from experiments.inference_loader import BaseDataset, collate_fn
+from experiments.inference_loader import BaseDataset, predict_dataloader
 
 from models.flow_module import FlowModule
 
@@ -42,16 +42,15 @@ class EvalRunner:
         self._samples_cfg = self._infer_cfg.samples
         self._rng = np.random.default_rng(self._infer_cfg.seed)
         self.use_prmsd = self._infer_cfg.interpolant.use_prmsd
+        self.batch_size = self._infer_cfg.samples.batch_size
 
         # Set-up output directory only on rank 0
-        local_rank = os.environ.get('LOCAL_RANK', 0)
-        if local_rank == 0:
-            inference_dir = self.setup_inference_dir(ckpt_path)
-            self._exp_cfg.inference_dir = inference_dir
-            config_path = os.path.join(inference_dir, 'config.yaml')
-            with open(config_path, 'w') as f:
-                OmegaConf.save(config=self._cfg, f=f)
-            log.info(f'Saving inference config to {config_path}')
+        inference_dir = self.setup_inference_dir(ckpt_path)
+        self._exp_cfg.inference_dir = inference_dir
+        config_path = os.path.join(inference_dir, 'config.yaml')
+        with open(config_path, 'w') as f:
+            OmegaConf.save(config=self._cfg, f=f)
+        log.info(f'Saving inference config to {config_path}')
 
         # Read checkpoint and initialize module.
         if not self.use_prmsd:
@@ -59,21 +58,7 @@ class EvalRunner:
                 checkpoint_path=ckpt_path,
                 cfg=self._cfg,
             )
-        # else:
-        #     # 먼저 FlowModule 인스턴스를 생성 (초기화만 하고 checkpoint는 사용하지 않음)
-        #     self._cfg.model.prmsd.use_prmsd = True
-        #     self._flow_module = FlowModule(cfg=self._cfg)
 
-        #     # self.model의 가중치 불러오기
-        #     main_ckpt = torch.load(ckpt_path, map_location='cpu')
-        #     main_ckpt_dict = {k.replace("model.", ""): v for k, v in main_ckpt['state_dict'].items() if k.startswith("model.")}
-        #     self._flow_module.model.load_state_dict(main_ckpt_dict)
-
-        #     # self.confidence_model의 가중치 불러오기
-        #     ckpt_path_conf = '/home/psh/protein-frame-flow/ckpt/confidence/IPA_plddt_fm_hybrid_only_ab/checkpoint_epoch_14.ckpt'
-        #     conf_ckpt = torch.load(ckpt_path_conf, map_location='cpu')
-        #     # confidence_model 관련 키만 골라서 로드
-        #     self._flow_module.confidence_model.load_state_dict(conf_ckpt['model_state_dict'], strict=True)
         log.info(pl.utilities.model_summary.ModelSummary(self._flow_module))
         self._flow_module.eval()
         self._flow_module._infer_cfg = self._infer_cfg
@@ -106,13 +91,17 @@ class EvalRunner:
         else:
             raise ValueError(f'Unknown task {self._infer_cfg.task}')
             
-        dataloader = torch.utils.data.DataLoader(
-            eval_dataset, batch_size=1, shuffle=False, drop_last=False, collate_fn=collate_fn)
+        dataloader = predict_dataloader(
+            dataset=eval_dataset,
+            loader_cfg=self._samples_cfg,
+            )
+        
         trainer = Trainer(
             accelerator="gpu",
             strategy="ddp",
             devices=devices,
         )
+
         self._flow_module.save_file = save_file
         trainer.predict(self._flow_module, dataloaders=dataloader)
 

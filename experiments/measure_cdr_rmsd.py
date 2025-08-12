@@ -111,10 +111,6 @@ def main(args):
                 extract_first_two_chains(predicted_filepath, only_ab_filepath)
                 label_filepath = os.path.join(label_dir, filename + '.pdb')
             
-                print(f'only_ab_filepath: {only_ab_filepath}')
-                print(f'label_filepath: {label_filepath}')
-                print(f"Processing {filename}...")
-
                 # PDB 파일 재체인 및 리넘버링
                 # rechain_pdb(predicted_filepath)
 
