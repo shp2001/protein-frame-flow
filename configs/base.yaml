@@ -103,7 +103,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol/2025-08-10_12-44-22/epoch=77-step=264498.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol_stage2_no_conf/2025-08-12_08-52-08/epoch=13-step=20076_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -136,7 +136,7 @@ experiment:
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_pde_loss_weight: 0.1 # 4.0 ~ 6.0
+    aux_loss_pde_loss_weight: 0.05 # 4.0 ~ 6.0
     aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
     aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
 
@@ -150,7 +150,7 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.4_biomol_stage2
+    name: CDRFlow_v1.2.4_biomol_stage2_grad_to_conf_x5
     project: se3-fm
   optimizer:
     warmup_steps: 0

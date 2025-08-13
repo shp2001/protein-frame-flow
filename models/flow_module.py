@@ -379,13 +379,13 @@ class FlowModule(LightningModule):
             interface_mask[:, interface_residues] = 1
             noisy_batch['interface_mask'] = interface_mask
 
-            with torch.no_grad():
-                _, _, mini_pred_positions, prmsd_final, mini_prmsd, mini_pred_trans, _, input_for_confidence = self.mini_rollout.sample(
-                    num_batch,
-                    num_res,
-                    self.model,
-                    noisy_batch
-                )
+            _, _, mini_pred_positions, prmsd_final, mini_prmsd, mini_pred_trans, _, input_for_confidence = self.mini_rollout.sample(
+                num_batch,
+                num_res,
+                self.model,
+                noisy_batch,
+                rollout=True
+            )
 
             plddt_logit, pde = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
             # prmsd_loss = h3_lddt_loss(
