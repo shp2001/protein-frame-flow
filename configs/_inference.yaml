@@ -10,7 +10,7 @@ inference:
 
   # Use this to write with date-time stamp.
   name: run_${now:%Y-%m-%d}_${now:%H-%M}
-  seed: 123
+  seed: 12
   task: inpainting
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
@@ -82,7 +82,7 @@ inference:
     csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
-    samples_per_target: 100
+    samples_per_target: 200
 
     # Batch size when sampling from the model
     batch_size: 25
