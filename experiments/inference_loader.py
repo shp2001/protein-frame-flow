@@ -5,7 +5,7 @@ import logging
 import torch
 from collections import defaultdict
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from data import utils as du
 
 
@@ -20,37 +20,8 @@ from itertools import accumulate
 import bisect
 
 from data import featurizer
-# def _rog_filter(df, quantile):
-#     y_quant = pd.pivot_table(
-#         df,
-#         values='radius_gyration', 
-#         index='modeled_seq_len',
-#         aggfunc=lambda x: np.quantile(x, quantile)
-#     )
-#     x_quant = y_quant.index.to_numpy()
-#     y_quant = y_quant.radius_gyration.to_numpy()
 
-#     # Fit polynomial regressor
-#     poly = PolynomialFeatures(degree=4, include_bias=True)
-#     poly_features = poly.fit_transform(x_quant[:, None])
-#     poly_reg_model = LinearRegression()
-#     poly_reg_model.fit(poly_features, y_quant)
-
-#     # Calculate cutoff for all sequence lengths
-#     max_len = df.modeled_seq_len.max()
-#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
-#     # Add a little more.
-#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
-
-#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
-#     return df[df.radius_gyration < row_rog_cutoffs]
-
-
-def _length_filter(data_csv, min_res, max_res):
-    return data_csv[
-        (data_csv.seq_len >= min_res)
-        & (data_csv.seq_len <= max_res)
-    ]
+from torch.utils.data import SequentialSampler
 
 
 def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
@@ -117,23 +88,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     }
 
 
-def _add_plddt_mask(feats, plddt_threshold):
-    feats['plddt_mask'] = torch.tensor(
-        feats['res_plddt'] > plddt_threshold).int()
-
-
-def _read_clusters(cluster_path):
-    with open(cluster_path, 'r') as f:
-        cluster_dict = json.load(f)
-    
-    pdb_to_cluster = {}
-    for cluster_id, pdb_ids in cluster_dict.items():
-        for pdb_id in pdb_ids:
-            pdb_to_cluster[pdb_id] = cluster_id
-    
-    return pdb_to_cluster
-
-
 class BaseDataset(Dataset):
     def __init__(
             self,
@@ -147,11 +101,10 @@ class BaseDataset(Dataset):
         self._inference_cfg = inf_cfg.inference
         self.task = task
 
-        num_batch = self._inference_cfg.samples.num_batch
-        self.n_samples = self._inference_cfg.samples.samples_per_target // num_batch
+        self.n_samples = self._inference_cfg.samples.samples_per_target
 
         self.raw_csv = pd.read_csv(self._inference_cfg.samples.csv_path)
-        
+
         metadata_csv = self.raw_csv
         self._create_split(metadata_csv)
         self._cache = {}
@@ -161,11 +114,11 @@ class BaseDataset(Dataset):
         for row_id in range(self.csv.shape[0]):
             target_row = self.csv.iloc[row_id]
             for sample_id in range(self.n_samples):
-                sample_ids = torch.tensor([num_batch * sample_id + i for i in range(num_batch)])
-                all_sample_ids.append((target_row, sample_ids))
+                sample_id = torch.tensor(sample_id)
+                all_sample_ids.append((target_row, sample_id))
 
         self._all_sample_ids = all_sample_ids
-
+        
     @property
     def is_training(self):
         return self._is_training
@@ -281,7 +234,7 @@ class BaseDataset(Dataset):
             feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
 
-            rng = self._rng if self.is_training else np.random.default_rng(seed=123)
+            rng = np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
             feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
                                                    feats['res_mask'], 
@@ -305,6 +258,7 @@ class BaseDataset(Dataset):
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
         feats['sample_id'] = sample_id
+
         return feats
 
 
@@ -319,7 +273,7 @@ def collate_fn(batch):
             cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=300,
+                                                    max_len=256,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=True
                                                     )
@@ -330,8 +284,6 @@ def collate_fn(batch):
                             max_len=256,
                             seq_list=feat['chain_seq_list']
                             )
-        # del feat['masked_chain']
-        # del feat['first_chain_len']
 
         not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
 
@@ -359,8 +311,7 @@ def collate_fn(batch):
         cropped_feat['pair_init'] = relpos_emb
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
-        cropped_feat['sample_id'] = feat['sample_id']
-        
+        cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
         del cropped_feat['chain_seq_list']
 
         cropped_batch.append(cropped_feat)
@@ -393,3 +344,18 @@ def collate_fn(batch):
         }
 
     return cropped_batch
+
+
+def predict_dataloader(dataset,
+                       loader_cfg):
+    return DataLoader(
+        dataset,
+        batch_size=loader_cfg.batch_size,
+        shuffle=False,
+        num_workers=loader_cfg.num_workers,
+        sampler=SequentialSampler(dataset),
+        prefetch_factor=None if loader_cfg.num_workers == 0 else loader_cfg.prefetch_factor,
+        pin_memory=False,
+        persistent_workers=True if loader_cfg.num_workers > 0 else False,
+        collate_fn=collate_fn
+    )
