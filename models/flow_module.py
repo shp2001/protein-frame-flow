@@ -365,8 +365,7 @@ class FlowModule(LightningModule):
 
 
         # calculate prmsd (perform mini rollout with 10 timesteps)
-        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        pde_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        confidence_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
         if training_cfg.aux_loss_use_confidence_loss:
             self.mini_rollout.set_device(loss_mask.device)
