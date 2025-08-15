@@ -46,14 +46,33 @@ class Experiment:
         )
         self._train_device_ids = eu.get_available_device(self._exp_cfg.num_devices)
         log.info(f"Training with devices: {self._train_device_ids}")
+
+        # FlowModule 초기화 (새로운 모듈 이미 포함)
         self._module: LightningModule = FlowModule(self._cfg)
 
-        if self._exp_cfg.add_modules:
-            state_dict = torch.load(cfg.experiment.warm_start, map_location='cpu')["state_dict"]
-            flow_state_dict = {k.replace("flow.", ""): v for k, v in state_dict.items() if k.startswith("flow.")}
-            self._module.model.load_state_dict(flow_state_dict, strict=False)
-            for name, param in self._module.model.named_parameters():
-                log.info(f"Found prmsd param: {name}")
+        # Warm-start 체크포인트 로드
+        if self._exp_cfg.warm_start:
+            self._load_warm_start()
+
+    def _load_warm_start(self):
+        """체크포인트에서 가중치 로드 및 새로운 모듈 초기화"""
+        checkpoint = torch.load(self._exp_cfg.warm_start, map_location='cpu')
+        state_dict = checkpoint.get("state_dict", checkpoint)  # 체크포인트 구조에 따라 조정
+        flow_state_dict = {
+            k.replace("model.", ""): v for k, v in state_dict.items() if k.startswith("model.")
+        }
+
+        # 기존 가중치 로드 (strict=False로 새로운 모듈 무시)
+        missing_keys, unexpected_keys = self._module.model.load_state_dict(flow_state_dict, strict=False)
+
+        log.info(f"Loaded warm-start checkpoint from {self._exp_cfg.warm_start}")
+        log.info(f"Missing keys (likely new modules): {missing_keys}")
+        log.info(f"Unexpected keys: {unexpected_keys}")
+
+        # 로드한 파라미터는 학습하지 않도록 requires_grad=False
+        for name, param in self._module.model.named_parameters():
+            if name in flow_state_dict:
+                param.requires_grad = False
 
     def _setup_dataset(self):
         if self._data_cfg.dataset == 'scope':
@@ -68,7 +87,6 @@ class Experiment:
     def run_lr_finder(self):
         # 설정된 logger 및 Trainer 준비
         logger = None if self._exp_cfg.debug else WandbLogger(**self._exp_cfg.wandb)
-
         trainer = Trainer(
             **self._exp_cfg.trainer,
             logger=logger,
@@ -80,10 +98,11 @@ class Experiment:
         )
 
         tuner = Tuner(trainer)
+        print('start to fine learning rate')
         lr_finder = tuner.lr_find(
             model=self._module,
             datamodule=self._datamodule,
-            num_training=400,
+            num_training=250,
             max_lr=0.1
         )
 

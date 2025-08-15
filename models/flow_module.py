@@ -546,7 +546,7 @@ class FlowModule(LightningModule):
         if self.confidence_model != None:
             seq = ''
             for i in batch["aatype"][0].tolist():
-                seq = seq +  rc.restypes_with_x[i]
+                seq = seq + rc.restypes_with_x[i]
 
             node_elem, node_xyz, bond_index, relpos = build_graph_tensors_multimer(
                 seq=seq,

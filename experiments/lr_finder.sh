@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v1_lrfinder
+#SBATCH -J CDRFlow_lrfinder
 #SBATCH -p gpu
-#SBATCH --gres=gpu:A6000:1
+#SBATCH --gres=gpu:A6000:2
 #SBATCH --mem=48g
 #SBATCH -c 12
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
@@ -9,4 +9,4 @@
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/lr_finder.py > /home/psh/protein-frame-flow/experiments/logs/lr_finder.log
+torchrun --standalone --nnodes=1 --nproc_per_node=2 /home/psh/protein-frame-flow/experiments/lr_finder.py > /home/psh/protein-frame-flow/experiments/logs/lr_finder.log
