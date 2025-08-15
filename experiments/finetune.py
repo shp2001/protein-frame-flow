@@ -58,13 +58,16 @@ class Experiment:
         }
 
         # 기존 가중치 로드 (strict=False로 새로운 모듈 무시)
-        missing_keys, unexpected_keys = self._module.model.load_state_dict(flow_state_dict)
+        missing_keys, unexpected_keys = self._module.model.load_state_dict(flow_state_dict, strict=False)
 
         log.info(f"Loaded warm-start checkpoint from {self._exp_cfg.warm_start}")
-
         log.info(f"Missing keys (likely new modules): {missing_keys}")
-
         log.info(f"Unexpected keys: {unexpected_keys}")
+
+        # 로드한 파라미터는 학습하지 않도록 requires_grad=False
+        for name, param in self._module.model.named_parameters():
+            if name in flow_state_dict:
+                param.requires_grad = False
 
     #     # 새로운 모듈의 가중치 초기화
     #     self._initialize_new_modules()

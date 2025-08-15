@@ -102,16 +102,8 @@ class FlowModule(LightningModule):
             current_lr,
             on_step=True,
             on_epoch=True,
-            prog_bar=False
+            prog_bar=True
         )
-    # def on_train_batch_start(self, batch, batch_idx):
-    #     # 모든 학습 가능한 파라미터 초기화
-    #     for p in self.parameters():
-    #         if p.requires_grad:
-    #             p.grad = None
-        
-    #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
-    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
     # def on_train_batch_end(self, outputs, batch, batch_idx):
     #     # Backward 이후 gradient가 계산된 파라미터 추적
@@ -121,6 +113,7 @@ class FlowModule(LightningModule):
     #             grads[id(p)] = n
         
     #     # 사용되지 않은 파라미터 찾기
+    #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
     #     unused = [self._params_before[id_p] for id_p in self._params_before 
     #             if id_p not in grads]
         
@@ -416,6 +409,7 @@ class FlowModule(LightningModule):
                 w_gt=training_cfg.w_gt,
                 w_str=training_cfg.w_str,
                 w_atom=training_cfg.w_atom)
+            
             confidence_loss = training_cfg.w_gt * loss_gt + training_cfg.w_str * loss_str + training_cfg.w_atom * loss_atom
 
         # calculate auxiliary loss 
@@ -469,10 +463,74 @@ class FlowModule(LightningModule):
             'bond_length_loss': bond_length_loss,
         }
 
+    def model_ft_step(self, noisy_batch: Any):
+        training_cfg = self._exp_cfg.training
+        loss_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
+        if torch.any(torch.sum(loss_mask, dim=-1) < 1):
+            raise ValueError('Empty batch encountered')
+        num_batch, num_res = loss_mask.shape
+        device = noisy_batch['trans_1'].device 
+
+        # Ground truth labels
+        gt_atom14_pos = noisy_batch['atom14_gt_positions'].clone()
+        print("raw_path", noisy_batch['raw_path'])
+        
+        # calculate prmsd (perform mini rollout with 10 timesteps)
+        confidence_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+
+        if training_cfg.aux_loss_use_confidence_loss:
+            self.mini_rollout.set_device(loss_mask.device)
+
+
+            _, _, mini_pred_positions, prmsd_final, mini_prmsd, mini_pred_trans, _, input_for_confidence = self.mini_rollout.sample(
+                num_batch,
+                num_res,
+                self.model,
+                noisy_batch,
+                rollout=True
+            )
+
+            # create graph tensor for confidence model
+            seq = ''
+            for i in noisy_batch["aatype"][0].tolist():
+                seq = seq +  rc.restypes_with_x[i]
+
+            node_elem, node_xyz, bond_index, relpos = build_graph_tensors_multimer(
+                seq=seq,
+                chain_list=noisy_batch['chain_idx'][0],
+                xyz_gt=noisy_batch['atom14_gt_positions'][0],
+                mask_gt=noisy_batch['atom14_gt_exists'][0],
+                xyz_decoys=mini_pred_positions,
+                residue_index=noisy_batch['res_idx'][0],
+                asym_id=noisy_batch['asym_id'][0],
+                entity_id=noisy_batch['entity_id'][0],
+                sym_id=noisy_batch['sym_id'][0],
+                device=device
+            )
+
+            scores_per_atom = self.confidence_model(node_elem, node_xyz, bond_index, relpos)[..., 0] # (D, L)
+
+            # calc loss
+            loss_gt, loss_str, loss_atom = calc_confidence_loss(
+                node_xyz, scores_per_atom,
+                w_gt=training_cfg.w_gt,
+                w_str=training_cfg.w_str,
+                w_atom=training_cfg.w_atom)
+            confidence_loss = training_cfg.w_gt * loss_gt + training_cfg.w_str * loss_str + training_cfg.w_atom * loss_atom
+
+        # calculate auxiliary loss 
+        se3_vf_loss = confidence_loss
+        print("confidence_loss", confidence_loss)
+        return {
+            'se3_vf_loss': se3_vf_loss,
+            'confidence_loss': confidence_loss,
+        }
+    
     def validation_step(self, batch: Any, batch_idx: int):
         res_mask = batch['res_mask']
+        device = res_mask.device
         b = res_mask.shape[0]
-        self.interpolant.set_device(res_mask.device)
+        self.interpolant.set_device(device)
         num_batch, num_res = res_mask.shape
         diffuse_mask = batch['diffuse_mask']
         raw_path = batch['raw_path']
@@ -484,7 +542,28 @@ class FlowModule(LightningModule):
             self.model,
             batch
         )
-        
+        logit = None 
+        if self.confidence_model != None:
+            seq = ''
+            for i in batch["aatype"][0].tolist():
+                seq = seq +  rc.restypes_with_x[i]
+
+            node_elem, node_xyz, bond_index, relpos = build_graph_tensors_multimer(
+                seq=seq,
+                chain_list=batch['chain_idx'][0],
+                xyz_gt=batch['atom14_gt_positions'][0],
+                mask_gt=batch['atom14_gt_exists'][0],
+                xyz_decoys=pred_positions,
+                residue_index=batch['res_idx'][0],
+                asym_id=batch['asym_id'][0],
+                entity_id=batch['entity_id'][0],
+                sym_id=batch['sym_id'][0],
+                device=device
+            )
+
+            logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B, L_atom, 1)
+            unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()) # (B, L, 14, 1)
+
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
         for i in range(pred_positions.shape[0]):
@@ -503,13 +582,14 @@ class FlowModule(LightningModule):
 
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
-            b_factors = prmsd_final[i].cpu().numpy()
-            if (b_factors==0).all():
+
+            if logit == None:
                 b_factor_alt = diffuse_mask.cpu().numpy()
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
             
             else:
-                b_factors = np.tile((b_factors)[:, None], (1, 37))
+                b_factors = unflatten_logit[i].cpu().numpy() # (L, 14, 1)
+                b_factors = all_atom.atom14_to_atom37(b_factors, batch).squeeze(-1)
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
@@ -529,7 +609,7 @@ class FlowModule(LightningModule):
                     [saved_path, self.global_step, wandb.Molecule(saved_path)]
                 )
 
-            # calculate trans loss (rmsd)
+            # calculate trans loss (rmsd)  
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
             trans_loss = torch.sum(
@@ -571,6 +651,15 @@ class FlowModule(LightningModule):
             h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
 
             batch_metrics.append(h3_trans_loss_dict)
+            if self._exp_cfg.stage == 'confidence':
+                loss_gt, loss_str, loss_atom = calc_confidence_loss(
+                    node_xyz, logit,
+                    w_gt=self._exp_cfg.training.w_gt,
+                    w_str=self._exp_cfg.training.w_str,
+                    w_atom=self._exp_cfg.training.w_atom)
+                loss_dict = {'loss_str': loss_str,
+                             'loss_atom': loss_atom}
+                batch_metrics.append(loss_dict)
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
@@ -605,10 +694,6 @@ class FlowModule(LightningModule):
     #             grad_norm_before = param.grad.norm(2).item()
     #             print(f"Gradient norm for {name} before clipping: {grad_norm_before}")
                 
-    #             # 클리핑 후 gradient의 norm 출력
-    #             torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
-    #             grad_norm_after = param.grad.norm(2).item()
-    #             print(f"Gradient norm for {name} after clipping: {grad_norm_after}")
 
     def _log_scalar(
             self,
@@ -642,27 +727,25 @@ class FlowModule(LightningModule):
         self.interpolant.set_device(batch['res_mask'].device)
         noisy_batch = self.interpolant.corrupt_batch(batch)
         
-        if self._interpolant_cfg.self_condition and random.random() > 0.5:
-            with torch.no_grad():
-                model_sc = self.model(noisy_batch)
-                noisy_batch['trans_sc'] = (
-                    model_sc['pred_trans'] * noisy_batch['diffuse_mask'][..., None]
-                    + noisy_batch['trans_1'] * (1 - noisy_batch['diffuse_mask'][..., None])
-                )
-                noisy_batch['rotmats_sc'] = (
-                    model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
-                    + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
-                )
+        if self._exp_cfg.stage == 'pretraining' or self._exp_cfg.stage == 'finetuning':
+            if self._interpolant_cfg.self_condition and random.random() > 0.5:
+                with torch.no_grad():
+                    model_sc = self.model(noisy_batch)
+                    noisy_batch['trans_sc'] = (
+                        model_sc['pred_trans'] * noisy_batch['diffuse_mask'][..., None]
+                        + noisy_batch['trans_1'] * (1 - noisy_batch['diffuse_mask'][..., None])
+                    )
+                    noisy_batch['rotmats_sc'] = (
+                        model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
+                        + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
+                    )
 
-        batch_losses = self.model_step(noisy_batch)
+            batch_losses = self.model_step(noisy_batch)
 
-        # for error proof
-        self.is_loss_nan = False 
-        if torch.any(torch.isnan(batch_losses['se3_vf_loss'])):
-            self.is_loss_nan = True
-            return None 
+        else:
+            batch_losses = self.model_ft_step(noisy_batch)
         
-        num_batch = batch_losses['trans_loss'].shape[0]
+        num_batch = batch['aatype'].shape[0]
         total_losses = {
             k: torch.mean(v) for k,v in batch_losses.items()
         }
@@ -670,27 +753,28 @@ class FlowModule(LightningModule):
             self._log_scalar(
                 f"train/{k}", v, prog_bar=False, batch_size=num_batch)
 
-        # Losses to track. Stratified across t.
-        so3_t = torch.squeeze(noisy_batch['so3_t'])
-        self._log_scalar(
-            "train/so3_t",
-            np.mean(du.to_numpy(so3_t)),
-            prog_bar=False, batch_size=num_batch)
-        r3_t = torch.squeeze(noisy_batch['r3_t'])
-        self._log_scalar(
-            "train/r3_t",
-            np.mean(du.to_numpy(r3_t)),
-            prog_bar=False, batch_size=num_batch)
-        for loss_name, loss_dict in batch_losses.items():
-            if loss_name == 'rots_vf_loss':
-                batch_t = so3_t
-            else:
-                batch_t = r3_t
-            stratified_losses = mu.t_stratified_loss(
-                batch_t, loss_dict, loss_name=loss_name)
-            for k,v in stratified_losses.items():
-                self._log_scalar(
-                    f"train/{k}", v, prog_bar=False, batch_size=num_batch)
+        if self._exp_cfg.stage in ['pretraining', 'finetuning']:
+            # Losses to track. Stratified across t.
+            so3_t = torch.squeeze(noisy_batch['so3_t'])
+            self._log_scalar(
+                "train/so3_t",
+                np.mean(du.to_numpy(so3_t)),
+                prog_bar=False, batch_size=num_batch)
+            r3_t = torch.squeeze(noisy_batch['r3_t'])
+            self._log_scalar(
+                "train/r3_t",
+                np.mean(du.to_numpy(r3_t)),
+                prog_bar=False, batch_size=num_batch)
+            for loss_name, loss_dict in batch_losses.items():
+                if loss_name == 'rots_vf_loss':
+                    batch_t = so3_t
+                else:
+                    batch_t = r3_t
+                stratified_losses = mu.t_stratified_loss(
+                    batch_t, loss_dict, loss_name=loss_name)
+                for k,v in stratified_losses.items():
+                    self._log_scalar(
+                        f"train/{k}", v, prog_bar=False, batch_size=num_batch)
 
         # Training throughput
         scaffold_percent = torch.mean(batch['diffuse_mask'].float()).item()
@@ -779,11 +863,6 @@ class FlowModule(LightningModule):
 
         optimizer.step(closure=optimizer_closure)
 
-    def on_train_batch_start(self, batch, batch_idx):
-        # 첫 번째 optimizer 기준
-        optimizer = self.trainer.optimizers[0]
-        lr = optimizer.param_groups[0]['lr']
-        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
         
     def predict_step(self, batch, batch_idx):
         del batch_idx # Unused

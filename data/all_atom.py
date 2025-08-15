@@ -334,3 +334,34 @@ def atom14_to_atom37(position: np.ndarray, sample: dict) -> np.ndarray:
     }
     
     return openfold_atom14_to_atom37(position, batch)
+
+def atom_flatten(unflatten_atom, mask):
+    """
+    coorunflatten_atomds: [B, L, 14, d]
+    mask:   [L, 14]  (배치 동일)
+    return: [B, L_atom, d]
+    """
+    # mask 브로드캐스트: (1, L, 14, 1)
+    B, L, A, d = unflatten_atom.shape
+    mask_expand = mask.unsqueeze(0).unsqueeze(-1)  # [1, L, 14, 1]
+    flatten = unflatten_atom[mask_expand.expand_as(unflatten_atom)].view(B, -1, d)
+    return flatten
+
+def atom_unflatten(flatten_atom, mask):
+    """
+    flatten_atom: [B, L_atom, 3]
+    mask:         [L, 14] (배치 동일)
+    return:       [B, L, 14, 3]
+    """
+    B, L_atom, d = flatten_atom.shape
+    L, A = mask.shape
+    coords_full = torch.zeros((B, L, A, d), device=flatten_atom.device, dtype=flatten_atom.dtype)
+    
+    # mask 브로드캐스트: (1, L, 14, 1)
+    mask_expand = mask.unsqueeze(0).unsqueeze(-1)  # [1, L, 14, 1]
+    
+    # True 위치만 flatten_atom 값을 대입
+    coords_full[mask_expand.expand_as(coords_full)] = flatten_atom.view(-1)
+    coords_full = coords_full.reshape(B, L, A, d)
+    
+    return coords_full

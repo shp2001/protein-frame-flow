@@ -23,7 +23,7 @@ data:
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 40
-    max_num_res_squared: 150_000
+    max_num_res_squared: 325_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
     
@@ -105,6 +105,7 @@ experiment:
   num_devices: 2
   warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol_stage2_no_conf/2025-08-12_08-52-08/epoch=13-step=20076_copy.ckpt
   warm_start_cfg_override: False
+  stage: confidence # ['pretraining', 'finetuning', 'confidence']
   training:
     mask_plddt: True
     bb_atom_scale: 0.1
@@ -137,7 +138,7 @@ experiment:
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     
-    aux_loss_confidence_loss_weight: 0.1 # 4.0 ~ 6.0
+    aux_loss_confidence_loss_weight: 1.0 # 4.0 ~ 6.0
     w_gt: 0.0
     w_str: 1.0
     w_atom: 0.1
@@ -155,13 +156,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.4_ebm
+    name: CDRFlow_v1.2.4_ebm_exp
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-5
-    max_lr: 1e-5
+    min_lr: 1e-3
+    max_lr: 1e-3
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

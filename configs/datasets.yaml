@@ -62,8 +62,8 @@ pdb_dataset:
   crop_ab: True
   ab_threshold: 40
   general_threshold: 40
-  ab_max_num_res: 256
-  general_max_num_res: 256
+  ab_max_num_res: 228
+  general_max_num_res: 228
   
   # Filtering
   filter:
