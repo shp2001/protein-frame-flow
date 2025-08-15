@@ -10,6 +10,8 @@ from bisect import bisect_left, bisect_right
 import random
 import json 
 
+from EBM_MPNN.scripts.common.chemical import * 
+
 def get_pdb_chain_seq(
     pdb_file,
     chain_id,
@@ -500,9 +502,11 @@ def embed_relpos(residue_index, seq_list):
 
 
     relpos_emb = relpos(    
-                    residue_index,
-                    asym_id,
-                    entity_id,
-                    sym_id)
+        residue_index,
+        asym_id,
+        entity_id,
+        sym_id
+        )
     
-    return relpos_emb
+    return relpos_emb, asym_id, entity_id, sym_id
+

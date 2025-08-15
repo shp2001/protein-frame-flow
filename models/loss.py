@@ -870,23 +870,14 @@ def h3_pde_loss(
 
     dist_error = torch.abs(pred_dist - gt_dist)  # (B, L, L)
 
-    # 2) bin 경계 생성
     bin_edges = torch.linspace(min_bin, max_bin, num_bins + 1, device=device)
-
-    # 3) bin index 계산
     bin_indices = torch.bucketize(dist_error, bin_edges) - 1
     bin_indices = bin_indices.clamp(min=0, max=num_bins - 1)
 
-    # 4) one-hot encoding
     gt_error_distogram = nn.functional.one_hot(bin_indices, num_classes=num_bins).float()  # (B, L, L, 64)
-
-    # 5) log pde 계산
     log_pde = torch.log(pde + 1e-8)
-
-    # 6) per-element loss
     loss_per_element = -(gt_error_distogram * log_pde).sum(dim=-1)  # (B, L, L)
 
-    # 7) CDR 행 마스크 적용 (열은 전부 포함)
     row_mask = torch.zeros(L, device=device)
     row_mask[cdr_residues] = 1
     cdr_mask = row_mask.unsqueeze(1).expand(L, L).clone()  # (L, L)
@@ -894,7 +885,6 @@ def h3_pde_loss(
 
     loss_per_element = loss_per_element * cdr_mask
 
-    # 8) 배치별 평균 loss 계산
     valid_pairs = cdr_mask.sum()
     loss_per_batch = loss_per_element.sum(dim=(1, 2)) / valid_pairs
 
@@ -1295,3 +1285,148 @@ def clash_potential(translations: torch.Tensor, rotmats: torch.Tensor, local_ato
         interface_mask=batch['interface_mask'].clone()
     )
     return within + inter
+
+# Energy-based loss 
+
+def compute_lddt_per_atom(
+    coords_gt: torch.Tensor,       # (L, 3)
+    coords_decoy: torch.Tensor,    # (D, L, 3)
+    cutoff: float = 15.0,
+    thresholds=(0.5, 1.0, 2.0, 4.0)
+) -> torch.Tensor:
+    """
+    Computes per-atom lDDT scores for each decoy structure.
+
+    Args:
+        coords_gt:    FloatTensor, ground-truth atom positions, shape (L,3)
+        coords_decoy: FloatTensor, decoy atom positions, shape (D,L,3)
+        cutoff:       Distance cutoff for neighbor selection (Å)
+        thresholds:   Tuple of lDDT thresholds (Å)
+
+    Returns:
+        FloatTensor of shape (D, L) with per-atom lDDT scores in [0,1].
+    """
+    ## Number of atoms and decoys
+    #L = coords_gt.size(0)
+    #D = coords_decoy.size(0)
+
+    ## 1) Pairwise distances in ground-truth
+    #diff_gt = coords_gt.unsqueeze(1) - coords_gt.unsqueeze(0)     # (L, L, 3)
+    #d_gt = diff_gt.norm(dim=-1)                                   # (L, L)
+
+    ## 2) Neighbor mask: exclude self, include edges within cutoff
+    #neigh_mask = (d_gt <= cutoff) & (d_gt > 0)                    # (L, L)
+
+    ## 3) Pairwise distances in decoys
+    #diff_dec = coords_decoy[:, :, None, :] - coords_decoy[:, None, :, :]  # (D, L, L, 3)
+    #d_dec = diff_dec.norm(dim=-1)                                        # (D, L, L)
+
+    ## 4) Compute absolute error for each threshold
+    #thr = torch.tensor(thresholds, device=coords_gt.device).view(-1, 1, 1, 1)  # (T,1,1,1)
+    ## error mask: (T, D, L, L)
+    #error = (d_dec.unsqueeze(0) - d_gt.unsqueeze(0)).abs() <= thr
+
+    ## 5) Restrict to valid neighbor pairs
+    #error = error & neigh_mask.unsqueeze(0).unsqueeze(0)  # broadcast to (T, D, L, L)
+
+    ## 6) Count neighbors per atom
+    #neighbor_counts = neigh_mask.sum(dim=1).clamp(min=1)  # (L,)
+
+    ## 7) Sum error per atom and threshold
+    ##    error is bool[T,D,L,L] -> float and sum over neighbor dim j -> shape (T, D, L)
+    #e_sum = error.float().sum(dim=-1)                    # (T, D, L)
+
+    ## 8) Fraction within threshold: divide by neighbor_counts
+    #frac = e_sum / neighbor_counts.view(1, 1, L)         # (T, D, L)
+
+    ## 9) Average over thresholds -> per-atom lDDT, shape (D, L)
+    #lddt_per_atom = frac.mean(dim=0)
+
+    #return lddt_per_atom
+    
+    L = coords_gt.size(0)
+    D = coords_decoy.size(0)
+
+    # 1) GT pairwise distances and neighbor mask
+    diff_gt = coords_gt.unsqueeze(1) - coords_gt.unsqueeze(0)  # (L,L,3)
+    d_gt = diff_gt.norm(dim=-1)                                # (L,L)
+    neigh = (d_gt <= cutoff) & (d_gt > 0)                      # (L,L)
+    idx_i, idx_j = torch.where(neigh)                          # (M,)
+
+    M = idx_i.size(0)
+    T = len(thresholds)
+
+    # 2) GT distances for neighbor pairs
+    d_gt_pairs = d_gt[idx_i, idx_j]                            # (M,)
+
+    # 3) Decoy distances for those pairs
+    dec_i = coords_decoy[:, idx_i]                             # (D,M,3)
+    dec_j = coords_decoy[:, idx_j]                             # (D,M,3)
+    d_dec_pairs = (dec_i - dec_j).norm(dim=-1)                 # (D,M)
+
+    # 4) Compute boolean mask of errors within thresholds
+    thr = torch.tensor(thresholds, device=coords_gt.device)    # (T,)
+    thr = thr.view(T, 1, 1)                                    # (T,1,1)
+    # (T,D,M)
+    ok = (d_dec_pairs.unsqueeze(0) - d_gt_pairs.unsqueeze(0).unsqueeze(0)).abs() <= thr
+
+    # 5) Neighbor counts per atom
+    neighbor_counts = neigh.sum(dim=1).clamp(min=1).float()     # (L,)
+
+    # 6) Initialize accumulator (T,D,L)
+    score_sum = torch.zeros((T, D, L), device=coords_gt.device)
+
+    # Expand idx_i for D dimension
+    idx_i_expand = idx_i.unsqueeze(0).expand(D, M)             # (D,M)
+
+    # 7) Scatter-add for each threshold
+    for t in range(T):
+        # ok[t]: (D,M) boolean -> float
+        vals = ok[t].float()                                   # (D,M)
+        # accumulate per atom i: scatter_add along L dimension
+        score_sum[t].scatter_add_(1, idx_i_expand, vals)
+
+    # 8) Compute fraction per threshold and atom
+    frac = score_sum / neighbor_counts.view(1, 1, L)           # (T,D,L)
+
+    # 9) Average over thresholds -> (D,L)
+    lddt_per_atom = frac.mean(dim=0)
+
+    return lddt_per_atom
+
+def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0):
+    xyz_gt = node_xyz[0] # (L, 3)
+    xyz_decoys = node_xyz[1:] # (D, L, 3)
+
+    score_gt = scores_per_atom[0,:] # (L)
+    score_decoys = scores_per_atom[1:,:] # (D, L)
+
+    lddt_per_atom = compute_lddt_per_atom(xyz_gt, xyz_decoys) # (D, L)
+    lddt_per_decoy = lddt_per_atom.mean(dim=-1)
+
+    # make ground-truth score in certain range
+    if w_gt > 0.0:
+        loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
+    else:
+        with torch.no_grad():
+            loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
+
+    # margin loss per structure
+    if w_str > 0.0:
+        margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D)
+        loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
+    else:
+        with torch.no_grad():
+            margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D)
+            loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
+
+    # margin loss per atoms
+    if w_atom > 0.0:
+        margins_per_atom = min_margin + (1.0 - lddt_per_atom) * (max_margin - min_margin) # (D, L)
+        loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
+    else:
+        with torch.no_grad():
+            margins_per_atom = min_margin + (1.0 - lddt_per_atom) * (max_margin - min_margin) # (D, L)
+            loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
+
+    return loss_gt, loss_str, loss_atom

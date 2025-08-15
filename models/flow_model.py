@@ -5,14 +5,15 @@ from torch import nn
 from models.node_feature_net import NodeFeatureNet
 from models.edge_feature_net import EdgeFeatureNet
 from models.heads import AAContactHead, DistogramHead, AllAtomModule
-from models.utils import calc_distogram, calc_unit_vector
 from models import ipa_pytorch
 from data import utils as du
+from data import residue_constants
 from openfold.utils.tensor_utils import dict_multimap
 from openfold.utils.rigid_utils import local_to_global
-from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 
+from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
 from Protenix.protenix.model.modules import transformer
+from EBM_MPNN.scripts.model.model import EBMMPNN
 
 class FlowModel(nn.Module):
 
@@ -212,9 +213,10 @@ class FlowModel(nn.Module):
 
         all_atom_outputs = dict_multimap(torch.stack, all_atom_outputs)
         input_for_confidence = {
-            'node_embed': node_embed,
-            'edge_embed': edge_embed,
-            'curr_rigids': curr_rigids_unscaled
+            'aatype': input_feats['aatype'][0],
+            'xyz_gt': input_feats['atom14_gt_positions'][0],
+            'xyz_decoys': all_atom_outputs['positions'],
+            'mask_gt': input_feats['atom14_gt_exists'][0]
         }
 
         return {
@@ -232,69 +234,16 @@ class ConfidenceModel(nn.Module):
     def __init__(self, model_conf):
         super(ConfidenceModel, self).__init__()
         self._model_conf = model_conf
-        self._aa_enc_conf = model_conf.aa_enc
-        self._ipa_conf = model_conf.ipa
-        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
-        self._all_atom_conf = model_conf.all_atom
-        self._distogram_conf = model_conf.distogram_head
-        self._confidence_head = model_conf.confidence_head
-        self.rigids_ang_to_nm = lambda x: x.apply_trans_fn(lambda x: x * du.ANG_TO_NM_SCALE)
-        self.rigids_nm_to_ang = lambda x: x.apply_trans_fn(lambda x: x * du.NM_TO_ANG_SCALE) 
+        confidence_head = model_conf.confidence_head
 
-        self.s_transform = ipa_pytorch.Linear(self._confidence_head.c_s, self._confidence_head.c_s)
-        self.str_2_pair = ipa_pytorch.Linear(self._distogram_conf.num_bins + 3, self._confidence_head.c_z)
-
-        self.edge_transition = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-        self.distogram_error_head = DistogramHead(
-            self._confidence_head.c_z,
-            self._confidence_head.num_bins
-            )
-
-
-    def forward(self, input_feats, node_mask):
-        edge_mask = node_mask[:, None] * node_mask[:, :, None]
-
-        # Initialize node and edge embeddings
-        node_embed = input_feats['node_embed']
-        edge_embed = input_feats['edge_embed']
-        curr_rigids = input_feats['curr_rigids']
-
-        # transform single feature 
-        node_embed = self.s_transform(node_embed)
-        
-        # transform pair feature
-        pred_trans = curr_rigids.get_trans()
-        pred_distogram = calc_distogram(
-            pos=pred_trans, 
-            min_bin=self._distogram_conf.min_bin,
-            max_bin=self._distogram_conf.max_bin,
-            num_bins=self._distogram_conf.num_bins
-            )
-        pred_unit_vector = calc_unit_vector(
-            rigids=curr_rigids
+        self.ebm_mpnn = EBMMPNN(
+            num_node_features=confidence_head.num_node_features,
+            hidden_dim=confidence_head.hidden_dim,
+            num_encoder_layers=confidence_head.num_encoder_layers,
+            k_neighbors=confidence_head.k_neighbors,
+            dropout=confidence_head.dropout
         )
-        edge_embed = edge_embed + self.str_2_pair(torch.concat([pred_distogram, pred_unit_vector], dim=-1))
 
-        # apply local triangle 
-        edge_embed = self.edge_transition(
-            node_embed, edge_embed, curr_rigids, edge_mask
-        )
-        
-        pde = self.distogram_error_head(edge_embed) # softmax 적용
-
-        plddt_logit = None
-        # # plddt 
-        # curr_rigids_scaled = self.rigids_ang_to_nm(curr_rigids)
-        # node_embed = self.ipa(
-        #     node_embed,
-        #     edge_embed,
-        #     curr_rigids_scaled,
-        #     node_mask)
-        # node_embed = node_embed * node_mask[..., None]
-        
-        # seq_tfmr_out = self.seq_tfmr(
-        #     node_embed, src_key_padding_mask=(1 - node_mask).to(torch.bool))
-        # node_embed = node_embed + self.post_tfmr(seq_tfmr_out)
-        # plddt_logit = self.plddt_head(node_embed) # softmax 미적용
-
-        return plddt_logit, pde
+    def forward(self, node_elem, node_xyz, bond_index, relpos):
+        lgoit = self.ebm_mpnn(node_elem, node_xyz, bond_index, relpos)
+        return lgoit

@@ -823,7 +823,7 @@ unk_restype_index = restype_num  # Catch-all index for unknown restypes.
 
 restypes_with_x = restypes + ['X']
 restype_order_with_x = {restype: i for i, restype in enumerate(restypes_with_x)}
-
+index_to_restype = {v: k for k, v in restype_order_with_x.items()}
 
 def sequence_to_onehot(
     sequence: str,

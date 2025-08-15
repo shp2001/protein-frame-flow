@@ -305,13 +305,18 @@ def collate_fn(batch):
                 cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
         # make pair_init (relpos)
-        relpos_emb = embed_relpos(cropped_feat['res_idx'],
-                                cropped_feat['chain_seq_list'])
+        relpos_emb, asym_id, entity_id, sym_id = embed_relpos(
+            cropped_feat['res_idx'],
+            cropped_feat['chain_seq_list']
+            )
         
         cropped_feat['pair_init'] = relpos_emb
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
         cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
+        cropped_feaet['asym_id'] = asym_id
+        cropped_feaet['entity_id'] = entity_id
+        cropped_feaet['sym_id'] = sym_id
         del cropped_feat['chain_seq_list']
 
         cropped_batch.append(cropped_feat)

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v1.2.4_biomol_stage2_grad_to_conf_x5
+#SBATCH -J CDRFlow_v1.2.4_ebm
 #SBATCH -p gpu
 #SBATCH -w gpu05
 #SBATCH --gres=gpu:A6000:2

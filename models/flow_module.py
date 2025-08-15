@@ -19,12 +19,16 @@ from data.interpolant import Interpolant
 from data import utils as du
 from data import all_atom
 from data import so3_utils
-from data import residue_constants
+from data import residue_constants as rc
+from data import motif_index 
+
 from experiments import utils as eu
 from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
 from openfold.utils.loss import between_residue_bond_loss
 import sys 
+from EBM_MPNN.scripts.data.data_loader import build_graph_tensors_multimer
+
 sys.stdout.flush()
 
 class FlowModule(LightningModule):
@@ -387,25 +391,33 @@ class FlowModule(LightningModule):
                 rollout=True
             )
 
-            plddt_logit, pde = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
-            # prmsd_loss = h3_lddt_loss(
-            #     logits=plddt_logit,
-            #     all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
-            #     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-            #     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
-            #     cdr_residues=cdr_residues
-            #     )
+            # create graph tensor for confidence model
+            seq = ''
+            for i in noisy_batch["aatype"][0].tolist():
+                seq = seq +  rc.restypes_with_x[i]
 
-            pde_loss = h3_pde_loss(
-                pde=pde,
-                gt_coord=noisy_batch['trans_1'],
-                pred_coord=mini_pred_trans,
-                cdr_residues=cdr_residues,
-                min_bin=self._exp_cfg.training.min_bin,
-                max_bin=self._exp_cfg.training.max_bin,
+            node_elem, node_xyz, bond_index, relpos = build_graph_tensors_multimer(
+                seq=seq,
+                chain_list=noisy_batch['chain_idx'][0],
+                xyz_gt=noisy_batch['atom14_gt_positions'][0],
+                mask_gt=noisy_batch['atom14_gt_exists'][0],
+                xyz_decoys=mini_pred_positions,
+                residue_index=noisy_batch['res_idx'][0],
+                asym_id=noisy_batch['asym_id'][0],
+                entity_id=noisy_batch['entity_id'][0],
+                sym_id=noisy_batch['sym_id'][0],
+                device=device
             )
-            # final_prmsd = compute_prmsd(pred_rmsd, cdr_mask=noisy_batch['diffuse_mask'])
-            # print(f"prmsd_max: {torch.max(final_prmsd[0])}")
+
+            scores_per_atom = self.confidence_model(node_elem, node_xyz, bond_index, relpos)[..., 0] # (D, L)
+
+            # calc loss
+            loss_gt, loss_str, loss_atom = calc_confidence_loss(
+                node_xyz, scores_per_atom,
+                w_gt=training_cfg.w_gt,
+                w_str=training_cfg.w_str,
+                w_atom=training_cfg.w_atom)
+            confidence_loss = training_cfg.w_gt * loss_gt + training_cfg.w_str * loss_str + training_cfg.w_atom * loss_atom
 
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
@@ -440,7 +452,7 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
         )
     
-        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + pde_loss * training_cfg.aux_loss_pde_loss_weight
+        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + confidence_loss * training_cfg.aux_loss_confidence_loss_weight
 
         return {
             "trans_loss": trans_loss,
@@ -452,7 +464,7 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
-            'pde_loss': pde_loss,
+            'confidence_loss': confidence_loss,
             'distogram_loss': distogram_loss,
             'contact_map_loss': contact_map_loss,
             'bond_length_loss': bond_length_loss,
