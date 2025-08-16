@@ -521,9 +521,15 @@ class FlowModule(LightningModule):
         # calculate auxiliary loss 
         se3_vf_loss = confidence_loss
         print("confidence_loss", confidence_loss)
+        print("loss_gt", loss_gt)
+        print("loss_str", loss_str)
+        print("loss_atom", loss_atom)
         return {
             'se3_vf_loss': se3_vf_loss,
             'confidence_loss': confidence_loss,
+            'loss_gt': loss_gt,
+            'loss_str': loss_str,
+            'loss_atom': loss_atom
         }
     
     def validation_step(self, batch: Any, batch_idx: int):
@@ -561,8 +567,8 @@ class FlowModule(LightningModule):
                 device=device
             )
 
-            logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B, L_atom, 1)
-            unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()) # (B, L, 14, 1)
+            logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B+1, L_atom, 1)
+            unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()) # (B+1, L, 14, 1)
 
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
@@ -588,7 +594,7 @@ class FlowModule(LightningModule):
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
             
             else:
-                b_factors = unflatten_logit[i].cpu().numpy() # (L, 14, 1)
+                b_factors = unflatten_logit[i+1].cpu().numpy() # (L, 14, 1), i+1인 이유는 unflatten_logit의 첫번째 batch는 정답구조의 logit이므로 
                 b_factors = all_atom.atom14_to_atom37(b_factors, batch).squeeze(-1)
 
             saved_path = au.write_prot_to_pdb(
@@ -892,42 +898,44 @@ class FlowModule(LightningModule):
             )
 
             if self.confidence_model != None:
-                _, pde = self.confidence_model(input_for_confidence, batch['res_mask'])
-            
-                # calculate pde-based confidence 
-                num_bins = pde.shape[-1]  # 32
-                bin_edges = torch.linspace(
-                    self._exp_cfg.training.min_bin,
-                    self._exp_cfg.training.max_bin,
-                    steps=num_bins + 1,
-                    device=pde.device
-                )  # (33,)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
-                bin_centers = bin_centers.reshape(1, 1, 1, -1)  # shape: (1, 1, 1, 32)
-                expected_pde = torch.sum(pde * bin_centers, axis=-1)  # shape: (B, N, N)
-                h3_anchor = find_anchor(batch['diffuse_mask'][0])
+                seq = ''
+                for i in batch["aatype"][0].tolist():
+                    seq = seq + rc.restypes_with_x[i]
 
-                expected_pde = expected_pde[:, h3_anchor[0]+1:h3_anchor[1], :]
-                mean_expected_pde = expected_pde.mean(dim=(1, 2))    # (B,)
-                ##########################################
-                gt_diff = trans_1.unsqueeze(2) - trans_1.unsqueeze(1)  # (B, L, L, 3)
-                gt_dist = torch.norm(gt_diff, dim=-1)  # (B, L, L)
+                node_elem, node_xyz, bond_index, relpos = build_graph_tensors_multimer(
+                    seq=seq,
+                    chain_list=batch['chain_idx'][0],
+                    xyz_gt=batch['atom14_gt_positions'][0],
+                    mask_gt=batch['atom14_gt_exists'][0],
+                    xyz_decoys=pred_positions,
+                    residue_index=batch['res_idx'][0],
+                    asym_id=batch['asym_id'][0],
+                    entity_id=batch['entity_id'][0],
+                    sym_id=batch['sym_id'][0],
+                    device=device
+                )
 
-                pred_diff = pred_trans_1.unsqueeze(2) - pred_trans_1.unsqueeze(1)  # (B, L, L, 3)
-                pred_dist = torch.norm(pred_diff, dim=-1)  # (B, L, L)
+                logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B+1, L_atom, 1)
+                unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()).squeeze(-1) # (B+1, L, 14)
 
-                dist_error = torch.abs(pred_dist - gt_dist)  # (B, L, L)
-                dist_error = dist_error[:, h3_anchor[0]+1:h3_anchor[1], :]
-                gt_mean_expected_pde = dist_error.mean(dim=(1, 2))    # (B,)
-                ##########################################
 
             bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
             pred_positions_37 = []
-
+            b_factors = []
             pred_positions = du.to_numpy(pred_positions) # (B, L_crop, 14 , 3)
             gt_positions = du.to_numpy(batch['original_atom14_gt_positions']) # (L, 14, 3)
             batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
             batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
+
+            # expand b_factors to total_b_factors
+            
+            L_total = batch['original_diffuse_mask'].shape[0]
+            B, L_part, A, d = batch['atom14_gt_positions'].shape
+            if logit != None:
+                total_b_factors = torch.zeros(B, L_total, A, device=device, dtype=logit.dtype)
+                batch_idx = torch.arange(B, device=device).unsqueeze(1).expand(B, L_part)
+                total_b_factors[batch_idx, batch["res_idx"], :] = unflatten_logit[1:]
+                total_b_factors = du.to_numpy(total_b_factors) # (B, L, 14)
 
             for i in range(pred_positions.shape[0]):
                 pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
@@ -939,13 +947,19 @@ class FlowModule(LightningModule):
                 gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
                 pred_positions_37.append(gt_position_37)
 
+                # processing b_factors 
+                if logit == None:
+                    b_factor_alt = diffuse_mask.cpu().numpy()
+                    b_factor = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
+                    
+                else:
+                    b_factor = total_b_factors[i] # (L, 14)
+                    b_factor = all_atom.atom14_to_atom37(np.expand_dims(b_factor, axis=-1), gt_batch) # (L, 37, 1)
+                    b_factor = np.squeeze(b_factor, axis=-1) # (L, 37)
+                b_factors.append(b_factor)
 
             pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
-
-            total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
-            total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
-            prmsds = du.to_numpy(total_prmsd)
-
+            final_b_factors = np.stack(b_factors) # (B, L, 37)
             samples = os.listdir(sample_root_dir)
             sample_nums = samples 
             next_sample_num = -1
@@ -957,34 +971,21 @@ class FlowModule(LightningModule):
                 next_sample_num += 1
                 sample_dir = os.path.join(sample_root_dir, f"sample_{next_sample_num}")
                 pred_position = pred_positions[i]
-                prmsd = prmsds[i]
                 bb_traj = bb_trajs[i]
                 os.makedirs(sample_dir, exist_ok=True)
                 aatype = du.to_numpy(batch['original_aatype'].long())
                 chain_idx = du.to_numpy(batch['original_chain_idx'].long())
 
-                # save confidence metric 
-                if self.confidence_model != None:
-                    with open(os.path.join(sample_dir, 'pde.txt'), 'w') as f:
-                        f.write(f"{mean_expected_pde[i]}\n")
-                    with open(os.path.join(sample_dir, 'gt_pde.txt'), 'w') as f:
-                        f.write(f"{gt_mean_expected_pde[i]}\n")
-                    eu.visualize_distogram(
-                        expected_pde[i], 
-                        os.path.join(sample_dir, 'pde.png'), 
-                        )
-
-                    eu.visualize_distogram(
-                        dist_error[i], 
-                        os.path.join(sample_dir, 'gt_distance_error.png'), 
-                        )
+                # save h3 cdr b_Factors
+                h3_anchor = motif_index.find_anchor(batch['diffuse_mask'][i]) 
+                torch.save(unflatten_logit[i+1, h3_anchor[0]+1:h3_anchor[1]], os.path.join(sample_dir, 'b_factor.pt'))
                 
                 # save structure data 
                 _ = eu.save_traj(
                     sample=pred_position, # (L, 37, 3)
                     bb_prot_traj=bb_traj, 
                     x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                    b_factors=prmsd,  # 위의 prmsd 집어넣기 
+                    b_factors=final_b_factors[i],  # 위의 prmsd 집어넣기 
                     diffuse_mask=batch['original_diffuse_mask'].cpu().numpy(),
                     output_dir=sample_dir,
                     aatype=aatype,

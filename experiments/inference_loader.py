@@ -273,7 +273,7 @@ def collate_fn(batch):
             cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=256,
+                                                    max_len=228,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=True
                                                     )
@@ -314,9 +314,9 @@ def collate_fn(batch):
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
         cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
-        cropped_feaet['asym_id'] = asym_id
-        cropped_feaet['entity_id'] = entity_id
-        cropped_feaet['sym_id'] = sym_id
+        cropped_feat['asym_id'] = torch.tensor(asym_id)
+        cropped_feat['entity_id'] = torch.tensor(entity_id)
+        cropped_feat['sym_id'] = torch.tensor(sym_id)
         del cropped_feat['chain_seq_list']
 
         cropped_batch.append(cropped_feat)

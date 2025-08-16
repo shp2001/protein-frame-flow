@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J CDRFlow_1.2.4_scaling_1
 #SBATCH -p gpu
-#SBATCH -w gpu04
-#SBATCH --gres=gpu:A6000:1
+#SBATCH -w gpu02
+#SBATCH --gres=gpu:A5000:1
 #SBATCH --mem=90g
 #SBATCH -c 12
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log

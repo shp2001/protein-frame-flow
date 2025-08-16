@@ -218,7 +218,7 @@ def save_traj(
         res_mask: [N] residue mask.
         diffuse_mask: [N] which residues are diffused.
         output_dir: where to save samples.
-        b_factors: [T, N 37]
+        b_factors: [T, N, 37]
     Returns:
         Dictionary with paths to saved samples.
             'sample_path': PDB file of final state of reverse trajectory.
@@ -232,14 +232,6 @@ def save_traj(
     sample_path = os.path.join(output_dir, 'sample.pdb')
     prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
-
-    # Use b-factors to specify which residues are diffused.
-    if all(b_factors==0) == True:
-        b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
-    
-    else:
-        b_factors = np.tile((b_factors)[:, None], (1, 37))
-    
     sample_path = au.write_prot_to_pdb(
         sample,
         sample_path,
@@ -254,6 +246,7 @@ def save_traj(
         }
     
     else:
+        print("b_factors.shape", b_factors.shape)
         prot_traj_path = au.write_prot_to_pdb(
             bb_prot_traj,
             prot_traj_path,
