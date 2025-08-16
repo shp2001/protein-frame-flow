@@ -102,7 +102,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
+  num_devices: 4
   warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol_stage2_no_conf/2025-08-12_08-52-08/epoch=13-step=20076_copy.ckpt
   warm_start_cfg_override: False
   stage: confidence # ['pretraining', 'finetuning', 'confidence']
@@ -139,7 +139,7 @@ experiment:
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     
     aux_loss_confidence_loss_weight: 1.0 # 4.0 ~ 6.0
-    w_gt: 0.0
+    w_gt: 0.05
     w_str: 1.0
     w_atom: 0.1
 
@@ -156,13 +156,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.4_ebm_exp
+    name: CDRFlow_v1.2.4_ebm_cdr_sep
     project: se3-fm
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-3
-    max_lr: 1e-3
+    min_lr: 2e-3
+    max_lr: 2e-3
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -176,7 +176,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/h3_trans_loss
+    monitor: valid/cdr_confidence_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

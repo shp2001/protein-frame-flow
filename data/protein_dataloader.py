@@ -90,6 +90,7 @@ class ProteinData(LightningDataModule):
             'ref_atom_name_chars': ref_atom_name_chars,
             'ref_rigid_frame': ref_rigid_frame
         }
+
         return cropped_batch
 
     

@@ -3,12 +3,15 @@ import torch.nn as nn
 from typing import Optional, Dict
 
 from data import residue_constants as rc
+from data.motif_index import find_anchor
+from data.all_atom import atom_unflatten
+
 from openfold.utils.loss import between_residue_clash_loss, within_residue_violations
 from openfold.utils.rigid_utils import Rigid, Rotation, local_to_global
 from openfold.utils.tensor_utils import permute_final_dims
 
 from models.utils import calc_distogram
-from data.motif_index import find_anchor
+
 import analysis.utils as au
 
 from itertools import combinations_with_replacement
@@ -16,6 +19,7 @@ from itertools import combinations_with_replacement
 import os 
 import matplotlib.pyplot as plt 
 import seaborn as sns 
+
 
 def get_unique_filepath(output_path):
     """
@@ -1292,7 +1296,7 @@ def compute_lddt_per_atom(
     coords_gt: torch.Tensor,       # (L, 3)
     coords_decoy: torch.Tensor,    # (D, L, 3)
     cutoff: float = 15.0,
-    thresholds=(0.5, 1.0, 2.0, 4.0)
+    thresholds=(0.1, 0.3, 0.5, 1.0, 1.5)
 ) -> torch.Tensor:
     """
     Computes per-atom lDDT scores for each decoy structure.
@@ -1306,43 +1310,6 @@ def compute_lddt_per_atom(
     Returns:
         FloatTensor of shape (D, L) with per-atom lDDT scores in [0,1].
     """
-    ## Number of atoms and decoys
-    #L = coords_gt.size(0)
-    #D = coords_decoy.size(0)
-
-    ## 1) Pairwise distances in ground-truth
-    #diff_gt = coords_gt.unsqueeze(1) - coords_gt.unsqueeze(0)     # (L, L, 3)
-    #d_gt = diff_gt.norm(dim=-1)                                   # (L, L)
-
-    ## 2) Neighbor mask: exclude self, include edges within cutoff
-    #neigh_mask = (d_gt <= cutoff) & (d_gt > 0)                    # (L, L)
-
-    ## 3) Pairwise distances in decoys
-    #diff_dec = coords_decoy[:, :, None, :] - coords_decoy[:, None, :, :]  # (D, L, L, 3)
-    #d_dec = diff_dec.norm(dim=-1)                                        # (D, L, L)
-
-    ## 4) Compute absolute error for each threshold
-    #thr = torch.tensor(thresholds, device=coords_gt.device).view(-1, 1, 1, 1)  # (T,1,1,1)
-    ## error mask: (T, D, L, L)
-    #error = (d_dec.unsqueeze(0) - d_gt.unsqueeze(0)).abs() <= thr
-
-    ## 5) Restrict to valid neighbor pairs
-    #error = error & neigh_mask.unsqueeze(0).unsqueeze(0)  # broadcast to (T, D, L, L)
-
-    ## 6) Count neighbors per atom
-    #neighbor_counts = neigh_mask.sum(dim=1).clamp(min=1)  # (L,)
-
-    ## 7) Sum error per atom and threshold
-    ##    error is bool[T,D,L,L] -> float and sum over neighbor dim j -> shape (T, D, L)
-    #e_sum = error.float().sum(dim=-1)                    # (T, D, L)
-
-    ## 8) Fraction within threshold: divide by neighbor_counts
-    #frac = e_sum / neighbor_counts.view(1, 1, L)         # (T, D, L)
-
-    ## 9) Average over thresholds -> per-atom lDDT, shape (D, L)
-    #lddt_per_atom = frac.mean(dim=0)
-
-    #return lddt_per_atom
     
     L = coords_gt.size(0)
     D = coords_decoy.size(0)
@@ -1394,16 +1361,24 @@ def compute_lddt_per_atom(
 
     return lddt_per_atom
 
-def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0):
+def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, 
+                         min_margin=0.0, max_margin=10.0, m0=0.0, s0=1.0,
+                         only_cdr=False, cdr_mask=None):
     xyz_gt = node_xyz[0] # (L, 3)
     xyz_decoys = node_xyz[1:] # (D, L, 3)
 
     score_gt = scores_per_atom[0,:] # (L)
     score_decoys = scores_per_atom[1:,:] # (D, L)
-
     lddt_per_atom = compute_lddt_per_atom(xyz_gt, xyz_decoys) # (D, L)
+    if only_cdr:
+        cdr_mask = cdr_mask.bool()
+        lddt_per_atom = lddt_per_atom[:, cdr_mask] # (D, L_cdr)
+        score_gt = score_gt[cdr_mask] # (L_cdr)
+        score_decoys = score_decoys[:, cdr_mask] # (D, L_cdr)
+        lddt_per_decoy_tmp = lddt_per_atom.mean(dim=-1)
+        print("cdr_lddt_per_decoy_tmp", lddt_per_decoy_tmp)
     lddt_per_decoy = lddt_per_atom.mean(dim=-1)
-
+    print("lddt_per_decoy", lddt_per_decoy)
     # make ground-truth score in certain range
     if w_gt > 0.0:
         loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
@@ -1413,14 +1388,16 @@ def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, min_mar
 
     # margin loss per structure
     if w_str > 0.0:
-        margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D)
+        margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D), lddt가 낮으면 decoy score가 gt score보다 더 많이 낮아야 한다. 
+        print("score_gt", score_gt.mean(dim=0))
+        print("score_decoys", score_decoys.mean(dim=1))
         loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
     else:
         with torch.no_grad():
             margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D)
             loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
 
-    # margin loss per atoms
+    # margin loss per atoms (relu를 취하는 순서가 str과 다름. str은 mean -> relu, atom은 relu -> mean)
     if w_atom > 0.0:
         margins_per_atom = min_margin + (1.0 - lddt_per_atom) * (max_margin - min_margin) # (D, L)
         loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
@@ -1430,3 +1407,4 @@ def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, min_mar
             loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
 
     return loss_gt, loss_str, loss_atom
+

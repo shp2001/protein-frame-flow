@@ -337,7 +337,7 @@ def atom14_to_atom37(position: np.ndarray, sample: dict) -> np.ndarray:
 
 def atom_flatten(unflatten_atom, mask):
     """
-    coorunflatten_atomds: [B, L, 14, d]
+    unflatten_atom: [B, L, 14, d]
     mask:   [L, 14]  (배치 동일)
     return: [B, L_atom, d]
     """
