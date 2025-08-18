@@ -244,6 +244,6 @@ class ConfidenceModel(nn.Module):
             dropout=confidence_head.dropout
         )
 
-    def forward(self, node_elem, node_xyz, bond_index, relpos):
-        lgoit = self.ebm_mpnn(node_elem, node_xyz, bond_index, relpos)
-        return lgoit
+    def forward(self, node_aa, node_xyz, relpos):
+        logit = self.ebm_mpnn(node_aa, node_xyz, relpos)
+        return logit

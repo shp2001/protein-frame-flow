@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v1.2.4_ebm_sep
+#SBATCH -J CDRFlow_v1.2.4_ebm_bb
 #SBATCH -p gpu
 #SBATCH -w gpu05
 #SBATCH --gres=gpu:A6000:4

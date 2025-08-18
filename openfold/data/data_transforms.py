@@ -364,7 +364,7 @@ def make_msa_mask(protein):
     return protein
 
 
-def pseudo_beta_fn(aatype, all_atom_positions, all_atom_mask):
+def pseudo_beta_fn(aatype, all_atom_positions, all_atom_mask=None):
     """Create pseudo beta features."""
     is_gly = torch.eq(aatype, rc.restype_order["G"])
     ca_idx = rc.atom_order["CA"]

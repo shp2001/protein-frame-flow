@@ -1296,7 +1296,7 @@ def compute_lddt_per_atom(
     coords_gt: torch.Tensor,       # (L, 3)
     coords_decoy: torch.Tensor,    # (D, L, 3)
     cutoff: float = 15.0,
-    thresholds=(0.1, 0.3, 0.5, 1.0, 1.5)
+    thresholds=(0.1, 0.2, 0.3, 0.5, 1.0, 1.5)
 ) -> torch.Tensor:
     """
     Computes per-atom lDDT scores for each decoy structure.
@@ -1362,23 +1362,21 @@ def compute_lddt_per_atom(
     return lddt_per_atom
 
 def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, 
-                         min_margin=0.0, max_margin=10.0, m0=0.0, s0=1.0,
+                         min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0,
                          only_cdr=False, cdr_mask=None):
-    xyz_gt = node_xyz[0] # (L, 3)
-    xyz_decoys = node_xyz[1:] # (D, L, 3)
+    xyz_gt = node_xyz[0] # (L, 5, 3)
+    xyz_decoys = node_xyz[1:] # (D, L, 5, 3)
 
     score_gt = scores_per_atom[0,:] # (L)
     score_decoys = scores_per_atom[1:,:] # (D, L)
-    lddt_per_atom = compute_lddt_per_atom(xyz_gt, xyz_decoys) # (D, L)
+    lddt_per_res = compute_lddt_per_atom(xyz_gt[:,1], xyz_decoys[:, :, 1]) # (D, L)
     if only_cdr:
         cdr_mask = cdr_mask.bool()
-        lddt_per_atom = lddt_per_atom[:, cdr_mask] # (D, L_cdr)
+        lddt_per_res = lddt_per_res[:, cdr_mask] # (D, L_cdr)
         score_gt = score_gt[cdr_mask] # (L_cdr)
         score_decoys = score_decoys[:, cdr_mask] # (D, L_cdr)
-        lddt_per_decoy_tmp = lddt_per_atom.mean(dim=-1)
-        print("cdr_lddt_per_decoy_tmp", lddt_per_decoy_tmp)
-    lddt_per_decoy = lddt_per_atom.mean(dim=-1)
-    print("lddt_per_decoy", lddt_per_decoy)
+
+    lddt_per_decoy = lddt_per_res.mean(dim=-1)
     # make ground-truth score in certain range
     if w_gt > 0.0:
         loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
@@ -1389,8 +1387,6 @@ def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom,
     # margin loss per structure
     if w_str > 0.0:
         margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D), lddt가 낮으면 decoy score가 gt score보다 더 많이 낮아야 한다. 
-        print("score_gt", score_gt.mean(dim=0))
-        print("score_decoys", score_decoys.mean(dim=1))
         loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
     else:
         with torch.no_grad():
@@ -1399,11 +1395,11 @@ def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom,
 
     # margin loss per atoms (relu를 취하는 순서가 str과 다름. str은 mean -> relu, atom은 relu -> mean)
     if w_atom > 0.0:
-        margins_per_atom = min_margin + (1.0 - lddt_per_atom) * (max_margin - min_margin) # (D, L)
+        margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin) # (D, L)
         loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
     else:
         with torch.no_grad():
-            margins_per_atom = min_margin + (1.0 - lddt_per_atom) * (max_margin - min_margin) # (D, L)
+            margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin) # (D, L)
             loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
 
     return loss_gt, loss_str, loss_atom

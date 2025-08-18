@@ -383,48 +383,29 @@ class FlowModule(LightningModule):
                 rollout=True
             )
 
-            # create graph tensor for confidence model
-            seq = ''
-            for i in noisy_batch["aatype"][0].tolist():
-                seq = seq +  rc.restypes_with_x[i]
-
-            node_elem, node_xyz, bond_index, relpos, atom_mask = build_graph_tensors_multimer(
-                seq=seq,
-                chain_list=noisy_batch['chain_idx'][0],
+            node_aa, node_xyz = build_graph_tensors_multimer(
+                aatype=noisy_batch["aatype"][0],
                 xyz_gt=noisy_batch['atom14_gt_positions'][0],
-                mask_gt=noisy_batch['atom14_gt_exists'][0],
                 xyz_decoys=mini_pred_positions,
-                residue_index=noisy_batch['res_idx'][0],
-                asym_id=noisy_batch['asym_id'][0],
-                entity_id=noisy_batch['entity_id'][0],
-                sym_id=noisy_batch['sym_id'][0],
-                diffuse_mask=noisy_batch['diffuse_mask'][0],
                 device=device
             )
+            relpos_decoy = noisy_batch['pair_init']
+            relpos_gt = noisy_batch['pair_init'][0:1]
+            relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
-            scores_per_atom = self.confidence_model(node_elem, node_xyz, bond_index, relpos)[..., 0] # (D, L)
+            scores_per_res = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D, L)
 
             # calc cdr confidence loss
             cdr_loss_gt, cdr_loss_str, cdr_loss_atom = calc_confidence_loss(
-                node_xyz, scores_per_atom,
+                node_xyz, scores_per_res,
                 w_gt=training_cfg.w_gt,
                 w_str=training_cfg.w_str,
                 w_atom=training_cfg.w_atom,
-                cdr_mask=atom_mask,
+                cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
-            cdr_confidence_loss = training_cfg.w_gt * cdr_loss_gt + training_cfg.w_str * cdr_loss_str + training_cfg.w_atom * cdr_loss_atom
+            confidence_loss = training_cfg.w_gt * cdr_loss_gt + training_cfg.w_str * cdr_loss_str + training_cfg.w_atom * cdr_loss_atom 
 
-            # calc confidence loss
-            loss_gt, loss_str, loss_atom = calc_confidence_loss(
-                node_xyz, scores_per_atom,
-                w_gt=training_cfg.w_gt,
-                w_str=training_cfg.w_str,
-                w_atom=training_cfg.w_atom,
-                only_cdr=False)
-            
-            confidence_loss = training_cfg.w_gt * loss_gt + training_cfg.w_str * loss_str + training_cfg.w_atom * loss_atom
-            confidence_loss = cdr_confidence_loss + confidence_loss * 0.1
 
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
@@ -505,57 +486,36 @@ class FlowModule(LightningModule):
             )
 
             # create graph tensor for confidence model
-            seq = ''
-            for i in noisy_batch["aatype"][0].tolist():
-                seq = seq +  rc.restypes_with_x[i]
 
-            node_elem, node_xyz, bond_index, relpos, atom_mask = build_graph_tensors_multimer(
-                seq=seq,
-                chain_list=noisy_batch['chain_idx'][0],
+            node_aa, node_xyz = build_graph_tensors_multimer(
+                aatype=noisy_batch["aatype"][0],
                 xyz_gt=noisy_batch['atom14_gt_positions'][0],
-                mask_gt=noisy_batch['atom14_gt_exists'][0],
                 xyz_decoys=mini_pred_positions,
-                residue_index=noisy_batch['res_idx'][0],
-                asym_id=noisy_batch['asym_id'][0],
-                entity_id=noisy_batch['entity_id'][0],
-                sym_id=noisy_batch['sym_id'][0],
-                diffuse_mask=noisy_batch['diffuse_mask'][0],
                 device=device
             )
+            relpos_decoy = noisy_batch['pair_init']
+            relpos_gt = noisy_batch['pair_init'][0:1]
+            relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
-            scores_per_atom = self.confidence_model(node_elem, node_xyz, bond_index, relpos)[..., 0] # (D, L)
+            scores_per_res = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D, L)
 
             # calc cdr confidence loss
             cdr_loss_gt, cdr_loss_str, cdr_loss_atom = calc_confidence_loss(
-                node_xyz, scores_per_atom,
+                node_xyz, scores_per_res,
                 w_gt=training_cfg.w_gt,
                 w_str=training_cfg.w_str,
                 w_atom=training_cfg.w_atom,
-                cdr_mask=atom_mask,
+                cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
             cdr_confidence_loss = training_cfg.w_gt * cdr_loss_gt + training_cfg.w_str * cdr_loss_str + training_cfg.w_atom * cdr_loss_str 
 
-            # calc confidence loss
-            loss_gt, loss_str, loss_atom = calc_confidence_loss(
-                node_xyz, scores_per_atom,
-                w_gt=training_cfg.w_gt,
-                w_str=training_cfg.w_str,
-                w_atom=training_cfg.w_atom,
-                only_cdr=False)
-            
-            confidence_loss = training_cfg.w_gt * loss_gt + training_cfg.w_atom * loss_atom
-            confidence_loss = cdr_confidence_loss + confidence_loss * 0.1
-
         # calculate auxiliary loss 
-        se3_vf_loss = confidence_loss
+        se3_vf_loss = cdr_confidence_loss
 
         return {
             'se3_vf_loss': se3_vf_loss,
             'cdr_confidence_loss': cdr_confidence_loss,
-            'loss_gt': loss_gt,
-            'loss_str': loss_str,
-            'loss_atom': loss_atom,
             'cdr_loss_gt': cdr_loss_gt,
             'cdr_loss_str': cdr_loss_str,
             'cdr_loss_atom': cdr_loss_atom,    
@@ -579,26 +539,17 @@ class FlowModule(LightningModule):
         )
         logit = None 
         if self.confidence_model != None:
-            seq = ''
-            for i in batch["aatype"][0].tolist():
-                seq = seq + rc.restypes_with_x[i]
-
-            node_elem, node_xyz, bond_index, relpos, atom_mask = build_graph_tensors_multimer(
-                seq=seq,
-                chain_list=batch['chain_idx'][0],
+            node_aa, node_xyz = build_graph_tensors_multimer(
+                aatype=batch["aatype"][0],
                 xyz_gt=batch['atom14_gt_positions'][0],
-                mask_gt=batch['atom14_gt_exists'][0],
                 xyz_decoys=pred_positions,
-                residue_index=batch['res_idx'][0],
-                asym_id=batch['asym_id'][0],
-                entity_id=batch['entity_id'][0],
-                sym_id=batch['sym_id'][0],
-                diffuse_mask=batch['diffuse_mask'][0],
                 device=device
             )
+            relpos_decoy = batch['pair_init']
+            relpos_gt = batch['pair_init'][0:1]
+            relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
-            logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B+1, L_atom, 1)
-            unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()) # (B+1, L, 14, 1)
+            logit = self.confidence_model(node_aa, node_xyz, relpos) # (D+1, L, 1)
 
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
@@ -624,8 +575,8 @@ class FlowModule(LightningModule):
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
             
             else:
-                b_factors = unflatten_logit[i+1].cpu().numpy() # (L, 14, 1), i+1인 이유는 unflatten_logit의 첫번째 batch는 정답구조의 logit이므로 
-                b_factors = all_atom.atom14_to_atom37(b_factors, batch).squeeze(-1)
+                b_factors = logit[i+1].cpu().numpy() # (L, 1)
+                b_factors = np.tile((b_factors), (1, 37))
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
@@ -688,25 +639,17 @@ class FlowModule(LightningModule):
 
             batch_metrics.append(h3_trans_loss_dict)
             if self._exp_cfg.stage == 'confidence':
-                loss_gt, loss_str, loss_atom = calc_confidence_loss(
-                    node_xyz, logit,
-                    w_gt=self._exp_cfg.training.w_gt,
-                    w_str=self._exp_cfg.training.w_str,
-                    w_atom=self._exp_cfg.training.w_atom)
-
                 cdr_loss_gt, cdr_loss_str, cdr_loss_atom = calc_confidence_loss(
                     node_xyz, logit,
                     w_gt=self._exp_cfg.training.w_gt,
                     w_str=self._exp_cfg.training.w_str,
                     w_atom=self._exp_cfg.training.w_atom,
-                    only_cdr=True,
-                    cdr_mask=atom_mask)
-                
+                    cdr_mask=batch['diffuse_mask'][0],
+                    only_cdr=True)
+                    
                 cdr_confidence_loss = cdr_loss_str + 0.1 * cdr_loss_atom
 
-                loss_dict = {'loss_str': loss_str,
-                             'loss_atom': loss_atom,
-                             'cdr_loss_str': cdr_loss_str,
+                loss_dict = {'cdr_loss_str': cdr_loss_str,
                              'cdr_loss_atom': cdr_loss_atom,
                              'cdr_confidence_loss': cdr_confidence_loss
                              }
