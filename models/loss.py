@@ -1436,10 +1436,7 @@ def calc_confidence_loss(
             loss_atom = torch.relu(arg_atom).mean()
 
     # ======================================================================
-    # (1) Rank-aware energy shaping:
-    #   더 좋은 decoy(i)의 lddt가 더 높다면 (q_i > q_j), 점수도 더 높아야 (s_i > s_j).
-    #   기대 제약: s_i - s_j >= beta * (q_i - q_j)
-    #   → 위반량에 대해 softplus로 페널티
+    # (1) RMSD regression 
     # ======================================================================
     logits = torch.cat([s_gt.unsqueeze(0), s_decoy], dim=0)
 
@@ -1456,12 +1453,11 @@ def calc_confidence_loss(
     
 
     loss_rmsd_local = nn.functional.mse_loss(scores_per_atom, rmsd_per_res, reduction='none') # (B, L)
-    loss_rmsd_local = torch.clip(loss_rmsd_local.mean(-1), max=10) # (B)
+    loss_rmsd_local = torch.clip(loss_rmsd_local.mean(-1), max=10).mean()
     loss_rmsd_global = nn.functional.mse_loss(scores_per_atom.mean(-1), rmsd_per_res.mean(-1), reduction='none') #(B)
-    loss_rmsd_global = torch.clip(loss_rmsd_global, max=10)
+    loss_rmsd_global = torch.clip(loss_rmsd_global, max=10).mean()
 
-    loss_rmsd_local = loss_rmsd_local.mean()
-    loss_rmsd_global = loss_rmsd_global.mean()
+
     # ======================================================================
     # (2) NCE 관점: GT를 positive로, decoy들을 negative로 두고 softmax-CE
     # - 점수(s)가 높을수록 좋은 구조라고 가정 → softmax logit에 's'를 사용
