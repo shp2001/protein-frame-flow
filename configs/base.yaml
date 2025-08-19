@@ -139,10 +139,12 @@ experiment:
     aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     
     aux_loss_confidence_loss_weight: 1.0 # 4.0 ~ 6.0
-    w_gt: 0.05
+    w_gt: 0.0
     w_str: 1.0
     w_atom: 0.1
-
+    w_nce: 0.0              # (2) NCE loss 가중치
+    w_rank: 0.0             # (3) Rank-aware loss 가중치
+    w_reg: 0.0              # (4) Regularization 가중치
     aux_loss_distogram_weight: 0.05 # 6.0 -> 2.0 ~ 3.0
     aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
 
@@ -156,13 +158,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.4_ebm_bb
+    name: ebm_bb_str_1e-3
     project: ebm
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 2e-3
-    max_lr: 2e-3
+    min_lr: 1e-3
+    max_lr: 1e-3
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -176,7 +178,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/cdr_confidence_loss
+    monitor: valid/loss_total
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

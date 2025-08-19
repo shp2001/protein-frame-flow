@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v1.2.4_ebm_bb
+#SBATCH -J ebm_bb_str_1e-3
 #SBATCH -p gpu
 #SBATCH -w gpu05
 #SBATCH --gres=gpu:A6000:4
@@ -10,4 +10,4 @@
 
 
 echo "Running train_abb3.py"
-torchrun --standalone --nnodes=1 --nproc_per_node=4 /home/psh/protein-frame-flow/experiments/finetune.py > /home/psh/protein-frame-flow/experiments/logs/debug.log
+torchrun --standalone --nnodes=1 --nproc_per_node=4 /home/psh/protein-frame-flow/experiments/finetune.py > /home/psh/protein-frame-flow/experiments/logs/debug2.log

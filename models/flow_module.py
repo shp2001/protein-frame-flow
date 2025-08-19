@@ -500,26 +500,21 @@ class FlowModule(LightningModule):
             scores_per_res = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D, L)
 
             # calc cdr confidence loss
-            cdr_loss_gt, cdr_loss_str, cdr_loss_atom = calc_confidence_loss(
+            confidence_loss = calc_confidence_loss(
                 node_xyz, scores_per_res,
                 w_gt=training_cfg.w_gt,
                 w_str=training_cfg.w_str,
                 w_atom=training_cfg.w_atom,
+                w_nce=training_cfg.w_nce,
+                w_rank=training_cfg.w_rank,
+                w_reg=training_cfg.w_reg,
                 cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
-            cdr_confidence_loss = training_cfg.w_gt * cdr_loss_gt + training_cfg.w_str * cdr_loss_str + training_cfg.w_atom * cdr_loss_str 
-
         # calculate auxiliary loss 
-        se3_vf_loss = cdr_confidence_loss
+        confidence_loss['se3_vf_loss'] = confidence_loss['loss_total']
 
-        return {
-            'se3_vf_loss': se3_vf_loss,
-            'cdr_confidence_loss': cdr_confidence_loss,
-            'cdr_loss_gt': cdr_loss_gt,
-            'cdr_loss_str': cdr_loss_str,
-            'cdr_loss_atom': cdr_loss_atom,    
-        }
+        return confidence_loss
     
     def validation_step(self, batch: Any, batch_idx: int):
         res_mask = batch['res_mask']
@@ -549,7 +544,7 @@ class FlowModule(LightningModule):
             relpos_gt = batch['pair_init'][0:1]
             relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
-            logit = self.confidence_model(node_aa, node_xyz, relpos) # (D+1, L, 1)
+            logit = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D+1, L)
 
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
@@ -575,8 +570,8 @@ class FlowModule(LightningModule):
                 b_factors = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
             
             else:
-                b_factors = logit[i+1].cpu().numpy() # (L, 1)
-                b_factors = np.tile((b_factors), (1, 37))
+                b_factors = logit[i+1].cpu().numpy() # (L)
+                b_factors = np.tile((b_factors)[:, None], (1, 37))
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
@@ -639,21 +634,18 @@ class FlowModule(LightningModule):
 
             batch_metrics.append(h3_trans_loss_dict)
             if self._exp_cfg.stage == 'confidence':
-                cdr_loss_gt, cdr_loss_str, cdr_loss_atom = calc_confidence_loss(
+                confidence_loss = calc_confidence_loss(
                     node_xyz, logit,
                     w_gt=self._exp_cfg.training.w_gt,
                     w_str=self._exp_cfg.training.w_str,
                     w_atom=self._exp_cfg.training.w_atom,
+                    w_nce=self._exp_cfg.training.w_nce,
+                    w_rank=self._exp_cfg.training.w_rank,
+                    w_reg=self._exp_cfg.training.w_reg,
                     cdr_mask=batch['diffuse_mask'][0],
                     only_cdr=True)
                     
-                cdr_confidence_loss = cdr_loss_str + 0.1 * cdr_loss_atom
-
-                loss_dict = {'cdr_loss_str': cdr_loss_str,
-                             'cdr_loss_atom': cdr_loss_atom,
-                             'cdr_confidence_loss': cdr_confidence_loss
-                             }
-                batch_metrics.append(loss_dict)
+                batch_metrics.append(confidence_loss)
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)

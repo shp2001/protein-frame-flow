@@ -1361,46 +1361,168 @@ def compute_lddt_per_atom(
 
     return lddt_per_atom
 
-def calc_confidence_loss(node_xyz, scores_per_atom, w_gt, w_str, w_atom, 
-                         min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0,
-                         only_cdr=False, cdr_mask=None):
-    xyz_gt = node_xyz[0] # (L, 5, 3)
-    xyz_decoys = node_xyz[1:] # (D, L, 5, 3)
+def calc_confidence_loss(
+    node_xyz, scores_per_atom, w_gt, w_str, w_atom, 
+    min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0, gamma=3.0,
+    only_cdr=False, cdr_mask=None,
+    # === NEW: weights & hyper-params ===
+    w_nce=1.0,              # (2) NCE loss 가중치
+    w_rank=1.0,             # (3) Rank-aware loss 가중치
+    w_reg=0.0,              # (4) Regularization 가중치
+    tau=1.0,                # NCE temperature
+    alpha=2.0,              # NCE에서 lddt 반영 강도 (decoy logit 보정)
+    beta=1.0,               # Rank-aware에서 lddt 차이에 대한 기대 점수 차이 기울기
+    pairwise_min_dq=0.02,   # 순위쌍 선택 시 최소 lddt 차이(노이즈/동률 억제)
+    softplus_margin=None    # hinge 대신 softplus로 바꾸고 싶을 때 margin 상수 (예: 1.0)
+):
+    """
+    scores_per_atom: (1 + D, L)  --- 점수는 '높을수록 더 좋은/신뢰 높은' 값이라고 가정 (GT > Decoy)
+    node_xyz:        (1 + D, L, 5, 3)
+    """
+    xyz_gt = node_xyz[0]              # (L, 5, 3)
+    xyz_decoys = node_xyz[1:]         # (D, L, 5, 3)
+    score_gt = scores_per_atom[0, :]  # (L,)
+    score_decoys = scores_per_atom[1:, :] # (D, L)
 
-    score_gt = scores_per_atom[0,:] # (L)
-    score_decoys = scores_per_atom[1:,:] # (D, L)
-    lddt_per_res = compute_lddt_per_atom(xyz_gt[:,1], xyz_decoys[:, :, 1]) # (D, L)
+    # lDDT per residue & per decoy (여기서는 CA index=1 사용)
+    lddt_per_res = compute_lddt_per_atom(xyz_gt[:, 1], xyz_decoys[:, :, 1])  # (D, L)
+
     if only_cdr:
         cdr_mask = cdr_mask.bool()
-        lddt_per_res = lddt_per_res[:, cdr_mask] # (D, L_cdr)
-        score_gt = score_gt[cdr_mask] # (L_cdr)
-        score_decoys = score_decoys[:, cdr_mask] # (D, L_cdr)
+        lddt_per_res = lddt_per_res[:, cdr_mask]     # (D, L_cdr)
+        score_gt = score_gt[cdr_mask]                # (L_cdr)
+        score_decoys = score_decoys[:, cdr_mask]     # (D, L_cdr)
 
-    lddt_per_decoy = lddt_per_res.mean(dim=-1)
-    # make ground-truth score in certain range
+    # 구조 단위 평균 점수 / lddt
+    lddt_per_decoy = lddt_per_res.mean(dim=-1)       # (D,)
+
+    s_gt = score_gt.mean()                           # scalar
+    s_decoy = score_decoys.mean(dim=1)               # (D,)
+    # === 기존 GT calibration (mean/var 고정) ===
     if w_gt > 0.0:
-        loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
+        loss_gt = 0.1 * (s_gt - m0)**2 + 0.1 * (score_gt.var(unbiased=False) - s0**2)**2
     else:
         with torch.no_grad():
-            loss_gt = 0.1*(score_gt.mean() - m0)**2 + 0.1*(score_gt.var() - s0**2)**2
+            loss_gt = 0.1 * (s_gt - m0)**2 + 0.1 * (score_gt.var(unbiased=False) - s0**2)**2
 
-    # margin loss per structure
+    # === (A) 기존 margin losses (원형 유지). 필요 시 softplus로 부드럽게 전환 가능 ===
     if w_str > 0.0:
-        margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D), lddt가 낮으면 decoy score가 gt score보다 더 많이 낮아야 한다. 
-        loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
+        margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin)  # (D,)
+        arg = margins_per_decoy - s_gt + s_decoy  # (D,)
+        if softplus_margin is None:
+            loss_str = torch.relu(arg).mean()
+        else:
+            # hinge 대신 softplus(logistic)로 gradient 소실 완화
+            loss_str = torch.nn.functional.softplus(arg - softplus_margin).mean()
     else:
         with torch.no_grad():
-            margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin) # (D)
-            loss_str = torch.relu(margins_per_decoy - score_gt.mean(dim=0) + score_decoys.mean(dim=1)).mean() # (D --> 1)
+            margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin)
+            arg = margins_per_decoy - s_gt + s_decoy
+            loss_str = torch.relu(arg).mean()
 
-    # margin loss per atoms (relu를 취하는 순서가 str과 다름. str은 mean -> relu, atom은 relu -> mean)
     if w_atom > 0.0:
-        margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin) # (D, L)
-        loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
+        margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin)  # (D, L)
+        arg_atom = margins_per_atom - score_gt[None, :] + score_decoys  # (D, L)
+        if softplus_margin is None:
+            loss_atom = torch.relu(arg_atom).mean()
+        else:
+            loss_atom = torch.nn.functional.softplus(arg_atom - softplus_margin).mean()
     else:
         with torch.no_grad():
-            margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin) # (D, L)
-            loss_atom = torch.relu(margins_per_atom - score_gt[None] + score_decoys).mean() # (D, L) --> 1
+            margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin)
+            arg_atom = margins_per_atom - score_gt[None, :] + score_decoys
+            loss_atom = torch.relu(arg_atom).mean()
 
-    return loss_gt, loss_str, loss_atom
+    # ======================================================================
+    # (2) NCE 관점: GT를 positive로, decoy들을 negative로 두고 softmax-CE
+    # - 점수(s)가 높을수록 좋은 구조라고 가정 → softmax logit에 's'를 사용
+    # - lDDT를 decoy logit 보정에 사용: 품질 낮은 decoy(1-lddt 큼)는 더 불리하도록
+    # ======================================================================
+    # logits: [GT, decoys...]  (크면 클수록 확률↑)
+    #   GT:     s_gt
+    #   Decoy:  s_decoy - alpha*(1 - lddt)  (품질 낮을수록 감점 커짐)
+    logits = torch.cat([s_gt.unsqueeze(0), s_decoy], dim=0) / tau
+    
+    gt_lddt = torch.tensor([1.0], device=s_gt.device)  # GT lddt
+    lddt_all = torch.cat([gt_lddt, lddt_per_decoy], dim=0)  # shape (D+1,)  
+    target_probs = (lddt_all ** gamma) / (lddt_all ** gamma).sum()
 
+    log_probs = torch.log_softmax(logits, dim=0)
+    loss_nce = -(target_probs * log_probs).sum()  # scalar
+    print("loss_nce", loss_nce)
+    # ======================================================================
+    # (3) Rank-aware energy shaping:
+    #   더 좋은 decoy(i)의 lddt가 더 높다면 (q_i > q_j), 점수도 더 높아야 (s_i > s_j).
+    #   기대 제약: s_i - s_j >= beta * (q_i - q_j)
+    #   → 위반량에 대해 softplus로 페널티
+    # ======================================================================
+    # Rank-aware energy shaping
+    q = lddt_per_decoy  # (D,)
+    s = s_decoy         # (D,)
+
+    # Pairwise 차이 계산
+    dq = q[:, None] - q[None, :]  # (D,D)
+    ds = s[:, None] - s[None, :]  # (D,D)
+
+    # dq, ds 정규화 (평균0, 표준편차1)
+    dq_norm = (dq - dq.mean()) / (dq.std() + 1e-6)
+    ds_norm = (ds - ds.mean()) / (ds.std() + 1e-6)
+
+    # i가 더 좋은 구조(dq_norm > pairwise_min_dq)만 고려
+    mask = dq > pairwise_min_dq
+
+    # violation 계산
+    violation = beta * dq_norm - ds_norm
+
+    # loss 계산
+    if mask.any():
+        loss_rank = torch.nn.functional.softplus(violation[mask]).mean()
+    else:
+        loss_rank = s.new_tensor(0.0)
+
+    # ======================================================================
+    # (4) Regularization (energy landscape를 lddt에 정렬/완만하게)
+    #   (a) Calibration: s_decoy를 (1 - lddt)와 정렬 (z-score 정규화 후 MSE)
+    #   (b) Spread match: var(s_decoy) ~ k * var(1-lddt) (과도한 collapse 방지)
+    # ======================================================================
+    # (a) Calibration
+    #   '좋을수록 점수↑' 이므로, target으로 l = 1 - lddt(나쁠수록 큼) 대신
+    #   t = zscore(lddt) 를 쓰고 s도 zscore(s)로 맞추면 '상관'을 직접 학습하는 효과
+    def _z(x):
+        x_mu = x.mean()
+        x_sd = x.std(unbiased=False).clamp_min(1e-6)
+        return (x - x_mu) / x_sd
+
+    s_z = _z(s_decoy)
+    q_z = _z(lddt_per_decoy)
+    loss_calib = torch.nn.functional.mse_loss(s_z, q_z)  # s ↔ lddt의 선형 일치 유도 (Spearman 근사)
+
+    # (b) Spread match (scale 정합): s 분산이 q 분산과 크게 어긋나지 않도록
+    var_s = s_decoy.var(unbiased=False)
+    var_q = lddt_per_decoy.var(unbiased=False).clamp_min(1e-6)
+    k = 1.0  # 스케일 목표 비율 (필요 시 튜닝)
+    loss_spread = (var_s - k * var_q).pow(2)
+
+    loss_reg = loss_calib + 0.1 * loss_spread
+
+    # === 최종 결합 ===
+    loss_total = (
+        w_gt   * loss_gt +
+        w_str  * loss_str +
+        w_atom * loss_atom +
+        w_nce  * loss_nce +
+        w_rank * loss_rank +
+        w_reg  * loss_reg
+    )
+
+    return {
+        "loss_total": loss_total,
+        "loss_gt": loss_gt,
+        "loss_str": loss_str,
+        "loss_atom": loss_atom,
+        "loss_nce": loss_nce,
+        "loss_rank": loss_rank,
+        "loss_reg": loss_reg,
+        "loss_reg_calib": loss_calib,
+        "loss_reg_spread": loss_spread,
+    }
