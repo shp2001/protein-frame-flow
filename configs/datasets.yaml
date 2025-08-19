@@ -67,8 +67,8 @@ pdb_dataset:
   
   # Filtering
   filter:
-    max_num_res: 2000
-    min_num_res: 100
+    max_num_res: 290
+    min_num_res: 250
     max_coil_percent: 1.0
     rog_quantile: 1.0
     # oligomeric: ['monomeric', 'heteromer']

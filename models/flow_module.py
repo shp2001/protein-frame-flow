@@ -508,6 +508,8 @@ class FlowModule(LightningModule):
                 w_nce=training_cfg.w_nce,
                 w_rank=training_cfg.w_rank,
                 w_reg=training_cfg.w_reg,
+                w_rmsd_global=training_cfg.w_rmsd_global,
+                w_rmsd_local=training_cfg.w_rmsd_local,
                 cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
@@ -642,6 +644,8 @@ class FlowModule(LightningModule):
                     w_nce=self._exp_cfg.training.w_nce,
                     w_rank=self._exp_cfg.training.w_rank,
                     w_reg=self._exp_cfg.training.w_reg,
+                    w_rmsd_global=self._exp_cfg.training.w_rmsd_global,
+                    w_rmsd_local=self._exp_cfg.training.w_rmsd_local,
                     cdr_mask=batch['diffuse_mask'][0],
                     only_cdr=True)
                     

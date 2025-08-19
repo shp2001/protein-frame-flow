@@ -1363,11 +1363,13 @@ def compute_lddt_per_atom(
 
 def calc_confidence_loss(
     node_xyz, scores_per_atom, w_gt, w_str, w_atom, 
-    min_margin=0.0, max_margin=5.0, m0=0.0, s0=1.0, gamma=3.0,
+    min_margin=0.0, max_margin=7.5, m0=0.0, s0=1.0, gamma=3.0,
     only_cdr=False, cdr_mask=None,
     # === NEW: weights & hyper-params ===
-    w_nce=1.0,              # (2) NCE loss 가중치
-    w_rank=1.0,             # (3) Rank-aware loss 가중치
+    w_rmsd_local=0.0,       # (1) RMSD regression 가중치 
+    w_rmsd_global=0.0,
+    w_nce=0.0,              # (2) NCE loss 가중치
+    w_rank=0.0,             # (3) Rank-aware loss 가중치
     w_reg=0.0,              # (4) Regularization 가중치
     tau=1.0,                # NCE temperature
     alpha=2.0,              # NCE에서 lddt 반영 강도 (decoy logit 보정)
@@ -1434,6 +1436,33 @@ def calc_confidence_loss(
             loss_atom = torch.relu(arg_atom).mean()
 
     # ======================================================================
+    # (1) Rank-aware energy shaping:
+    #   더 좋은 decoy(i)의 lddt가 더 높다면 (q_i > q_j), 점수도 더 높아야 (s_i > s_j).
+    #   기대 제약: s_i - s_j >= beta * (q_i - q_j)
+    #   → 위반량에 대해 softplus로 페널티
+    # ======================================================================
+    logits = torch.cat([s_gt.unsqueeze(0), s_decoy], dim=0)
+
+    diff = xyz_decoys[:, :, 1] - xyz_gt[:, 1].unsqueeze(0)
+    mse_per_res = diff.pow(2).mean(dim=-1)
+    rmsd_per_res_decoy = torch.sqrt(mse_per_res + 1e-8)
+    rmsd_per_res_gt = torch.zeros(1, rmsd_per_res_decoy.shape[1], device=rmsd_per_res_decoy.device)
+    rmsd_per_res = torch.cat((rmsd_per_res_gt, rmsd_per_res_decoy), dim=0)
+
+    if only_cdr:
+        cdr_mask = cdr_mask.bool()
+        rmsd_per_res = rmsd_per_res[:, cdr_mask]     # (D, L_cdr)
+        scores_per_atom = scores_per_atom[:, cdr_mask]     # (D, L_cdr)
+    
+
+    loss_rmsd_local = nn.functional.mse_loss(scores_per_atom, rmsd_per_res, reduction='none') # (B, L)
+    loss_rmsd_local = torch.clip(loss_rmsd_local.mean(-1), max=10) # (B)
+    loss_rmsd_global = nn.functional.mse_loss(scores_per_atom.mean(-1), rmsd_per_res.mean(-1), reduction='none') #(B)
+    loss_rmsd_global = torch.clip(loss_rmsd_global, max=10)
+
+    loss_rmsd_local = loss_rmsd_local.mean()
+    loss_rmsd_global = loss_rmsd_global.mean()
+    # ======================================================================
     # (2) NCE 관점: GT를 positive로, decoy들을 negative로 두고 softmax-CE
     # - 점수(s)가 높을수록 좋은 구조라고 가정 → softmax logit에 's'를 사용
     # - lDDT를 decoy logit 보정에 사용: 품질 낮은 decoy(1-lddt 큼)는 더 불리하도록
@@ -1449,7 +1478,6 @@ def calc_confidence_loss(
 
     log_probs = torch.log_softmax(logits, dim=0)
     loss_nce = -(target_probs * log_probs).sum()  # scalar
-    print("loss_nce", loss_nce)
     # ======================================================================
     # (3) Rank-aware energy shaping:
     #   더 좋은 decoy(i)의 lddt가 더 높다면 (q_i > q_j), 점수도 더 높아야 (s_i > s_j).
@@ -1512,7 +1540,9 @@ def calc_confidence_loss(
         w_atom * loss_atom +
         w_nce  * loss_nce +
         w_rank * loss_rank +
-        w_reg  * loss_reg
+        w_reg  * loss_reg +
+        w_rmsd_local * loss_rmsd_local +
+        w_rmsd_global * loss_rmsd_global
     )
 
     return {
@@ -1520,9 +1550,15 @@ def calc_confidence_loss(
         "loss_gt": loss_gt,
         "loss_str": loss_str,
         "loss_atom": loss_atom,
-        "loss_nce": loss_nce,
-        "loss_rank": loss_rank,
-        "loss_reg": loss_reg,
-        "loss_reg_calib": loss_calib,
-        "loss_reg_spread": loss_spread,
+        # "loss_nce": loss_nce,
+        # "loss_rank": loss_rank,
+        # "loss_reg": loss_reg,
+        # "loss_reg_calib": loss_calib,
+        # "loss_reg_spread": loss_spread,
+        # "loss_rmsd_local": loss_rmsd_local,
+        # "loss_rmsd_global": loss_rmsd_global,
+        "lddt_per_decoy": lddt_per_decoy,
+        "s_gt-s_decoy": s_gt - s_decoy,
+        "s_gt_mean": s_gt.mean(),
+        "s_decoys_mean": s_decoy.mean()
     }

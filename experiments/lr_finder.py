@@ -102,7 +102,7 @@ class Experiment:
         lr_finder = tuner.lr_find(
             model=self._module,
             datamodule=self._datamodule,
-            num_training=250,
+            num_training=100,
             max_lr=0.1
         )
 
