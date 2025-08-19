@@ -90,7 +90,7 @@ mini_rollout:
   inference_time_scaling:
     use: False
   sampling:
-    num_timesteps: 15
+    num_timesteps: 8
     do_sde: False
 
   use_prmsd: ${model.confidence_head.use_confidence}
@@ -102,7 +102,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
+  num_devices: 4
   warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol_stage2_no_conf/2025-08-12_08-52-08/epoch=13-step=20076_copy.ckpt
   warm_start_cfg_override: False
   stage: confidence # ['pretraining', 'finetuning', 'confidence']
@@ -142,6 +142,8 @@ experiment:
     w_gt: 0.1
     w_str: 1.0
     w_atom: 0.1
+    w_str_over: 0.3
+    w_atom_over: 0.03
     w_nce: 0.0              # (2) NCE loss 가중치
     w_rank: 0.0             # (3) Rank-aware loss 가중치
     w_reg: 0.0              # (4) Regularization 가중치
@@ -160,7 +162,7 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: ebm_bb_gt_str_margin_7_ts_15_5e-4
+    name: ebm_bb_gt_str_margin_7_sup_ts_8_5e-4
     project: ebm
   optimizer:
     warmup_steps: 0

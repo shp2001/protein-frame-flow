@@ -1366,6 +1366,8 @@ def calc_confidence_loss(
     min_margin=0.0, max_margin=7.5, m0=0.0, s0=1.0, gamma=3.0,
     only_cdr=False, cdr_mask=None,
     # === NEW: weights & hyper-params ===
+    w_str_over=0.3,
+    w_atom_over=0.03,
     w_rmsd_local=0.0,       # (1) RMSD regression 가중치 
     w_rmsd_global=0.0,
     w_nce=0.0,              # (2) NCE loss 가중치
@@ -1413,6 +1415,7 @@ def calc_confidence_loss(
         arg = margins_per_decoy - s_gt + s_decoy  # (D,)
         if softplus_margin is None:
             loss_str = torch.relu(arg).mean()
+            loss_str_over = torch.relu(s_gt - s_decoy - margins_per_decoy * 1.4).mean() # s_gt가 s_decoy보다 margins_per_decoy보다 작아야 loss 0
         else:
             # hinge 대신 softplus(logistic)로 gradient 소실 완화
             loss_str = torch.nn.functional.softplus(arg - softplus_margin).mean()
@@ -1420,13 +1423,15 @@ def calc_confidence_loss(
         with torch.no_grad():
             margins_per_decoy = min_margin + (1.0 - lddt_per_decoy) * (max_margin - min_margin)
             arg = margins_per_decoy - s_gt + s_decoy
-            loss_str = torch.relu(arg).mean()
+            loss_str = torch.relu(arg).mean() # s_gt가 s_decoy보다 margins_per_decoy 이상 커야 loss 0 
+            loss_str_over = torch.relu(s_gt - s_decoy - margins_per_decoy * 1.4).mean() # s_gt가 s_decoy보다 margins_per_decoy보다 작아야 loss 0
 
     if w_atom > 0.0:
         margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin)  # (D, L)
         arg_atom = margins_per_atom - score_gt[None, :] + score_decoys  # (D, L)
         if softplus_margin is None:
             loss_atom = torch.relu(arg_atom).mean()
+            loss_atom_over = torch.relu(score_gt[None, :] - score_decoys - margins_per_atom * 1.4).mean() # s_gt가 s_decoy보다 margins_per_decoy보다 작아야 loss 0
         else:
             loss_atom = torch.nn.functional.softplus(arg_atom - softplus_margin).mean()
     else:
@@ -1434,7 +1439,7 @@ def calc_confidence_loss(
             margins_per_atom = min_margin + (1.0 - lddt_per_res) * (max_margin - min_margin)
             arg_atom = margins_per_atom - score_gt[None, :] + score_decoys
             loss_atom = torch.relu(arg_atom).mean()
-
+            loss_str_over = torch.relu(s_gt - s_decoy - margins_per_decoy * 1.4).mean() # s_gt가 s_decoy보다 margins_per_decoy보다 작아야 loss 0
     # ======================================================================
     # (1) RMSD regression 
     # ======================================================================
@@ -1538,7 +1543,9 @@ def calc_confidence_loss(
         w_rank * loss_rank +
         w_reg  * loss_reg +
         w_rmsd_local * loss_rmsd_local +
-        w_rmsd_global * loss_rmsd_global
+        w_rmsd_global * loss_rmsd_global +
+        w_str_over * loss_str_over +
+        w_atom_over * loss_atom_over
     )
 
     return {
@@ -1546,6 +1553,8 @@ def calc_confidence_loss(
         "loss_gt": loss_gt,
         "loss_str": loss_str,
         "loss_atom": loss_atom,
+        "loss_str_over": loss_str_over,
+        "loss_atom_over": loss_atom_over,
         # "loss_nce": loss_nce,
         # "loss_rank": loss_rank,
         # "loss_reg": loss_reg,
