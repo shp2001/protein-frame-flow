@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH -J ebm_bb
+#SBATCH -J ebm_margin_10_over14
 #SBATCH -p gpu
 #SBATCH -w gpu05
 #SBATCH --gres=gpu:A6000:4
-#SBATCH --mem=128g
+#SBATCH --mem=80g
 #SBATCH -c 24
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm2.err
