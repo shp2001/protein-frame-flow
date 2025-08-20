@@ -886,26 +886,17 @@ class FlowModule(LightningModule):
             )
 
             if self.confidence_model != None:
-                seq = ''
-                for i in batch["aatype"][0].tolist():
-                    seq = seq + rc.restypes_with_x[i]
-
-                node_elem, node_xyz, bond_index, relpos, atom_mask = build_graph_tensors_multimer(
-                    seq=seq,
-                    chain_list=batch['chain_idx'][0],
+                node_aa, node_xyz = build_graph_tensors_multimer(
+                    aatype=batch["aatype"][0],
                     xyz_gt=batch['atom14_gt_positions'][0],
-                    mask_gt=batch['atom14_gt_exists'][0],
                     xyz_decoys=pred_positions,
-                    residue_index=batch['res_idx'][0],
-                    asym_id=batch['asym_id'][0],
-                    entity_id=batch['entity_id'][0],
-                    sym_id=batch['sym_id'][0],
-                    diffuse_mask=batch['diffuse_mask'][0],
                     device=device
                 )
+                relpos_decoy = batch['pair_init']
+                relpos_gt = batch['pair_init'][0:1]
+                relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
-                logit = self.confidence_model(node_elem, node_xyz, bond_index, relpos) # (B+1, L_atom, 1)
-                unflatten_logit = all_atom.atom_unflatten(logit, batch['atom14_gt_exists'][0].bool()).squeeze(-1) # (B+1, L, 14)
+                logit = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D+1, L)
 
 
             bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1))
@@ -921,10 +912,10 @@ class FlowModule(LightningModule):
             L_total = batch['original_diffuse_mask'].shape[0]
             B, L_part, A, d = batch['atom14_gt_positions'].shape
             if logit != None:
-                total_b_factors = torch.zeros(B, L_total, A, device=device, dtype=logit.dtype)
+                total_b_factors = torch.zeros(B, L_total, device=device, dtype=logit.dtype)
                 batch_idx = torch.arange(B, device=device).unsqueeze(1).expand(B, L_part)
-                total_b_factors[batch_idx, batch["res_idx"], :] = unflatten_logit[1:]
-                total_b_factors = du.to_numpy(total_b_factors) # (B, L, 14)
+                total_b_factors[batch_idx, batch["res_idx"]] = logit[1:]
+                total_b_factors = du.to_numpy(total_b_factors) # (B, L)
 
             for i in range(pred_positions.shape[0]):
                 pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
@@ -942,9 +933,9 @@ class FlowModule(LightningModule):
                     b_factor = np.tile((b_factor_alt[i] * 100)[:, None], (1, 37))
                     
                 else:
-                    b_factor = total_b_factors[i] # (L, 14)
-                    b_factor = all_atom.atom14_to_atom37(np.expand_dims(b_factor, axis=-1), gt_batch) # (L, 37, 1)
-                    b_factor = np.squeeze(b_factor, axis=-1) # (L, 37)
+                    b_factor = total_b_factors[i] # (L)
+                    b_factor = np.tile((b_factor)[:, None], (1, 37)) # (L, 37)
+
                 b_factors.append(b_factor)
 
             pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
