@@ -53,7 +53,7 @@ class ProteinData(LightningDataModule):
 
                     cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
-            relpos_emb = embed_relpos(feat['residue_index'], cropped_feat['chain_seq_list'])
+            relpos_emb = embed_relpos(cropped_feat['residue_index'], cropped_feat['chain_seq_list'])
             cropped_feat['pair_init'] = relpos_emb
             cropped_feat['csv_idx'] = feat['csv_idx']
             cropped_feat['crop_idx'] = torch.tensor(feat['crop_idx'])
