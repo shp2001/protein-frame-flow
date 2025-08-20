@@ -323,7 +323,7 @@ class FlowModule(LightningModule):
                 all_atom_clash_loss = compute_all_atom_clash_loss(
                     model_output['all_atom_preds']['positions'][-1],
                     noisy_batch['atom14_gt_exists'],
-                    noisy_batch['res_idx'],
+                    noisy_batch['residue_index'],
                     noisy_batch['residx_atom14_to_atom37'],
                     interface_mask=interface_mask
                 )
@@ -352,7 +352,7 @@ class FlowModule(LightningModule):
             bond_loss_info = between_residue_bond_loss(
                 pred_atom_positions=model_output['all_atom_preds']['positions'][-1],
                 pred_atom_mask=noisy_batch['atom14_gt_exists'],
-                residue_index=noisy_batch['res_idx'],
+                residue_index=noisy_batch['residue_index'],
                 aatype=noisy_batch['aatype']
             )
             bond_length_loss = bond_loss_info['c_n_loss_mean']
@@ -846,14 +846,14 @@ class FlowModule(LightningModule):
                     'atom37_atom_exists': batch['original_atom37_atom_exists']
                 }
                 gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
-                gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
+                gt_position_37[batch['crop_idx'][i].cpu().numpy()] = pred_position_37
                 pred_positions_37.append(gt_position_37)
 
 
             pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
 
-            total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['res_idx'].device)
-            total_prmsd.scatter_(dim=1, index=batch['res_idx'], src=prmsd_final)
+            total_prmsd = torch.zeros(pred_positions.shape[0], gt_positions.shape[0], device=batch['crop_idx'].device)
+            total_prmsd.scatter_(dim=1, index=batch['crop_idx'], src=prmsd_final)
             prmsds = du.to_numpy(total_prmsd)
 
             samples = os.listdir(sample_root_dir)

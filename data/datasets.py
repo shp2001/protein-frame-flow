@@ -90,7 +90,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
     res_mask[chain_feats['aatype'] == 20] = 0
     chain_idx = torch.tensor(processed_feats['chain_index'])
-    res_idx = processed_feats['residue_index']
+    residue_index = processed_feats['residue_index']
 
     return {
         'res_plddt': torch.tensor(res_plddt),
@@ -98,7 +98,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'chain_index': chain_feats['chain_index'],
         'res_mask': res_mask,
         'chain_idx': chain_idx,
-        'res_idx': res_idx,
+        'residue_index': residue_index,
         'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
         'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
@@ -326,37 +326,40 @@ class BaseDataset(Dataset):
             feats['atom14_alt_gt_positions'] = feats['atom14_alt_gt_positions'] - motif_com[None, None, :] 
             feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] = feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
 
-            # create res_idx for cropping 
+            # create crop_idx for cropping 
             mode = feats['mode']
             
             if mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
                 raise ValueError('Mode should be one of [ab, nanobody, general, monomer, polymer]')
 
             if mode == 'ab':
-                feats['res_idx'] = crop_antigen(feats['trans_1'],
-                                                cdr_mask=feats['diffuse_mask'],
-                                                nan_mask=feats['res_mask'],
-                                                max_len=self.dataset_cfg.ab_max_num_res,
-                                                seq_list=feats['chain_seq_list'],
-                                                crop_ab=self.dataset_cfg.crop_ab,
-                                                mode=mode
-                                                )
+                feats['crop_idx'] = crop_antigen(
+                    feats['trans_1'],
+                    cdr_mask=feats['diffuse_mask'],
+                    nan_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.ab_max_num_res,
+                    seq_list=feats['chain_seq_list'],
+                    crop_ab=self.dataset_cfg.crop_ab,
+                    mode=mode,
+                    )
             if mode == 'nanobody':
-                feats['res_idx'] = crop_antigen(feats['trans_1'],
-                                                cdr_mask=feats['diffuse_mask'],
-                                                nan_mask=feats['res_mask'],
-                                                max_len=self.dataset_cfg.ab_max_num_res,
-                                                seq_list=feats['chain_seq_list'],
-                                                crop_ab=self.dataset_cfg.crop_ab,
-                                                mode=mode
-                                                )   
+                feats['crop_idx'] = crop_antigen(
+                    feats['trans_1'],
+                    cdr_mask=feats['diffuse_mask'],
+                    nan_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.ab_max_num_res,
+                    seq_list=feats['chain_seq_list'],
+                    crop_ab=self.dataset_cfg.crop_ab,
+                    mode=mode,
+                    )   
             if mode == 'general' or mode == 'polymer' or mode == 'monomer':
-                feats['res_idx'] = crop_general_protein(feats['trans_1'],
-                                loop_mask=feats['diffuse_mask'],
-                                nan_mask=feats['res_mask'],
-                                max_len=self.dataset_cfg.general_max_num_res,
-                                seq_list=feats['chain_seq_list']
-                                )
+                feats['crop_idx'] = crop_general_protein(
+                    feats['trans_1'],
+                    loop_mask=feats['diffuse_mask'],
+                    nan_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.general_max_num_res,
+                    seq_list=feats['chain_seq_list'],
+                    )
 
         else:
             raise ValueError(f'Unknown task {self.task}')

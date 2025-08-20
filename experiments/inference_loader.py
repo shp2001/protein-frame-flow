@@ -66,7 +66,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
 
     chain_idx = torch.tensor(processed_feats['chain_index'])
-    res_idx = processed_feats['residue_index']
+    residue_index = processed_feats['residue_index']
 
     return {
         'res_plddt': torch.tensor(res_plddt),
@@ -76,7 +76,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'trans_1': trans_1,
         'res_mask': res_mask,
         'chain_idx': chain_idx,
-        'res_idx': res_idx,
+        'residue_index': residue_index,
         'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
@@ -270,7 +270,7 @@ def collate_fn(batch):
         cropped_feat = {}
 
         if mode =='ab':
-            cropped_feat['res_idx'] = crop_antigen(feat['trans_1'],
+            cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['diffuse_mask'],
                                                     nan_mask=feat['res_mask'],
                                                     max_len=256,
@@ -278,18 +278,18 @@ def collate_fn(batch):
                                                     crop_ab=True
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
-            cropped_feat['res_idx'] = crop_general_protein(feat['trans_1'],
+            cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
                             loop_mask=feat['diffuse_mask'],
                             nan_mask=feat['res_mask'],
                             max_len=256,
                             seq_list=feat['chain_seq_list']
                             )
 
-        not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
+        not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
 
         for key in feat.keys():
             if key not in not_crop_key:
-                cropped_feat[key] = feat[key][cropped_feat['res_idx']]
+                cropped_feat[key] = feat[key][cropped_feat['crop_idx']]
 
             if key == 'chain_seq_list':
                 lengths = [len(s) for s in feat[key]]
@@ -298,19 +298,19 @@ def collate_fn(batch):
                 merged = "".join(feat[key])
                 cropped_seq_list = [[] for _ in range(len(feat[key]))]
 
-                for idx in cropped_feat['res_idx']:
+                for idx in cropped_feat['crop_idx']:
                     chain_idx = bisect.bisect_right(start_positions, idx) - 1
                     cropped_seq_list[chain_idx].append(merged[idx])
 
                 cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
         # make pair_init (relpos)
-        relpos_emb = embed_relpos(cropped_feat['res_idx'],
+        relpos_emb = embed_relpos(cropped_feat['residue_index'],
                                 cropped_feat['chain_seq_list'])
         
         cropped_feat['pair_init'] = relpos_emb
         cropped_feat['csv_idx'] = feat['csv_idx']
-        cropped_feat['res_idx'] = torch.tensor(cropped_feat['res_idx'])
+        cropped_feat['crop_idx'] = torch.tensor(cropped_feat['crop_idx'])
         cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
         del cropped_feat['chain_seq_list']
 
@@ -332,7 +332,7 @@ def collate_fn(batch):
     cropped_batch['original_chain_idx'] = feat['chain_idx']
     cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
 
-    ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
+    ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
     cropped_batch['ref_feature_dict'] = {
         'ref_space_uid': ref_space_uid,
         'ref_element': ref_element,
