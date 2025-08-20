@@ -140,8 +140,8 @@ experiment:
     
     aux_loss_confidence_loss_weight: 1.0 # 4.0 ~ 6.0
     w_gt: 0.1
-    w_str: 1.0
-    w_atom: 0.1
+    w_str: 0.1
+    w_atom: 1.0
     w_str_over: 0.3
     w_atom_over: 0.03
     w_nce: 0.0              # (2) NCE loss 가중치
