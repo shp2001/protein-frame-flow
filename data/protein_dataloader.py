@@ -36,11 +36,11 @@ class ProteinData(LightningDataModule):
         cropped_batch = []
         for i, feat in enumerate(batch):
             cropped_feat = {}
-            not_crop_key = ['res_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
+            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
 
             for key in feat.keys():
                 if key not in not_crop_key:
-                    cropped_feat[key] = feat[key][feat['res_idx']]
+                    cropped_feat[key] = feat[key][feat['crop_idx']]
 
                 if key == 'chain_seq_list':
                     lengths = [len(s) for s in feat[key]]
@@ -48,16 +48,16 @@ class ProteinData(LightningDataModule):
                     merged = "".join(feat[key])
                     cropped_seq_list = [[] for _ in range(len(feat[key]))]
 
-                    for idx in feat['res_idx']:
+                    for idx in feat['crop_idx']:
                         chain_idx = bisect.bisect_right(start_positions, idx) - 1
                         cropped_seq_list[chain_idx].append(merged[idx])
 
                     cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
-            relpos_emb, asym_id, entity_id, sym_id = embed_relpos(feat['res_idx'], cropped_feat['chain_seq_list'])
+            relpos_emb, asym_id, entity_id, sym_id = embed_relpos(feat['residue_index'], cropped_feat['chain_seq_list'])
             cropped_feat['pair_init'] = relpos_emb
             cropped_feat['csv_idx'] = feat['csv_idx']
-            cropped_feat['res_idx'] = torch.tensor(feat['res_idx'])
+            cropped_feat['crop_idx'] = torch.tensor(feat['crop_idx'])
             cropped_feat['asym_id'] = torch.tensor(asym_id)
             cropped_feat['entity_id'] = torch.tensor(entity_id)
             cropped_feat['sym_id'] = torch.tensor(sym_id)
@@ -80,7 +80,7 @@ class ProteinData(LightningDataModule):
         cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
         
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = \
-            featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['res_idx'])
+            featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
         cropped_batch['ref_feature_dict'] = {
             'ref_space_uid': ref_space_uid,
             'atom_to_token_idx': atom_to_token_idx,

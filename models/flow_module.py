@@ -320,7 +320,7 @@ class FlowModule(LightningModule):
                 all_atom_clash_loss = compute_all_atom_clash_loss(
                     model_output['all_atom_preds']['positions'][-1],
                     noisy_batch['atom14_gt_exists'],
-                    noisy_batch['res_idx'],
+                    noisy_batch['residue_index'],
                     noisy_batch['residx_atom14_to_atom37'],
                     interface_mask=interface_mask
                 )
@@ -349,7 +349,7 @@ class FlowModule(LightningModule):
             bond_loss_info = between_residue_bond_loss(
                 pred_atom_positions=model_output['all_atom_preds']['positions'][-1],
                 pred_atom_mask=noisy_batch['atom14_gt_exists'],
-                residue_index=noisy_batch['res_idx'],
+                residue_index=noisy_batch['residue_index'],
                 aatype=noisy_batch['aatype']
             )
             bond_length_loss = bond_loss_info['c_n_loss_mean']
@@ -401,6 +401,7 @@ class FlowModule(LightningModule):
                 w_gt=training_cfg.w_gt,
                 w_str=training_cfg.w_str,
                 w_atom=training_cfg.w_atom,
+                over=training_cfg.over,
                 cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
@@ -512,6 +513,7 @@ class FlowModule(LightningModule):
                 w_rmsd_local=training_cfg.w_rmsd_local,
                 w_str_over=training_cfg.w_str_over,
                 w_atom_over=training_cfg.w_atom_over,
+                over=training_cfg.over,
                 cdr_mask=noisy_batch['diffuse_mask'][0],
                 only_cdr=True)
             
@@ -650,6 +652,7 @@ class FlowModule(LightningModule):
                     w_rmsd_local=self._exp_cfg.training.w_rmsd_local,
                     w_str_over=self._exp_cfg.training.w_str_over,
                     w_atom_over=self._exp_cfg.training.w_atom_over,
+                    over=self._exp_cfg.training.over,
                     cdr_mask=batch['diffuse_mask'][0],
                     only_cdr=True)
                     
@@ -914,7 +917,7 @@ class FlowModule(LightningModule):
             if logit != None:
                 total_b_factors = torch.zeros(B, L_total, device=device, dtype=logit.dtype)
                 batch_idx = torch.arange(B, device=device).unsqueeze(1).expand(B, L_part)
-                total_b_factors[batch_idx, batch["res_idx"]] = logit[1:]
+                total_b_factors[batch_idx, batch["crop_idx"]] = logit[1:]
                 total_b_factors = du.to_numpy(total_b_factors) # (B, L)
 
             for i in range(pred_positions.shape[0]):
@@ -924,7 +927,7 @@ class FlowModule(LightningModule):
                     'atom37_atom_exists': batch['original_atom37_atom_exists']
                 }
                 gt_position_37 = all_atom.atom14_to_atom37(gt_positions, gt_batch) # (L, 37, 3)
-                gt_position_37[batch['res_idx'][i].cpu().numpy()] = pred_position_37
+                gt_position_37[batch['crop_idx'][i].cpu().numpy()] = pred_position_37
                 pred_positions_37.append(gt_position_37)
 
                 # processing b_factors 
