@@ -90,7 +90,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
     res_mask[chain_feats['aatype'] == 20] = 0
     chain_idx = torch.tensor(processed_feats['chain_index'])
-    residue_index = processed_feats['residue_index']
+    residue_index = torch.tensor(processed_feats['residue_index'])
 
     return {
         'res_plddt': torch.tensor(res_plddt),
