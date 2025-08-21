@@ -89,7 +89,7 @@ model:
     atom_num: 14
     
   confidence_head:
-    use_confidence: True
+    use_confidence: False
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
     num_bins: 32

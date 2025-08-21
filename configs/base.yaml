@@ -103,7 +103,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/se3-fm/CDRFlow_v1.2.4_biomol_stage2_no_conf/2025-08-12_08-52-08/epoch=13-step=20076_copy.ckpt
+  warm_start: ebm
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -150,7 +150,7 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.4_biomol_stage2_grad_to_conf_x5
+    name: CDRFlow_v1.2.5_stage2
     project: se3-fm
   optimizer:
     warmup_steps: 0
