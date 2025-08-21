@@ -482,6 +482,7 @@ def relpos(
 
     rel_feats.append(rel_chain)
     rel_feat = torch.cat(rel_feats, dim=-1)
+    
     return rel_feat
 
 def embed_relpos(residue_index, seq_list):

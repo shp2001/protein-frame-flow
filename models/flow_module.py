@@ -383,11 +383,10 @@ class FlowModule(LightningModule):
                 rollout=True
             )
 
-            node_aa, node_xyz = build_graph_tensors_multimer(
+            node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                 aatype=noisy_batch["aatype"][0],
                 xyz_gt=noisy_batch['atom14_gt_positions'][0],
                 xyz_decoys=mini_pred_positions,
-                device=device
             )
             relpos_decoy = noisy_batch['pair_init']
             relpos_gt = noisy_batch['pair_init'][0:1]
@@ -487,16 +486,13 @@ class FlowModule(LightningModule):
             )
 
             # create graph tensor for confidence model
-
-            node_aa, node_xyz = build_graph_tensors_multimer(
+            relpos_gt = noisy_batch['pair_init']
+            node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                 aatype=noisy_batch["aatype"][0],
                 xyz_gt=noisy_batch['atom14_gt_positions'][0],
                 xyz_decoys=mini_pred_positions,
-                device=device
+                relpos=relpos_gt
             )
-            relpos_decoy = noisy_batch['pair_init']
-            relpos_gt = noisy_batch['pair_init'][0:1]
-            relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
             scores_per_res = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D, L)
 
@@ -540,15 +536,13 @@ class FlowModule(LightningModule):
         )
         logit = None 
         if self.confidence_model != None:
-            node_aa, node_xyz = build_graph_tensors_multimer(
+            relpos_gt = batch['pair_init']
+            node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                 aatype=batch["aatype"][0],
                 xyz_gt=batch['atom14_gt_positions'][0],
                 xyz_decoys=pred_positions,
-                device=device
+                relpos=relpos_gt
             )
-            relpos_decoy = batch['pair_init']
-            relpos_gt = batch['pair_init'][0:1]
-            relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
             logit = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D+1, L)
 
@@ -889,15 +883,13 @@ class FlowModule(LightningModule):
             )
 
             if self.confidence_model != None:
-                node_aa, node_xyz = build_graph_tensors_multimer(
+                relpos_gt = batch['pair_init']
+                node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                     aatype=batch["aatype"][0],
                     xyz_gt=batch['atom14_gt_positions'][0],
                     xyz_decoys=pred_positions,
-                    device=device
+                    relpos=relpos_gt
                 )
-                relpos_decoy = batch['pair_init']
-                relpos_gt = batch['pair_init'][0:1]
-                relpos = torch.cat([relpos_gt, relpos_decoy], dim=0)
 
                 logit = self.confidence_model(node_aa, node_xyz, relpos)[..., 0] # (D+1, L)
 
