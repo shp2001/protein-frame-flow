@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_1.2.4_scaling_1
+#SBATCH -J ebm_bb
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1
@@ -10,4 +10,4 @@
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/CDRFlow_1.2.4_aug_1.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/ebm_bb.log

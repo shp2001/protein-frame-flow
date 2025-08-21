@@ -486,7 +486,7 @@ class FlowModule(LightningModule):
             )
 
             # create graph tensor for confidence model
-            relpos_gt = noisy_batch['pair_init']
+            relpos_gt = noisy_batch['pair_init'][0]
             node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                 aatype=noisy_batch["aatype"][0],
                 xyz_gt=noisy_batch['atom14_gt_positions'][0],
@@ -536,7 +536,7 @@ class FlowModule(LightningModule):
         )
         logit = None 
         if self.confidence_model != None:
-            relpos_gt = batch['pair_init']
+            relpos_gt = batch['pair_init'][0]
             node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                 aatype=batch["aatype"][0],
                 xyz_gt=batch['atom14_gt_positions'][0],
@@ -883,7 +883,7 @@ class FlowModule(LightningModule):
             )
 
             if self.confidence_model != None:
-                relpos_gt = batch['pair_init']
+                relpos_gt = batch['pair_init'][0]
                 node_aa, node_xyz, relpos = build_graph_tensors_multimer(
                     aatype=batch["aatype"][0],
                     xyz_gt=batch['atom14_gt_positions'][0],
@@ -906,6 +906,7 @@ class FlowModule(LightningModule):
             
             L_total = batch['original_diffuse_mask'].shape[0]
             B, L_part, A, d = batch['atom14_gt_positions'].shape
+            
             if logit != None:
                 total_b_factors = torch.zeros(B, L_total, device=device, dtype=logit.dtype)
                 batch_idx = torch.arange(B, device=device).unsqueeze(1).expand(B, L_part)
@@ -930,7 +931,6 @@ class FlowModule(LightningModule):
                 else:
                     b_factor = total_b_factors[i] # (L)
                     b_factor = np.tile((b_factor)[:, None], (1, 37)) # (L, 37)
-
                 b_factors.append(b_factor)
 
             pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
@@ -950,11 +950,9 @@ class FlowModule(LightningModule):
                 os.makedirs(sample_dir, exist_ok=True)
                 aatype = du.to_numpy(batch['original_aatype'].long())
                 chain_idx = du.to_numpy(batch['original_chain_idx'].long())
-
-                # save h3 cdr b_Factors
-                h3_anchor = motif_index.find_anchor(batch['diffuse_mask'][i]) 
-                torch.save(unflatten_logit[i+1, h3_anchor[0]+1:h3_anchor[1]], os.path.join(sample_dir, 'b_factor.pt'))
-
+                diffuse_mask = du.to_numpy(batch['diffuse_mask'])[i]
+                print("pred_position", pred_position.shape)
+                print("final_b_factors[i]", final_b_factors[i].shape)
                 # save structure data 
                 _ = eu.save_traj(
                     sample=pred_position, # (L, 37, 3)

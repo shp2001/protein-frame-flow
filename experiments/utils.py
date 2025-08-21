@@ -246,7 +246,6 @@ def save_traj(
         }
     
     else:
-        print("b_factors.shape", b_factors.shape)
         prot_traj_path = au.write_prot_to_pdb(
             bb_prot_traj,
             prot_traj_path,
