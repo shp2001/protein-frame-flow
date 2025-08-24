@@ -30,8 +30,8 @@ data:
 interpolant:
   min_t: 1e-2
   sample_t_mode: uniform # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
-  max_angle_deg: 20
-  max_shift: 5
+  max_angle_deg: 30
+  max_shift: 8
   twisting:
     use: False
 
@@ -149,11 +149,11 @@ experiment:
     viol_loss_ca_c_n_weight: 0.0 # 0.01 ->
     viol_loss_c_n_ca_weight: 0.0 # 0.001~0.01 -> 
 
-    aux_loss_t_pass: 0.25
+    aux_loss_t_pass: 0.3
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v2.0.0_debug
+    name: CDRFlow_v2.0.0_angle_30_shift_8
     project: v2.0.0
   optimizer:
     warmup_steps: 0

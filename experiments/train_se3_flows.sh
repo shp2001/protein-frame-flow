@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v2.0.0_debug
+#SBATCH -J CDRFlow_v2.0.0_angle_30_shift_8
 #SBATCH -p gpu
 #SBATCH -w gpu05
 #SBATCH --gres=gpu:A6000:2
