@@ -9,11 +9,10 @@ from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import embed_relpos
 from data import featurizer
-from data import utils as du
 
+import analysis.utils as au 
 from itertools import accumulate
 import bisect
-import math 
 
 class ProteinData(LightningDataModule):
 
@@ -96,8 +95,15 @@ class ProteinData(LightningDataModule):
         cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
         cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
         
-        cropped_batch['original_diffuse_mask'] = torch.tensor(feat['diffuse_mask']).to(motif_mask.device)
-        cropped_batch['original_loop_mask'] = torch.tensor(feat['loop_mask']).to(motif_mask.device)
+        # get interface index 
+        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+            cropped_batch['atom14_gt_positions'],
+            cropped_batch['atom14_gt_exists'],
+            cropped_batch['loop_mask'][0],
+            cropped_batch['mode']
+        )
+        cropped_batch['cdr_residues'] = cdr_residues
+        cropped_batch['neighbor_indices'] = neighbor_indices
         return cropped_batch
 
     

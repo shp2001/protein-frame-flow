@@ -1029,22 +1029,12 @@ def local_distance_loss(
     atom14_pred_positions, # (B, N, 14, 3)
     renamed_atom14_gt_exists, # (B, N, 14)
     renamed_atom14_gt_positions, # (B, N, 14, 3)
-    original_loop_mask, # (N)
-    scale_factor,
-    mode
+    cdr_residues, # (N_cdr)
+    neighbor_indices, # (N_nb)
     ):
     """
     In order to update interface properly, this loss will scan distance among interface atoms.
     """
-    cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
-        renamed_atom14_gt_positions,
-        renamed_atom14_gt_exists,
-        original_loop_mask,
-        mode,
-        scale_factor,
-        distance_threshold=5
-    )
-
     # calculate gt distance map 
     device = renamed_atom14_gt_exists.device
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍

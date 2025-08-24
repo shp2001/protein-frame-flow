@@ -104,7 +104,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 4
+  num_devices: 2
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -123,7 +123,7 @@ experiment:
     aux_loss_use_chi_loss: False
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_local_dist_mat_loss: False 
+    aux_loss_use_local_dist_mat_loss: True 
     aux_loss_use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
 
     viol_loss_use_all_atom_clash_loss: True
@@ -134,8 +134,7 @@ experiment:
     min_bin: 0
     max_bin: 10 
 
-    aux_loss_dist_mat_loss_weight: 0.5
-    aux_loss_chi_loss_weight: 0.3 # 1.2 -> 0.7 ~ 0.8 
+    aux_loss_dist_mat_loss_weight: 1.0
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
@@ -150,11 +149,11 @@ experiment:
     viol_loss_ca_c_n_weight: 0.0 # 0.01 ->
     viol_loss_c_n_ca_weight: 0.0 # 0.001~0.01 -> 
 
-    aux_loss_t_pass: 0.2
+    aux_loss_t_pass: 0.25
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v2.0.0
+    name: CDRFlow_v2.0.0_debug
     project: v2.0.0
   optimizer:
     warmup_steps: 0

@@ -259,18 +259,15 @@ class FlowModule(LightningModule):
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        scale_factor = training_cfg.bb_atom_scale / (1 - torch.min(
-        r3_t, torch.tensor(training_cfg.t_normalize_clip)))
 
         if training_cfg.aux_loss_use_local_dist_mat_loss:
             pred_atom_14 = pred_atom_14_list[-1]
             local_dist_mat_loss, neighbor_indices, cdr_residues = local_distance_loss(
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
-                renamed_atom14_gt_positions, # scaled 
-                noisy_batch['original_loop_mask'],
-                scale_factor,
-                noisy_batch['mode']
+                renamed_atom14_gt_positions, # scaled
+                noisy_batch['cdr_residues'],
+                noisy_batch['neighbor_indices']
             )   # local_loss_mask: (B, N, N, 14)
 
         # Backbone atom loss
@@ -424,44 +421,6 @@ class FlowModule(LightningModule):
         prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         pde_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
-        if training_cfg.aux_loss_use_confidence_loss:
-            self.mini_rollout.set_device(noisy_batch['loop_mask'].device)
-
-            cdr_residues, _ = au.get_cdr_and_neighbors(
-                atom14_gt_positions=noisy_batch["atom14_gt_positions"],
-                atom14_gt_exists=noisy_batch["atom14_gt_exists"],
-                original_diffuse_mask=noisy_batch["original_diffuse_mask"],
-                mode=noisy_batch['mode'],
-                scale_factor=torch.ones(num_batch)
-                )
-
-            _, _, mini_pred_positions, prmsd_final, mini_prmsd, mini_pred_trans, _, input_for_confidence = self.mini_rollout.sample(
-                num_batch,
-                num_res,
-                self.model,
-                noisy_batch,
-                rollout=True
-            )
-
-            plddt_logit, pde = self.confidence_model(input_for_confidence, noisy_batch['res_mask'])
-            # prmsd_loss = h3_lddt_loss(
-            #     logits=plddt_logit,
-            #     all_atom_pred_pos=mini_pred_positions, # predicted structure (b, l, 14, 3)
-            #     all_atom_positions=renamed_dict["renamed_atom14_gt_positions"], # gt stucture  (b, l, 14, 3)
-            #     all_atom_mask=renamed_dict["renamed_atom14_gt_exists"],
-            #     cdr_residues=cdr_residues
-            #     )
-
-            pde_loss = h3_pde_loss(
-                pde=pde,
-                gt_coord=noisy_batch['trans_1'],
-                pred_coord=mini_pred_trans,
-                cdr_residues=cdr_residues,
-                min_bin=self._exp_cfg.training.min_bin,
-                max_bin=self._exp_cfg.training.max_bin,
-            )
-            # final_prmsd = compute_prmsd(pred_rmsd, cdr_mask=noisy_batch['diffuse_mask'])
-            # print(f"prmsd_max: {torch.max(final_prmsd[0])}")
 
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
