@@ -30,6 +30,8 @@ data:
 interpolant:
   min_t: 1e-2
   sample_t_mode: uniform # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
+  max_angle_deg: 20
+  max_shift: 5
   twisting:
     use: False
 
@@ -102,8 +104,8 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
-  warm_start: ebm
+  num_devices: 4
+  warm_start: null
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -115,12 +117,13 @@ experiment:
     rotation_loss_weights: 1.0
 
     aux_loss_weight: 1.0
+    aux_loss_use_dist_mat_loss: True
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False
     aux_loss_use_chi_loss: False
     aux_loss_use_sc_atom_loss: True
     aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_local_dist_mat_loss: True 
+    aux_loss_use_local_dist_mat_loss: False 
     aux_loss_use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
 
     viol_loss_use_all_atom_clash_loss: True
@@ -131,6 +134,7 @@ experiment:
     min_bin: 0
     max_bin: 10 
 
+    aux_loss_dist_mat_loss_weight: 0.5
     aux_loss_chi_loss_weight: 0.3 # 1.2 -> 0.7 ~ 0.8 
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
@@ -150,13 +154,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v1.2.5_stage2
-    project: se3-fm
+    name: CDRFlow_v2.0.0
+    project: v2.0.0
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-5
-    max_lr: 1e-5
+    min_lr: 1e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

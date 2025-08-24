@@ -25,6 +25,8 @@ class EdgeFeatureNet(nn.Module):
             total_edge_feats += self._cfg.ref_pos_dim
         if self._cfg.embed_chain:
             total_edge_feats += 1
+        if self._cfg.embed_loop_mask:
+            total_edge_feats += 1
         if self._cfg.embed_diffuse_mask:
             total_edge_feats += 1
         if self._cfg.embed_distogram:
@@ -49,7 +51,8 @@ class EdgeFeatureNet(nn.Module):
     def forward(self, 
                 trans_t, trans_sc, 
                 rotmats_t, rotmats_sc, 
-                p_mask, diffuse_mask, pair_init,
+                p_mask, diffuse_mask, loop_mask, 
+                pair_init,
                 input_feature_dict):
         """
         trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
@@ -63,14 +66,20 @@ class EdgeFeatureNet(nn.Module):
             ref_pos = self.ref_pos_embedder(input_feature_dict)
             all_edge_feats.append(ref_pos)
 
+        if self._cfg.embed_loop_mask:
+            loop_feat = (1-loop_mask[:, :, None]) * (1-loop_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
+            all_edge_feats.append(loop_feat[..., None])
+
         if self._cfg.embed_diffuse_mask:
-            diff_feat = (1-diffuse_mask[:, :, None]) * (1-diffuse_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1
-            all_edge_feats.append(diff_feat[..., None])
+            diffuse_mask_i = diffuse_mask[:, :, None]  # (B, L, 1)
+            diffuse_mask_j = diffuse_mask[:, None, :]  # (B, 1, L)
+            diffuse_mask = (diffuse_mask_i == diffuse_mask_j).float() 
+            all_edge_feats.append(diffuse_mask[..., None])
 
         if self._cfg.embed_distogram:
             distogram_t = calc_distogram(
                 trans_t, min_bin=self._cfg.min_bin, max_bin=self._cfg.max_bin, num_bins=self._cfg.num_bins)
-            distogram_t = distogram_t * diff_feat[..., None]
+            distogram_t = distogram_t * loop_feat[..., None]
             all_edge_feats.append(distogram_t)
 
             distogram_sc = calc_distogram(
@@ -80,7 +89,7 @@ class EdgeFeatureNet(nn.Module):
         if self._cfg.embed_unit_vector:
             rigid_t = create_rigid(rotmats_t, trans_t)
             unit_vec_t = calc_unit_vector(rigid_t)
-            unit_vec_t = unit_vec_t * diff_feat[..., None]
+            unit_vec_t = unit_vec_t * loop_feat[..., None]
             all_edge_feats.append(unit_vec_t)
 
             rigid_sc = create_rigid(rotmats_sc, trans_sc)

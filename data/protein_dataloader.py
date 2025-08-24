@@ -64,7 +64,7 @@ class ProteinData(LightningDataModule):
 
         cropped_batch = {key: [d[key] for d in cropped_batch] for key in cropped_batch[0].keys()}   
 
-        for key in cropped_batch.keys():     
+        for key in cropped_batch.keys():
             cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
         cropped_batch['mode'] = feat['mode']
@@ -95,15 +95,9 @@ class ProteinData(LightningDataModule):
         cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
         cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
         cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
-
-        cropped_batch['backbone_rigid_tensor'] = du.create_rigid(
-            rots=cropped_batch['rotmats_1'],
-            trans=cropped_batch['trans_1']).to_tensor_4x4() # (B, L, 4, 4)
-        cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
-        cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
         
-        cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
-        
+        cropped_batch['original_diffuse_mask'] = torch.tensor(feat['diffuse_mask']).to(motif_mask.device)
+        cropped_batch['original_loop_mask'] = torch.tensor(feat['loop_mask']).to(motif_mask.device)
         return cropped_batch
 
     

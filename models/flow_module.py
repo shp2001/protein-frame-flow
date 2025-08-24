@@ -139,23 +139,20 @@ class FlowModule(LightningModule):
 
     def model_step(self, noisy_batch: Any):
         training_cfg = self._exp_cfg.training
-        loss_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
-        if torch.any(torch.sum(loss_mask, dim=-1) < 1):
+        loss_loop_mask = noisy_batch['res_mask'] * noisy_batch['loop_mask']
+        loss_diffuse_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
+        if torch.any(torch.sum(loss_loop_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
-        num_batch, num_res = loss_mask.shape
+        num_batch, num_res = loss_loop_mask.shape
         device = noisy_batch['trans_1'].device 
 
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
         gt_rotmats_1 = noisy_batch['rotmats_1']
         rotmats_t = noisy_batch['rotmats_t']
-        gt_chi_angle = noisy_batch['chi_angles_sin_cos']
         gt_atom14_pos = noisy_batch['atom14_gt_positions'].clone()
         alt_atom14_pos = noisy_batch['atom14_alt_gt_positions'].clone()
         gt_pseudo_beta = noisy_batch['pseudo_beta'].clone()
-        backbone_rigid_tensor = noisy_batch['backbone_rigid_tensor'].clone()
-        rigidgroups_gt_frames = noisy_batch['rigidgroups_gt_frames'].clone()
-        rigidgroups_alt_gt_frames = noisy_batch['rigidgroups_alt_gt_frames'].clone()
 
         print("raw_path", noisy_batch['raw_path'])
         
@@ -178,9 +175,6 @@ class FlowModule(LightningModule):
         alt_atom14_pos = alt_atom14_pos * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         gt_pseudo_beta = gt_pseudo_beta * training_cfg.bb_atom_scale / r3_norm_scale
 
-        backbone_rigid_tensor[..., :3, 3] = backbone_rigid_tensor[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale
-        rigidgroups_gt_frames[..., :3, 3] = rigidgroups_gt_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
-        rigidgroups_alt_gt_frames[..., :3, 3] = rigidgroups_alt_gt_frames[..., :3, 3] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Model output predictions.
         model_output = self.model(noisy_batch)
@@ -194,6 +188,7 @@ class FlowModule(LightningModule):
             pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
+        pred_bb_atoms = pred_atom_14_list[-1, :, :, :3]
 
         if torch.isnan(pred_atom_14_list).any():
             raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_atom_14_list).any()} \n")
@@ -211,20 +206,56 @@ class FlowModule(LightningModule):
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Translation VF loss
-        loss_denom = torch.sum(loss_mask, dim=-1) * 3
         trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
-        trans_loss = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_mask[..., None],
+
+        loss_loop_denom = torch.sum(loss_loop_mask, dim=-1) * 3
+        trans_loop_loss = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * loss_loop_mask[..., None],
             dim=(-1, -2)
-        ) / loss_denom
-        trans_loss = torch.clamp(trans_loss, max=5)
+        ) / loss_loop_denom
+        trans_loop_loss = torch.clamp(trans_loop_loss, max=5)
+
+        loss_diffuse_denom = torch.sum(loss_diffuse_mask, dim=-1) * 3
+        trans_diffuse_loss = training_cfg.translation_loss_weight * torch.sum(
+            trans_error ** 2 * loss_diffuse_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_diffuse_denom
+        trans_diffuse_loss = torch.clamp(trans_diffuse_loss, max=10)
+
+        trans_loss = (trans_loop_loss + trans_diffuse_loss) / 2
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
-        rots_vf_loss = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_mask[..., None],
+        rots_vf_loop_loss = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * loss_loop_mask[..., None],
             dim=(-1, -2)
-        ) / loss_denom
+        ) / loss_loop_denom
+
+        rots_vf_diffuse_loss = training_cfg.rotation_loss_weights * torch.sum(
+            rots_vf_error ** 2 * loss_diffuse_mask[..., None],
+            dim=(-1, -2)
+        ) / loss_diffuse_denom
+
+        rots_vf_loss = (rots_vf_loop_loss + rots_vf_diffuse_loss) / 2
+        
+        # distance map loss
+        dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
+        if training_cfg.aux_loss_use_dist_mat_loss:
+            gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
+            pred_flat_atoms = pred_bb_atoms.reshape([num_batch, num_res*3, 3])
+
+            gt_pair_dists = torch.linalg.norm(gt_flat_atoms[:, :, None, :] - gt_flat_atoms[:, None, :, :], dim=-1)
+            pred_pair_dists = torch.linalg.norm(pred_flat_atoms[:, :, None, :] - pred_flat_atoms[:, None, :, :], dim=-1)
+
+            # diffuse_mask를 pair mask로 확장
+            flat_diffuse_mask = loss_diffuse_mask[:, :, None].repeat(1, 1, 3)  # (B, L, 3)
+            flat_diffuse_mask = flat_diffuse_mask.reshape(num_batch, num_res*3)  # (B, L*3)
+            pair_dist_mask = (flat_diffuse_mask[:, :, None] + flat_diffuse_mask[:, None, :]) > 0
+            pair_dist_mask = pair_dist_mask.float()
+
+            # loss 계산
+            dist_mat_loss = torch.sum((gt_pair_dists - pred_pair_dists)**2 * pair_dist_mask, dim=(1,2))
+            dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1,2)) + 1)
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -237,7 +268,7 @@ class FlowModule(LightningModule):
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
                 renamed_atom14_gt_positions, # scaled 
-                noisy_batch['original_diffuse_mask'][0],
+                noisy_batch['original_loop_mask'],
                 scale_factor,
                 noisy_batch['mode']
             )   # local_loss_mask: (B, N, N, 14)
@@ -245,35 +276,56 @@ class FlowModule(LightningModule):
         # Backbone atom loss
         bb_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_bb_loss:
-            bb_atom_loss = compute_rmsd(pred_atom_14_list,
-                                    renamed_atom14_gt_positions,
-                                    cdr_mask=noisy_batch['diffuse_mask'],
-                                    atom14_gt_exists=renamed_atom14_gt_exists,
-                                    mode='bb',
-                                    data_mode=noisy_batch['mode'],
-                                    compute_non_cdr=False,
-                                    compute_cdr=True,
-                                    compute_h3=True
-                                    )
-                                
+            bb_loop_loss = compute_rmsd(
+                pred_atom_14_list,
+                renamed_atom14_gt_positions,
+                mask=noisy_batch['loop_mask'],
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='bb',
+                data_mode=noisy_batch['mode'],
+                compute_unmasked=False,
+                mask_clamp=30
+                )
+            bb_diffuse_loss = compute_rmsd(
+                pred_atom_14_list,
+                renamed_atom14_gt_positions,
+                mask=noisy_batch['diffuse_mask'],
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='bb',
+                data_mode=noisy_batch['mode'],
+                compute_unmasked=False,
+                mask_clamp=30
+                )   
+            bb_atom_loss = (bb_loop_loss + bb_diffuse_loss) / 2       
+
         # sc atom loss (final layer만 계산)
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
-        interface_mask = noisy_batch['diffuse_mask'].clone()
-        interface_mask[:, neighbor_indices] = 1
-
         if training_cfg.aux_loss_use_sc_atom_loss:
-            sc_atom_loss = compute_rmsd(pred_atom_14_list,
-                                    renamed_atom14_gt_positions,
-                                    cdr_mask=interface_mask,
-                                    atom14_gt_exists=renamed_atom14_gt_exists,
-                                    mode='sc',
-                                    data_mode=noisy_batch['mode'],
-                                    compute_non_cdr=True,
-                                    compute_cdr=True,
-                                    compute_h3=False
-                                    )    
+            sc_loop_loss = compute_rmsd(
+                pred_atom_14_list,
+                renamed_atom14_gt_positions,
+                mask=noisy_batch['loop_mask'],
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='sc',
+                data_mode=noisy_batch['mode'],
+                compute_unmasked=False,
+                mask_clamp=30
+                ) # compute side chain mse of loops and their neighbors 
+
+            sc_diffuse_loss = compute_rmsd(
+                pred_atom_14_list,
+                renamed_atom14_gt_positions,
+                mask=noisy_batch['diffuse_mask'],
+                atom14_gt_exists=renamed_atom14_gt_exists,
+                mode='sc',
+                data_mode=noisy_batch['mode'],
+                compute_unmasked=True,
+                mask_clamp=30
+                ) # compute side chain mse of whole chains 
             
+            sc_atom_loss = (sc_loop_loss + sc_diffuse_loss) / 2
+
         # calculate pair feature loss (beta carbon contact prob)
         distogram_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_local_pair_feat_loss and self._model_cfg.distogram_head.use_pair_head:
@@ -301,18 +353,26 @@ class FlowModule(LightningModule):
             )
             
         # final layer backbone rmsd loss
-        final_bb_rmsd = compute_rmsd(pred_atom_14_list[-1].unsqueeze(0),
-                                renamed_atom14_gt_positions,
-                                cdr_mask=noisy_batch['diffuse_mask'],
-                                atom14_gt_exists=renamed_atom14_gt_exists,
-                                mode='bb',
-                                data_mode=noisy_batch['mode'],
-                                compute_non_cdr=False,
-                                compute_cdr=True,
-                                compute_h3=True
-                                )
-
-        final_layer_rmsd = final_bb_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
+        final_bb_loop_rmsd = compute_rmsd(
+            pred_atom_14_list[-1].unsqueeze(0),
+            renamed_atom14_gt_positions,
+            mask=noisy_batch['loop_mask'],
+            atom14_gt_exists=renamed_atom14_gt_exists,
+            mode='bb',
+            data_mode=noisy_batch['mode'],
+            compute_unmasked=False,
+            )
+        final_bb_diffuse_rmsd = compute_rmsd(
+            pred_atom_14_list[-1].unsqueeze(0),
+            renamed_atom14_gt_positions,
+            mask=noisy_batch['diffuse_mask'],
+            atom14_gt_exists=renamed_atom14_gt_exists,
+            mode='bb',
+            data_mode=noisy_batch['mode'],
+            compute_unmasked=False,
+            )
+        final_layer_rmsd = (final_bb_loop_rmsd + final_bb_diffuse_rmsd) / 2
+        final_layer_rmsd = final_layer_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
         
 
         # all atom clash loss 
@@ -325,7 +385,7 @@ class FlowModule(LightningModule):
                     noisy_batch['atom14_gt_exists'],
                     noisy_batch['residue_index'],
                     noisy_batch['residx_atom14_to_atom37'],
-                    interface_mask=interface_mask
+                    noisy_batch['loop_mask']
                 )
             except Exception as e:
                 print(f"[Warning] all atom clash loss skipped due to error: {e}")
@@ -337,7 +397,7 @@ class FlowModule(LightningModule):
                 within_clash_loss = compute_within_clash_loss(
                     model_output['all_atom_preds']['positions'][-1],
                     noisy_batch['atom14_gt_exists'],
-                    interface_mask,
+                    noisy_batch['loop_mask'],
                     noisy_batch['aatype']
                     )   
             except Exception as e:
@@ -365,19 +425,15 @@ class FlowModule(LightningModule):
         pde_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
 
         if training_cfg.aux_loss_use_confidence_loss:
-            self.mini_rollout.set_device(loss_mask.device)
+            self.mini_rollout.set_device(noisy_batch['loop_mask'].device)
 
-            cdr_residues, interface_residues = au.get_cdr_and_neighbors(
+            cdr_residues, _ = au.get_cdr_and_neighbors(
                 atom14_gt_positions=noisy_batch["atom14_gt_positions"],
                 atom14_gt_exists=noisy_batch["atom14_gt_exists"],
-                original_diffuse_mask=noisy_batch["original_diffuse_mask"][0],
+                original_diffuse_mask=noisy_batch["original_diffuse_mask"],
                 mode=noisy_batch['mode'],
                 scale_factor=torch.ones(num_batch)
                 )
-            
-            interface_mask = noisy_batch['diffuse_mask'].clone()
-            interface_mask[:, interface_residues] = 1
-            noisy_batch['interface_mask'] = interface_mask
 
             _, _, mini_pred_positions, prmsd_final, mini_prmsd, mini_pred_trans, _, input_for_confidence = self.mini_rollout.sample(
                 num_batch,
@@ -410,7 +466,8 @@ class FlowModule(LightningModule):
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
         auxiliary_loss = (
-            bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
+            dist_mat_loss * training_cfg.aux_loss_use_dist_mat_loss * training_cfg.aux_loss_dist_mat_loss_weight
+            + bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
@@ -451,6 +508,7 @@ class FlowModule(LightningModule):
             'sc_atom_loss': sc_atom_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
+            'dist_mat_loss': dist_mat_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
             'pde_loss': pde_loss,
             'distogram_loss': distogram_loss,
@@ -463,6 +521,7 @@ class FlowModule(LightningModule):
         b = res_mask.shape[0]
         self.interpolant.set_device(res_mask.device)
         num_batch, num_res = res_mask.shape
+        loop_mask = batch['loop_mask']
         diffuse_mask = batch['diffuse_mask']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
@@ -518,19 +577,27 @@ class FlowModule(LightningModule):
                     [saved_path, self.global_step, wandb.Molecule(saved_path)]
                 )
 
-            # calculate trans loss (rmsd)
+            # calculate trans diffuse loss (rmsd)
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
-            trans_loss = torch.sum(
+            trans_diffuse_loss = torch.sum(
                 trans_error ** 2 * diffuse_mask[..., None],
                 dim=(-1, -2)
             ) / (torch.sum(diffuse_mask, dim=-1) * 3)
-            trans_loss_dict = {'trans_loss': trans_loss**0.5}
-            batch_metrics.append(trans_loss_dict)
+            trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
+
+            # calculate trans loop loss (rmsd)
+            trans_loop_loss = torch.sum(
+                trans_error ** 2 * loop_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(loop_mask, dim=-1) * 3)
+            trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
+            batch_metrics.append(trans_loop_loss_dict)
 
             # calcuclate trans loss (h3 rmsd)
-            b, N = diffuse_mask.shape
-            h3_mask = torch.zeros_like(diffuse_mask)
+            b, N = loop_mask.shape
+            h3_mask = torch.zeros_like(loop_mask)
             count = 0
             for i in range(b):
                 count = 0  
@@ -539,7 +606,7 @@ class FlowModule(LightningModule):
                 
                 # 연속된 1들의 그룹을 추적
                 for j in range(N):
-                    if diffuse_mask[i, j] == 1:
+                    if loop_mask[i, j] == 1:
                         if not in_group:  # 새로운 그룹 시작
                             group_start = j
                             in_group = True
@@ -622,8 +689,6 @@ class FlowModule(LightningModule):
             sync_dist=sync_dist,
             rank_zero_only=rank_zero_only
         )
-
-
     
     def training_step(self, batch: Any, stage: int):
         step_start_time = time.time()
@@ -634,14 +699,8 @@ class FlowModule(LightningModule):
         if self._interpolant_cfg.self_condition and random.random() > 0.5:
             with torch.no_grad():
                 model_sc = self.model(noisy_batch)
-                noisy_batch['trans_sc'] = (
-                    model_sc['pred_trans'] * noisy_batch['diffuse_mask'][..., None]
-                    + noisy_batch['trans_1'] * (1 - noisy_batch['diffuse_mask'][..., None])
-                )
-                noisy_batch['rotmats_sc'] = (
-                    model_sc['pred_rotmats'] * noisy_batch['diffuse_mask'][..., None, None]
-                    + noisy_batch['rotmats_1'] * (1 - noisy_batch['diffuse_mask'][..., None, None])
-                )
+                noisy_batch['trans_sc'] = model_sc['pred_trans'] 
+                noisy_batch['rotmats_sc'] = model_sc['pred_rotmats'] 
 
         batch_losses = self.model_step(noisy_batch)
 
@@ -782,13 +841,9 @@ class FlowModule(LightningModule):
 
         num_batch = batch['sample_id'].shape[0]
         pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
-        if 'diffuse_mask' in batch: # motif-scaffolding
-            trans_1 = batch['trans_1']
-            _, sample_length, _ = trans_1.shape
+        trans_1 = batch['trans_1']
+        _, sample_length, _ = trans_1.shape
 
-        else: # unconditional
-            sample_length = batch['num_res'].item()
-            trans_1 = rotmats_1 = diffuse_mask = None
 
         sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):

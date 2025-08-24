@@ -278,9 +278,9 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=256,
+                                                    max_len=320,
                                                     seq_list=feat['chain_seq_list'],
-                                                    crop_ab=True
+                                                    crop_ab=False
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
@@ -349,13 +349,6 @@ def collate_fn(batch):
     cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
     cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
     cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
-
-    cropped_batch['backbone_rigid_tensor'] = du.create_rigid(
-        rots=cropped_batch['rotmats_1'],
-        trans=cropped_batch['trans_1']).to_tensor_4x4() # (B, L, 4, 4)
-    cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
-    cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
-
 
     cropped_batch['raw_path'] = feat['raw_path']
     cropped_batch['mode'] = feat['mode']

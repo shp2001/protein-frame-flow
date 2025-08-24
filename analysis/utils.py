@@ -90,66 +90,49 @@ def get_cdr_and_neighbors(
         mode,
         scale_factor,
         distance_threshold=5
-        ):
+    ):
     
     device = atom14_gt_positions.device
+
     # find anchor residues 
-
     anchor_residues = find_anchor(original_diffuse_mask, only_h3=False)
-    if mode == 'ab' or mode == 'nanobody': # ab dataset -> extract only_h3 
+    if mode in ['ab', 'nanobody']:  # ab dataset -> extract only_h3 
         anchor_residues = anchor_residues[4:6]
-    else: # ppi dataset -> use original residues  
-        anchor_residues = anchor_residues
 
+    # select CDR residues
     cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if original_diffuse_mask[i]==1]
-    cdr_residues = torch.tensor(cdr_residues, device=device)
+    if len(cdr_residues) == 0:
+        return torch.tensor([], device=device, dtype=torch.long), torch.tensor([], device=device, dtype=torch.long)
+    cdr_residues = torch.tensor(cdr_residues, device=device, dtype=torch.long)
 
     # make pairwise all atom contact map (gt)
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
     i_idx = torch.tensor([i for i, j in pair_indices], device=device)
     j_idx = torch.tensor([j for i, j in pair_indices], device=device)
 
-    atom_i = atom14_gt_positions[:, :, i_idx]  # (B, L, 105, 3)
-    atom_j = atom14_gt_positions[:, :, j_idx]  # (B, L, 105, 3)
+    atom_i = atom14_gt_positions[:, :, i_idx].unsqueeze(2)  # (B, L, 1, 105, 3)
+    atom_j = atom14_gt_positions[:, :, j_idx].unsqueeze(1)  # (B, 1, L, 105, 3)
 
-    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
-    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
     gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
 
-    # # make pairwise all atom contact map (pred)
-    # pred_atom_i = atom14_pred_positions[:, :, i_idx]  # (B, L, 105, 3)
-    # pred_atom_j = atom14_pred_positions[:, :, j_idx]  # (B, L, 105, 3)
-
-    # pred_atom_i = pred_atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
-    # pred_atom_j = pred_atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
-    # pred_aa_distance_map = torch.norm(pred_atom_i - pred_atom_j, dim=-1)  # (B, L, L, 105)
-
     # make pairwise all atom contact map mask 
-    exists_i = atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
-    exists_j = atom14_gt_exists[:, :, j_idx]  # (B, L, 105)
+    exists_i = atom14_gt_exists[:, :, i_idx].unsqueeze(2)  # (B, L, 1, 105)
+    exists_j = atom14_gt_exists[:, :, j_idx].unsqueeze(1)  # (B, 1, L, 105)
+    edge_mask = exists_i * exists_j  # (B, L, L, 105)
 
-    mask_i = exists_i.unsqueeze(2)  # (B, L, 1, 105)
-    mask_j = exists_j.unsqueeze(1)  # (B, 1, L, 105)
+    # mask out non-existing atoms
+    gt_aa_distance_map = torch.where(edge_mask == 0, 1000.0, gt_aa_distance_map)
 
-    edge_mask = mask_i * mask_j  # (B, L, L, 105)
-
-    # find gt neighbors
-    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), gt_aa_distance_map) # (B, L, L, 105)
-    gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale_factor[0]), dim=-1)  # (N_cdr, N)
-    gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
-
-    # # find pred neighbors
-    # pred_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), pred_aa_distance_map) # (B, L, L, 105)
-    # pred_neighbor_list = []
-    # for b in range(pred_aa_distance_map.shape[0]):
-    #     neighbor_mask = torch.any((pred_aa_distance_map[b, cdr_residues] < distance_threshold * scale_factor[b]), dim=-1)  # (N_cdr, N)
-    #     pred_neighbor_indices = torch.nonzero(neighbor_mask)[:, -1]  # (N_nb,)
-
-    #     pred_neighbor_list.append(pred_neighbor_indices)
+    # find gt neighbors safely
+    scale = scale_factor[0] if isinstance(scale_factor, (list, torch.Tensor)) else scale_factor
+    neighbor_mask = torch.any(gt_aa_distance_map[0, cdr_residues] < distance_threshold * scale, dim=-1)  # (N_cdr, L)
     
-    # pred_neighbor = torch.cat(pred_neighbor_list)
-    neighbor_indices = torch.unique(gt_neighbor)
-        
+    if neighbor_mask.numel() == 0:
+        neighbor_indices = torch.tensor([], device=device, dtype=torch.long)
+    else:
+        neighbor_indices = torch.nonzero(neighbor_mask, as_tuple=True)[1]  # (N_nb,)
+        neighbor_indices = torch.unique(neighbor_indices)
+
     return cdr_residues, neighbor_indices
 
 def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_path):

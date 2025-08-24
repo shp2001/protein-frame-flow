@@ -293,17 +293,14 @@ def supervised_chi_loss(
 def compute_rmsd(
     pred, # (o, b, l, 14, 3)
     aligned_target, # (b, l, 14, 3)
-    cdr_mask, # (b, l)  <- cdr: 1 fv: 0
+    mask, # (b, l)  <- cdr: 1 fv: 0
     atom14_gt_exists, # (b, l, 14) <- exists: 1 non-exists: 0
     mode,
     data_mode, # ab or general or nanobody 
-    cdr_clamp=30,
-    compute_non_cdr=False,
-    compute_cdr=False,
-    compute_h3=False,
+    mask_clamp=30,
+    compute_unmasked=False
 ):
-    if compute_cdr == False and compute_non_cdr == False and compute_h3 == False:
-        assert "At least one of 'compute_cdr' or 'compute_non_cdr' or 'compute_cdr' must be True."
+
     if data_mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
         assert "Data mode should be one of 'ab', 'nanobody', 'general', 'monomer', and 'polymer'."
     
@@ -315,9 +312,6 @@ def compute_rmsd(
         pred = pred[:, :, :, 3:]
         aligned_target = aligned_target[:, :, 3:]
         atom14_gt_exists = atom14_gt_exists[:, :, 3:]
-
-    if data_mode in ['general', 'monomer', 'polymer'] and mode != 'bb':
-        compute_cdr = False
     
     mse = nn.functional.mse_loss(
         pred,
@@ -325,54 +319,42 @@ def compute_rmsd(
         reduction='none',
     ).mean(-1) # (o, b, L, a)
 
-    loss = 0
-    if compute_cdr: 
-        if compute_h3:
-            mask = cdr_mask[..., None] * atom14_gt_exists # (b, L, a)
-        else:
-            h3_anchor = find_anchor(cdr_mask[0], only_h3=True) # [a, b]
-            cdr_residues = [i for i in range(h3_anchor[0]+1, h3_anchor[1]) if cdr_mask[0,i]==1]
-            cdr_mask_wo_h3 = cdr_mask.clone()
-            cdr_mask_wo_h3[:, cdr_residues] = 0
-            mask = cdr_mask_wo_h3[..., None] * atom14_gt_exists
-            
-        cdr_mse = mse * mask[None, ...] # (o, b, L, a)
+    atom_mask = mask[..., None] * atom14_gt_exists # (b, L, a)
+    masked_mse = mse * atom_mask[None, ...] # (o, b, L, a)
+    masked_mse = masked_mse.permute(1,0,2,3) # (b, o, L, a)
+    if mask_clamp > 0:
+        masked_mse = torch.clamp(masked_mse, max=mask_clamp**2)
 
-        cdr_mse = cdr_mse.permute(1,0,2,3) # (b, o, L, a)
+    masked_mse = torch.sum(
+        masked_mse,
+        dim=(-1,-2,-3),
+    ) / (torch.sum(
+        atom_mask,
+        dim=(-1,-2),
+    ) * 3)
+    
+    masked_mse = torch.sqrt(masked_mse) # (b)
+    loss = masked_mse 
 
-        if cdr_clamp > 0:
-            cdr_mse = torch.clamp(cdr_mse, max=cdr_clamp**2)
+    if compute_unmasked:
+        atom_mask_reversed = (1-mask[..., None]) * atom14_gt_exists # (b, L, a)
+        unmasked_mse = mse * atom_mask_reversed[None, ...]
 
-        cdr_mse = torch.sum(
-            cdr_mse,
+        unmasked_mse = unmasked_mse.permute(1,0,2,3) # (b, o, L, a)
+
+        if mask_clamp > 0:
+            unmasked_mse = torch.clamp(unmasked_mse, max=mask_clamp**2)
+
+        unmasked_mse = torch.sum(
+            unmasked_mse,
             dim=(-1,-2,-3),
         ) / (torch.sum(
-            mask,
+            atom_mask_reversed,
             dim=(-1,-2),
         ) * 3)
         
-        cdr_mse = torch.sqrt(cdr_mse) # (b)
-        loss = loss + cdr_mse 
-
-    if compute_non_cdr:
-        mask = (1-cdr_mask[..., None]) * atom14_gt_exists # (b, L, a)
-        non_cdr_mse = mse * mask[None, ...]
-
-        non_cdr_mse = non_cdr_mse.permute(1,0,2,3) # (b, o, L, a)
-
-        if cdr_clamp > 0:
-            non_cdr_mse = torch.clamp(non_cdr_mse, max=cdr_clamp**2)
-
-        non_cdr_mse = torch.sum(
-            non_cdr_mse,
-            dim=(-1,-2,-3),
-        ) / (torch.sum(
-            mask,
-            dim=(-1,-2),
-        ) * 3)
-        
-        non_cdr_mse = torch.sqrt(non_cdr_mse) # (b)
-        loss = loss + non_cdr_mse 
+        unmasked_mse = torch.sqrt(unmasked_mse) # (b)
+        loss = loss * 0.8 + unmasked_mse * 0.2
 
     return loss
 
@@ -1047,7 +1029,7 @@ def local_distance_loss(
     atom14_pred_positions, # (B, N, 14, 3)
     renamed_atom14_gt_exists, # (B, N, 14)
     renamed_atom14_gt_positions, # (B, N, 14, 3)
-    original_diffuse_mask, # (N)
+    original_loop_mask, # (N)
     scale_factor,
     mode
     ):
@@ -1057,7 +1039,7 @@ def local_distance_loss(
     cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
         renamed_atom14_gt_positions,
         renamed_atom14_gt_exists,
-        original_diffuse_mask,
+        original_loop_mask,
         mode,
         scale_factor,
         distance_threshold=5

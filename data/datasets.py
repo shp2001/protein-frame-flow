@@ -297,9 +297,9 @@ class BaseDataset(Dataset):
         if self.task == 'hallucination':
             feats['loop_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
-            feats['rigids_1'] = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
-            feats['rotmats_1'] = torch.tensor(feats['rigids_1'].get_rots().get_rot_mats(), device=feats['rigids_1'].device)
-            feats['trans_1'] = torch.tensor(feats['rigids_1'].get_trans(), device=feats['rigids_1'].device)
+            rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
+            feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+            feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
@@ -324,6 +324,7 @@ class BaseDataset(Dataset):
                 for i, chain_len in enumerate(chain_len_list):
                     for _ in range(chain_len):
                         asym_id.append(i)
+                asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
             feats['diffuse_mask'] = diffuse_mask

@@ -88,6 +88,7 @@ class FlowModel(nn.Module):
         node_mask = input_feats['res_mask']
         edge_mask = node_mask[:, None] * node_mask[:, :, None]
         diffuse_mask = input_feats['diffuse_mask']
+        loop_mask = input_feats['loop_mask']
         r3_t = input_feats['r3_t']
         trans_t = input_feats['trans_t']
         rotmats_t = input_feats['rotmats_t']
@@ -100,16 +101,17 @@ class FlowModel(nn.Module):
             r3_t,
             node_mask,
             diffuse_mask,
+            loop_mask,
             aatype
         )
 
         if 'trans_sc' not in input_feats:
-            trans_sc = du.manage_missing_batch(trans_t, mask=~diffuse_mask.bool())
+            trans_sc = torch.zeros_like(trans_t)
         else:
             trans_sc = input_feats['trans_sc']
 
         if 'rotmats_sc' not in input_feats:
-            rotmats_sc = du.manage_missing_batch(rotmats_t, mask=~diffuse_mask.bool())
+            rotmats_sc = torch.zeros_like(rotmats_t)
         else:
             rotmats_sc = input_feats['rotmats_sc']
 
@@ -120,6 +122,7 @@ class FlowModel(nn.Module):
             rotmats_sc,
             edge_mask,
             diffuse_mask,
+            loop_mask,
             pair_init,
             ref_feature_dict
         )
@@ -131,7 +134,6 @@ class FlowModel(nn.Module):
         all_atom_outputs = []
         pair_outputs = []
 
-
         curr_rigids = self.rigids_ang_to_nm(curr_rigids)
         node_embed = node_embed * node_mask[..., None]
         edge_embed = edge_embed * edge_mask[..., None]
@@ -141,6 +143,7 @@ class FlowModel(nn.Module):
             all_atom_contact_map = None 
 
             init_node_embed = node_embed
+            
             # atom embed 
             a_token, q_skip, c_skip, p_skip = self.trunk[f"atom_attention_encoder_{b}"](
                 input_feature_dict=ref_feature_dict,
