@@ -505,4 +505,4 @@ def embed_relpos(residue_index, seq_list):
                     entity_id,
                     sym_id)
     
-    return relpos_emb
+    return relpos_emb, asym_id, entity_id, sym_id
