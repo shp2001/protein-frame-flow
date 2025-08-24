@@ -215,13 +215,13 @@ class BaseDataset(Dataset):
         return scaffold_mask * batch['res_mask']
     
     def setup_inpainting(self, feats, rng):
-        diffuse_mask = self._sample_scaffold_mask(feats, rng)
+        loop_mask = self._sample_scaffold_mask(feats, rng)
         if 'plddt_mask' in feats:
-            diffuse_mask = diffuse_mask * feats['plddt_mask']
-        if torch.sum(diffuse_mask) < 1:
+            loop_mask = loop_mask * feats['plddt_mask']
+        if torch.sum(loop_mask) < 1:
             # Should only happen rarely.
-            diffuse_mask = torch.ones_like(diffuse_mask)
-        feats['diffuse_mask'] = diffuse_mask
+            loop_mask = torch.ones_like(loop_mask)
+        feats['loop_mask'] = loop_mask
     
     def __getitem__(self, row_idx):
         # Process data example.
@@ -231,29 +231,34 @@ class BaseDataset(Dataset):
         feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
 
         if self.task == 'hallucination':
-            feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
+            feats['loop_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
 
             rng = np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
-            feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
+            feats['loop_mask'] = provide_anchor(feats['loop_mask'], 
                                                    feats['res_mask'], 
                                                    feats['chain_index'],
-                                                   feats['mode'])
-            # Center based on motif locations
-            motif_mask = 1 - feats['diffuse_mask']
-            trans_1 = feats['trans_1']
-            motif_1 = trans_1 * motif_mask[:, None]
-            motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
-            trans_1 = trans_1 - motif_com[None, :]
-            feats['trans_1'] = trans_1
-            feats['atom14_gt_positions'] = feats['atom14_gt_positions'] - motif_com[None, :]
-            feats['pseudo_beta'] = feats['pseudo_beta'] - motif_com[None, :]
-
+                                                   feats['mode']).to(torch.long)
 
         else:
             raise ValueError(f'Unknown task {self.task}')
-        feats['diffuse_mask'] = feats['diffuse_mask'].int()
+
+        # make diffuse_mask
+        # if sample is monomer -> diffuse_mask = loop_mask
+        # if sample is polymer -> diffuse_mask is whole chains which have masked loops
+            
+        chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
+        if len(chain_len_list) == 1:
+            diffuse_mask = feats['loop_mask']
+        else:
+            asym_id = []
+            for i, chain_len in enumerate(chain_len_list):
+                for _ in range(chain_len):
+                    asym_id.append(i)
+            masked_chain = asym_id[feats['loop_mask'] == 1].unique()
+            diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
+        feats['diffuse_mask'] = diffuse_mask
         
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
@@ -271,7 +276,7 @@ def collate_fn(batch):
 
         if mode =='ab':
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
-                                                    cdr_mask=feat['diffuse_mask'],
+                                                    cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
                                                     max_len=256,
                                                     seq_list=feat['chain_seq_list'],
@@ -279,7 +284,7 @@ def collate_fn(batch):
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
-                            loop_mask=feat['diffuse_mask'],
+                            loop_mask=feat['loop_mask'],
                             nan_mask=feat['res_mask'],
                             max_len=256,
                             seq_list=feat['chain_seq_list']
@@ -305,8 +310,9 @@ def collate_fn(batch):
                 cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
         # make pair_init (relpos)
-        relpos_emb = embed_relpos(cropped_feat['residue_index'],
-                                cropped_feat['chain_seq_list'])
+        relpos_emb, asym_id, entity_id, sym_id = embed_relpos(
+            cropped_feat['residue_index'],
+            cropped_feat['chain_seq_list'])
         
         cropped_feat['pair_init'] = relpos_emb
         cropped_feat['csv_idx'] = feat['csv_idx']
@@ -322,15 +328,6 @@ def collate_fn(batch):
     for key in cropped_batch.keys():                
         cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
-    cropped_batch['raw_path'] = feat['raw_path']
-    cropped_batch['mode'] = feat['mode']
-    cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
-    cropped_batch['original_residx_atom37_to_atom14'] = feat['residx_atom37_to_atom14']
-    cropped_batch['original_atom37_atom_exists'] = feat['atom37_atom_exists']
-    cropped_batch['original_aatype'] = feat['aatype']
-    cropped_batch['original_aatype'] = feat['aatype']
-    cropped_batch['original_chain_idx'] = feat['chain_idx']
-    cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
 
     ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
     cropped_batch['ref_feature_dict'] = {
@@ -342,6 +339,32 @@ def collate_fn(batch):
         'ref_pos': ref_pos,
         'ref_rigid_frame': ref_rigid_frame
         }
+
+    # Center based on motif locations
+    motif_mask = 1 - cropped_batch['diffuse_mask'] # (B, L)
+    motif_1 = cropped_batch['trans_1'] * motif_mask[..., None] # (B, L, 3)
+    motif_com = torch.sum(motif_1, dim=1) / (torch.sum(motif_mask, dim=1) + 1)[..., None] # (B, 3)
+
+    cropped_batch["trans_1"] = cropped_batch['trans_1'] - motif_com[:, None, :] # (B, L, 3)
+    cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
+    cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
+    cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
+
+    cropped_batch['backbone_rigid_tensor'] = du.create_rigid(
+        rots=cropped_batch['rotmats_1'],
+        trans=cropped_batch['trans_1']).to_tensor_4x4() # (B, L, 4, 4)
+    cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
+    cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
+
+
+    cropped_batch['raw_path'] = feat['raw_path']
+    cropped_batch['mode'] = feat['mode']
+    cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
+    cropped_batch['original_residx_atom37_to_atom14'] = feat['residx_atom37_to_atom14']
+    cropped_batch['original_atom37_atom_exists'] = feat['atom37_atom_exists']
+    cropped_batch['original_aatype'] = feat['aatype']
+    cropped_batch['original_chain_idx'] = feat['chain_idx']
+    cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
 
     return cropped_batch
 

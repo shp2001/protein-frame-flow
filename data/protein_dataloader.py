@@ -9,6 +9,7 @@ from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import embed_relpos
 from data import featurizer
+from data import utils as du
 
 from itertools import accumulate
 import bisect
@@ -53,7 +54,7 @@ class ProteinData(LightningDataModule):
 
                     cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
-            relpos_emb = embed_relpos(cropped_feat['residue_index'], cropped_feat['chain_seq_list'])
+            relpos_emb, asym_id, entity_id, sym_id = embed_relpos(cropped_feat['residue_index'], cropped_feat['chain_seq_list'])
             cropped_feat['pair_init'] = relpos_emb
             cropped_feat['csv_idx'] = feat['csv_idx']
             cropped_feat['crop_idx'] = torch.tensor(feat['crop_idx'])
@@ -72,8 +73,6 @@ class ProteinData(LightningDataModule):
             cropped_batch['diffuse_mask'][:, 0] = 0
         if cropped_batch['diffuse_mask'][0, -1] == 1:
             cropped_batch['diffuse_mask'][:, -1] = 0
-            
-        cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
         
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
@@ -86,6 +85,25 @@ class ProteinData(LightningDataModule):
             'ref_atom_name_chars': ref_atom_name_chars,
             'ref_rigid_frame': ref_rigid_frame
         }
+
+        # Center based on motif locations
+        motif_mask = 1 - cropped_batch['diffuse_mask'] # (B, L)
+        motif_1 = cropped_batch['trans_1'] * motif_mask[..., None] # (B, L, 3)
+        motif_com = torch.sum(motif_1, dim=1) / (torch.sum(motif_mask, dim=1) + 1)[..., None] # (B, 3)
+
+        cropped_batch["trans_1"] = cropped_batch['trans_1'] - motif_com[:, None, :] # (B, L, 3)
+        cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
+        cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
+        cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
+
+        cropped_batch['backbone_rigid_tensor'] = du.create_rigid(
+            rots=cropped_batch['rotmats_1'],
+            trans=cropped_batch['trans_1']).to_tensor_4x4() # (B, L, 4, 4)
+        cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
+        cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] = cropped_batch['rigidgroups_alt_gt_frames'][:, :, :, :3, 3] - motif_com[:, None, None, :] # (B, L, 8, 3)
+        
+        cropped_batch['original_diffuse_mask'] = cropped_batch['diffuse_mask']
+        
         return cropped_batch
 
     

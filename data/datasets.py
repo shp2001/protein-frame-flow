@@ -276,13 +276,13 @@ class BaseDataset(Dataset):
 
     
     def setup_inpainting(self, feats, rng):
-        diffuse_mask = self._sample_scaffold_mask(feats, rng)
+        loop_mask = self._sample_scaffold_mask(feats, rng)
         if 'plddt_mask' in feats:
-            diffuse_mask = diffuse_mask * feats['plddt_mask']
-        if torch.sum(diffuse_mask) < 1:
+            loop_mask = loop_mask * feats['plddt_mask']
+        if torch.sum(loop_mask) < 1:
             # Should only happen rarely.
-            diffuse_mask = torch.ones_like(diffuse_mask)
-        feats['diffuse_mask'] = diffuse_mask
+            loop_mask = torch.ones_like(loop_mask)
+        feats['loop_mask'] = loop_mask
 
     def __getitem__(self, row_idx):
         # Process data example.
@@ -295,36 +295,38 @@ class BaseDataset(Dataset):
             feats['plddt_mask'] = torch.ones_like(feats['res_mask'])
 
         if self.task == 'hallucination':
-            feats['diffuse_mask'] = torch.ones_like(feats['res_mask']).bool()
+            feats['loop_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
-            rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
-            rotmats_1 = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-            trans_1 = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+            feats['rigids_1'] = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
+            feats['rotmats_1'] = torch.tensor(feats['rigids_1'].get_rots().get_rot_mats(), device=feats['rigids_1'].device)
+            feats['trans_1'] = torch.tensor(feats['rigids_1'].get_trans(), device=feats['rigids_1'].device)
 
             rng = self._rng if self.is_training else np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
 
-            # modify diffuse mask (if it is terminal mask, exclude end residue to provide an anchor)
-            feats['diffuse_mask'] = provide_anchor(feats['diffuse_mask'], 
-                                                   feats['res_mask'], 
-                                                   feats['chain_index'],
-                                                   feats['mode'])
+            # modify loop mask (if it is terminal mask, exclude end residue to provide an anchor)
+            feats['loop_mask'] = provide_anchor(
+                feats['loop_mask'], 
+                feats['res_mask'], 
+                feats['chain_index'],
+                feats['mode']
+                ).to(torch.long)
             
-            # Center based on motif locations
-            motif_mask = 1 - feats['diffuse_mask']
-            motif_1 = trans_1 * motif_mask[:, None]
-            motif_com = torch.sum(motif_1, dim=0) / (torch.sum(motif_mask) + 1)
-            trans_1 = trans_1 - motif_com[None, :]
-            feats['trans_1'] = trans_1
-            feats['rotmats_1'] = rotmats_1
-            feats['atom14_gt_positions'] = feats['atom14_gt_positions'] - motif_com[None, :]
-            feats['pseudo_beta'] = feats['pseudo_beta'] - motif_com[None, :]
-
-            feats['backbone_rigid_tensor'] = du.create_rigid(rots=feats['rotmats_1'],
-                                                             trans=trans_1).to_tensor_4x4()
-            feats['rigidgroups_gt_frames'][:, :, :3, 3] = feats['rigidgroups_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
-            feats['atom14_alt_gt_positions'] = feats['atom14_alt_gt_positions'] - motif_com[None, None, :] 
-            feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] = feats['rigidgroups_alt_gt_frames'][:, :, :3, 3] - motif_com[None, None, :]
+            # make diffuse_mask
+            # if sample is monomer -> diffuse_mask = loop_mask
+            # if sample is polymer -> diffuse_mask is whole chains which have masked loops
+             
+            chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
+            if len(chain_len_list) == 1:
+                diffuse_mask = feats['loop_mask']
+            else:
+                asym_id = []
+                for i, chain_len in enumerate(chain_len_list):
+                    for _ in range(chain_len):
+                        asym_id.append(i)
+                masked_chain = asym_id[feats['loop_mask'] == 1].unique()
+                diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
+            feats['diffuse_mask'] = diffuse_mask
 
             # create crop_idx for cropping 
             mode = feats['mode']
@@ -335,7 +337,7 @@ class BaseDataset(Dataset):
             if mode == 'ab':
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
-                    cdr_mask=feats['diffuse_mask'],
+                    cdr_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.ab_max_num_res,
                     seq_list=feats['chain_seq_list'],
@@ -345,7 +347,7 @@ class BaseDataset(Dataset):
             if mode == 'nanobody':
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
-                    cdr_mask=feats['diffuse_mask'],
+                    cdr_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.ab_max_num_res,
                     seq_list=feats['chain_seq_list'],
@@ -355,7 +357,7 @@ class BaseDataset(Dataset):
             if mode == 'general' or mode == 'polymer' or mode == 'monomer':
                 feats['crop_idx'] = crop_general_protein(
                     feats['trans_1'],
-                    loop_mask=feats['diffuse_mask'],
+                    loop_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.general_max_num_res,
                     seq_list=feats['chain_seq_list'],
@@ -363,7 +365,7 @@ class BaseDataset(Dataset):
 
         else:
             raise ValueError(f'Unknown task {self.task}')
-        feats['diffuse_mask'] = feats['diffuse_mask'].int()
+        feats['loop_mask'] = feats['loop_mask'].int()
         
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
