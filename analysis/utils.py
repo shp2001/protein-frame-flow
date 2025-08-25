@@ -100,8 +100,6 @@ def get_cdr_and_neighbors(
     else: # ppi dataset -> use original residues  
         anchor_residues = anchor_residues
 
-    print("anchor_residues", anchor_residues)
-    print("len(loop_mask)", len(loop_mask))
     cdr_residues = [i for i in range(anchor_residues[0]+1, anchor_residues[1]) if loop_mask[i]==1]
     cdr_residues = torch.tensor(cdr_residues, device=device)
 

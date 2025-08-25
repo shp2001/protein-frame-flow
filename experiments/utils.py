@@ -273,7 +273,7 @@ def save_traj(
         return {
             'sample_path': sample_path,
             'traj_path': prot_traj_path,
-            'x0_traj_path': x0_traj_path,
+            # 'x0_traj_path': x0_traj_path,
         }
 
 

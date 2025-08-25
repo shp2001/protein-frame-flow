@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_1.2.4_scaling_1
+#SBATCH -J CDRFlow_2.0.0_inf
 #SBATCH -p gpu
 #SBATCH -w gpu04
 #SBATCH --gres=gpu:A6000:1

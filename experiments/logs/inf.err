@@ -3,8 +3,4 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+slurmstepd-gpu04: error: *** JOB 819959 ON gpu04 CANCELLED AT 2025-08-25T12:47:13 ***
