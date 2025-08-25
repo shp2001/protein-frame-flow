@@ -30,8 +30,8 @@ data:
 interpolant:
   min_t: 1e-2
   sample_t_mode: uniform # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
-  max_angle_deg: 30
-  max_shift: 8
+  max_angle_deg: 20
+  max_shift: 5
   twisting:
     use: False
 
@@ -104,7 +104,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
+  num_devices: 4
   warm_start: null
   warm_start_cfg_override: False
   training:
@@ -153,13 +153,13 @@ experiment:
     viol_loss_t_pass: 0.5
     
   wandb:
-    name: CDRFlow_v2.0.0_angle_30_shift_8
+    name: CDRFlow_v2.0.1_angle_20_shift_5
     project: v2.0.0
   optimizer:
     warmup_steps: 0
     decay_steps: 80_000
-    min_lr: 1e-4
-    max_lr: 1e-4
+    min_lr: 3e-4
+    max_lr: 3e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
