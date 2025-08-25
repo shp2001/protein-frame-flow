@@ -49,8 +49,8 @@ class EdgeFeatureNet(nn.Module):
         return self.linear_relpos(pair_init)
 
     def forward(self, 
-                trans_t, trans_sc, 
-                rotmats_t, rotmats_sc, 
+                trans_template, trans_sc,
+                rotmats_template, rotmats_sc, 
                 p_mask, diffuse_mask, loop_mask, 
                 pair_init,
                 input_feature_dict):
@@ -78,7 +78,7 @@ class EdgeFeatureNet(nn.Module):
 
         if self._cfg.embed_distogram:
             distogram_t = calc_distogram(
-                trans_t, min_bin=self._cfg.min_bin, max_bin=self._cfg.max_bin, num_bins=self._cfg.num_bins)
+                trans_template, min_bin=self._cfg.min_bin, max_bin=self._cfg.max_bin, num_bins=self._cfg.num_bins)
             distogram_t = distogram_t * loop_feat[..., None]
             all_edge_feats.append(distogram_t)
 
@@ -87,7 +87,7 @@ class EdgeFeatureNet(nn.Module):
             all_edge_feats.append(distogram_sc)
 
         if self._cfg.embed_unit_vector:
-            rigid_t = create_rigid(rotmats_t, trans_t)
+            rigid_t = create_rigid(rotmats_template, trans_template)
             unit_vec_t = calc_unit_vector(rigid_t)
             unit_vec_t = unit_vec_t * loop_feat[..., None]
             all_edge_feats.append(unit_vec_t)

@@ -213,7 +213,7 @@ class FlowModule(LightningModule):
             trans_error ** 2 * loss_loop_mask[..., None],
             dim=(-1, -2)
         ) / loss_loop_denom
-        trans_loop_loss = torch.clamp(trans_loop_loss, max=5)
+        trans_loop_loss = torch.clamp(trans_loop_loss, max=10)
 
         loss_diffuse_denom = torch.sum(loss_diffuse_mask, dim=-1) * 3
         trans_diffuse_loss = training_cfg.translation_loss_weight * torch.sum(

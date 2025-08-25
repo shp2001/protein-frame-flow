@@ -91,7 +91,9 @@ class FlowModel(nn.Module):
         loop_mask = input_feats['loop_mask']
         r3_t = input_feats['r3_t']
         trans_t = input_feats['trans_t']
+        trans_template = input_feats['trans_template']
         rotmats_t = input_feats['rotmats_t']
+        rotmats_template = input_feats['rotmats_template']
         pair_init = input_feats['pair_init']
         aatype = input_feats['aatype']
         ref_feature_dict = input_feats['ref_feature_dict']
@@ -116,9 +118,9 @@ class FlowModel(nn.Module):
             rotmats_sc = input_feats['rotmats_sc']
 
         edge_embed = self.edge_feature_net(
-            trans_t,
+            trans_template,
             trans_sc,
-            rotmats_t,
+            rotmats_template,
             rotmats_sc,
             edge_mask,
             diffuse_mask,

@@ -22,13 +22,13 @@ def _uniform_so3(num_batch, num_res, device):
         dtype=torch.float32,
     ).reshape(num_batch, num_res, 3, 3)
 
-def _trans_loop_mask(trans_t, trans_1, loop_mask):
-    return trans_t * loop_mask[..., None] + trans_1 * (1 - loop_mask[..., None])
+def _trans_diffuse_mask(trans_t, trans_1, diffuse_mask):
+    return trans_t * diffuse_mask[..., None] + trans_1 * (1 - diffuse_mask[..., None])
 
-def _rots_loop_mask(rotmats_t, rotmats_1, loop_mask):
+def _rots_diffuse_mask(rotmats_t, rotmats_1, diffuse_mask):
     return (
-        rotmats_t * loop_mask[..., None, None]
-        + rotmats_1 * (1 - loop_mask[..., None, None])
+        rotmats_t * diffuse_mask[..., None, None]
+        + rotmats_1 * (1 - diffuse_mask[..., None, None])
     )
 
 def _random_rotation_matrices(batch_size, max_angle_deg=20, device='cpu'):
@@ -202,20 +202,17 @@ class Interpolant:
 
         return new_xyz
         
-    def _corrupt_trans(self, trans_1, t, res_mask, loop_mask, random_trans, random_rotation, diffuse_mask):
+    def _corrupt_trans(self, trans_1, t, res_mask, random_trans, random_rotation, diffuse_mask):
         trans_0 = _centered_gaussian(*res_mask.shape, self._device)
-        masked_trans = self.manage_missing_batch(trans_1, mask=~loop_mask.bool())
         trans_0 = trans_0 * du.NM_TO_ANG_SCALE
-
-        trans_0 = trans_0 + masked_trans
-        trans_0 = _trans_loop_mask(trans_0, trans_1, loop_mask)
-        trans_0 = _apply_random_transform_to_trans(trans_0, random_trans, random_rotation, diffuse_mask)
-
+        trans_0 = _trans_diffuse_mask(trans_0, trans_1, diffuse_mask)
         trans_t = (1 - t[..., None]) * trans_0 + t[..., None] * trans_1
         
-        return trans_t * res_mask[..., None]
+        trans_template = _apply_random_transform_to_trans(trans_1, random_trans, random_rotation, diffuse_mask)
+
+        return trans_t, trans_template
     
-    def _corrupt_rotmats(self, rotmats_1, t, res_mask, loop_mask, random_rotation, diffuse_mask):
+    def _corrupt_rotmats(self, rotmats_1, t, res_mask, random_rotation, diffuse_mask):
         num_batch, num_res = res_mask.shape
         noisy_rotmats = self.igso3.sample(
             torch.tensor([1.5]),
@@ -224,15 +221,17 @@ class Interpolant:
         noisy_rotmats = noisy_rotmats.reshape(num_batch, num_res, 3, 3)
         rotmats_0 = torch.einsum(
             "...ij,...jk->...ik", rotmats_1, noisy_rotmats)
-        rotmats_0 = _rots_loop_mask(rotmats_0, rotmats_1, loop_mask)
-        rotmats_0 = _apply_random_transform_to_rotmats(rotmats_0, random_rotation, diffuse_mask)
+        rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
         rotmats_t = so3_utils.geodesic_t(t[..., None], rotmats_1, rotmats_0)
         identity = torch.eye(3, device=self._device)
         rotmats_t = (
             rotmats_t * res_mask[..., None, None]
             + identity[None, None] * (1 - res_mask[..., None, None])
         )
-        return rotmats_t
+
+        rotmats_template = _apply_random_transform_to_rotmats(rotmats_0, random_rotation, diffuse_mask)
+
+        return rotmats_t, rotmats_template
 
     def corrupt_batch(self, batch):
         noisy_batch = copy.deepcopy(batch)
@@ -259,16 +258,13 @@ class Interpolant:
         random_trans = _random_translations(trans_1.shape[0], self._cfg.max_shift, self._device)
         random_rotation = _random_rotation_matrices(trans_1.shape[0], self._cfg.max_angle_deg, self._device)
 
-        trans_t = self._corrupt_trans(trans_1, r3_t, res_mask, loop_mask, random_trans, random_rotation, diffuse_mask)
-        if torch.any(torch.isnan(trans_t)):
-            raise ValueError('NaN in trans_t during corruption')
-        
-        rotmats_t = self._corrupt_rotmats(rotmats_1, so3_t, res_mask, loop_mask, random_rotation, diffuse_mask)
-        if torch.any(torch.isnan(rotmats_t)):
-            raise ValueError('NaN in rotmats_t during corruption')
+        trans_t, trans_template = self._corrupt_trans(trans_1, r3_t, res_mask, random_trans, random_rotation, diffuse_mask)
+        rotmats_t, rotmats_template = self._corrupt_rotmats(rotmats_1, so3_t, res_mask, random_rotation, diffuse_mask)
         
         noisy_batch['trans_t'] = trans_t
+        noisy_batch['trans_template'] = trans_template
         noisy_batch['rotmats_t'] = rotmats_t
+        noisy_batch['rotmats_template'] = rotmats_template
         noisy_batch['pair_init'] = batch['pair_init']
 
         return noisy_batch
@@ -317,7 +313,6 @@ class Interpolant:
         ):
 
         motif_scaffolding = True
-        loop_mask = batch['loop_mask']
         diffuse_mask = batch['diffuse_mask']
         motif_mask = ~diffuse_mask.bool().squeeze(0)
         trans_1 = batch['trans_1']
@@ -327,25 +322,22 @@ class Interpolant:
             motif_mask = motif_mask[None].expand((num_batch, -1))
 
         # Set-up initial prior samples
-        if trans_0 is None:
-            trans_0 = _centered_gaussian(
-                    num_batch, num_res, self._device)
-
-            trans_0 *= du.NM_TO_ANG_SCALE
-
-            masked_trans = self.manage_missing_batch(batch["trans_1"], mask=~batch["loop_mask"].bool())
-            trans_0 = trans_0 + masked_trans
-            trans_0 = _trans_loop_mask(trans_0, batch["trans_1"], batch["loop_mask"])
-
-        if rotmats_0 is None:
-            rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
-            rotmats_0 = _rots_loop_mask(rotmats_0, rotmats_1, loop_mask)
 
         random_trans = _random_translations(trans_1.shape[0], self._cfg.max_shift, self._device)
         random_rot = _random_rotation_matrices(trans_1.shape[0], self._cfg.max_angle_deg, device=self._device)
-        trans_0 = _apply_random_transform_to_trans(trans_0, random_trans, random_rot, diffuse_mask)
-        rotmats_0 = _apply_random_transform_to_rotmats(rotmats_0, random_rot, diffuse_mask)
 
+        if trans_0 is None:
+            trans_0 = _centered_gaussian(num_batch, num_res, self._device)
+            trans_0 = trans_0 * du.NM_TO_ANG_SCALE
+            trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], diffuse_mask)
+            batch['trans_template'] = _apply_random_transform_to_trans(trans_1, random_trans, random_rot, diffuse_mask)
+
+        if rotmats_0 is None:
+            rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
+            rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
+            batch['rotmats_template'] = _apply_random_transform_to_rotmats(rotmats_1, random_rot, diffuse_mask)
+        
+        
         logs_traj = defaultdict(list)
         if motif_scaffolding and self._cfg.twisting.use: # sampling / guidance
             assert trans_1.shape[0] == 1 # assume only one motif
