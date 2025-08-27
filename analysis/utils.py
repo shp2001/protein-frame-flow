@@ -95,6 +95,8 @@ def get_cdr_and_neighbors(
     # find anchor residues 
 
     anchor_residues = find_anchor(loop_mask, only_h3=False)
+    full_anchor_residues = anchor_residues
+
     if mode == 'ab' or mode == 'nanobody': # ab dataset -> extract only_h3 
         anchor_residues = anchor_residues[4:6]
     else: # ppi dataset -> use original residues  
@@ -130,7 +132,7 @@ def get_cdr_and_neighbors(
     gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
     neighbor_indices = torch.unique(gt_neighbor)
         
-    return cdr_residues, neighbor_indices
+    return cdr_residues, neighbor_indices, full_anchor_residues
 
 def visualize_contact_map(contact_map, cdr_residues, neighbor, title, output_path):
     """

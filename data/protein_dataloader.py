@@ -96,7 +96,7 @@ class ProteinData(LightningDataModule):
         cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
         
         # get interface index 
-        cdr_residues, neighbor_indices = au.get_cdr_and_neighbors(
+        cdr_residues, neighbor_indices, anchor_residues = au.get_cdr_and_neighbors(
             cropped_batch['atom14_gt_positions'],
             cropped_batch['atom14_gt_exists'],
             cropped_batch['loop_mask'][0],
@@ -104,6 +104,7 @@ class ProteinData(LightningDataModule):
         )
         cropped_batch['cdr_residues'] = cdr_residues
         cropped_batch['neighbor_indices'] = neighbor_indices
+        cropped_batch['anchor_residues'] = anchor_residues
         return cropped_batch
 
     

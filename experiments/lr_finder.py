@@ -76,15 +76,16 @@ class Experiment:
             enable_progress_bar=True,
             enable_model_summary=True,
             devices=self._train_device_ids,
-            gradient_clip_val=1.0
+            gradient_clip_val=0.5
         )
 
         tuner = Tuner(trainer)
         lr_finder = tuner.lr_find(
             model=self._module,
             datamodule=self._datamodule,
-            num_training=400,
-            max_lr=0.1
+            num_training=300,
+            max_lr=0.01,
+            min_lr=1e-6
         )
 
         fig = lr_finder.plot(suggest=True)

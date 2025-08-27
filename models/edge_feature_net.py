@@ -30,9 +30,13 @@ class EdgeFeatureNet(nn.Module):
         if self._cfg.embed_diffuse_mask:
             total_edge_feats += 1
         if self._cfg.embed_distogram:
-            total_edge_feats += self._cfg.num_bins * 2
+            total_edge_feats += self._cfg.num_bins
+            if self._cfg.self_condition:
+                total_edge_feats += self._cfg.num_bins
         if self._cfg.embed_unit_vector:
-            total_edge_feats += 3 * 2
+            total_edge_feats += 3 
+            if self._cfg.self_condition:
+                total_edge_feats += 3 
         
         self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
 
@@ -82,9 +86,10 @@ class EdgeFeatureNet(nn.Module):
             distogram_t = distogram_t * loop_feat[..., None]
             all_edge_feats.append(distogram_t)
 
-            distogram_sc = calc_distogram(
-                trans_sc, min_bin=self._cfg.min_bin, max_bin=self._cfg.max_bin, num_bins=self._cfg.num_bins)
-            all_edge_feats.append(distogram_sc)
+            if self._cfg.self_condition:
+                distogram_sc = calc_distogram(
+                    trans_sc, min_bin=self._cfg.min_bin, max_bin=self._cfg.max_bin, num_bins=self._cfg.num_bins)
+                all_edge_feats.append(distogram_sc)
 
         if self._cfg.embed_unit_vector:
             rigid_t = create_rigid(rotmats_template, trans_template)
@@ -92,9 +97,10 @@ class EdgeFeatureNet(nn.Module):
             unit_vec_t = unit_vec_t * loop_feat[..., None]
             all_edge_feats.append(unit_vec_t)
 
-            rigid_sc = create_rigid(rotmats_sc, trans_sc)
-            unit_vec_sc = calc_unit_vector(rigid_sc)
-            all_edge_feats.append(unit_vec_sc)
+            if self._cfg.self_condition:
+                rigid_sc = create_rigid(rotmats_sc, trans_sc)
+                unit_vec_sc = calc_unit_vector(rigid_sc)
+                all_edge_feats.append(unit_vec_sc)
 
         edge_feats = self.edge_embedder(torch.concat(all_edge_feats, dim=-1))
         edge_feats *= p_mask.unsqueeze(-1)

@@ -32,7 +32,7 @@ inference:
       corrupt: True
       sample_schedule: linear
     sampling:
-      num_timesteps: 50
+      num_timesteps: 30
     self_condition: True
 
     inference_time_scaling:

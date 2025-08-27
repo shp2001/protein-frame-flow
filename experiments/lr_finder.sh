@@ -1,9 +1,10 @@
 #!/bin/bash
 #SBATCH -J CDRFlow_v1_lrfinder
 #SBATCH -p gpu
-#SBATCH --gres=gpu:A6000:1
+#SBATCH --gres=gpu:A6000:2
 #SBATCH --mem=48g
 #SBATCH -c 12
+#SBATCH -w gpu05
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
 

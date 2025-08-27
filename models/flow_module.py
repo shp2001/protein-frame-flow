@@ -183,23 +183,22 @@ class FlowModule(LightningModule):
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
 
         if self._model_cfg.distogram_head.use_pair_head:
-            pred_cb_distogram = model_output['pair_outputs'][:self._model_cfg.num_blocks-2] # (O, B, L, L) <- contact prob
-            pred_aa_contact_map = model_output['pair_outputs'][-1] # (B, L, L, 14)
+            pred_cb_distogram = model_output['pair_outputs'] # (O, B, L, L) <- contact prob
             pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
         pred_atom_14_list = [pred * training_cfg.bb_atom_scale / r3_norm_scale[..., None] for pred in pred_atom_14_list]
         pred_atom_14_list = torch.stack(pred_atom_14_list, dim=0) # (O, B, L, A, 3)
         pred_bb_atoms = pred_atom_14_list[-1, :, :, :3]
 
-        if torch.isnan(pred_atom_14_list).any():
-            raise ValueError(f"pred_aa_contact_map: {torch.isnan(pred_atom_14_list).any()} \n")
         
         pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
         # if torch.any(torch.isnan(pred_rots_vf)):
         #     raise ValueError('NaN encountered in pred_rots_vf')
 
         # Get the renamed ground truth 
-        renamed_dict = compute_renamed_ground_truth(noisy_batch,
-                                                    atom14_pred_positions=model_output['all_atom_preds']["positions"][-1])
+        renamed_dict = compute_renamed_ground_truth(
+            noisy_batch,
+            atom14_pred_positions=model_output['all_atom_preds']["positions"][-1]
+            )
 
         alt_naming_is_better = renamed_dict['alt_naming_is_better'].clone()
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
@@ -222,7 +221,7 @@ class FlowModule(LightningModule):
         ) / loss_diffuse_denom
         trans_diffuse_loss = torch.clamp(trans_diffuse_loss, max=10)
 
-        trans_loss = (trans_loop_loss + trans_diffuse_loss) / 2
+        trans_loss = trans_diffuse_loss
 
         # Rotation VF loss
         rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
@@ -236,7 +235,7 @@ class FlowModule(LightningModule):
             dim=(-1, -2)
         ) / loss_diffuse_denom
 
-        rots_vf_loss = (rots_vf_loop_loss + rots_vf_diffuse_loss) / 2
+        rots_vf_loss = rots_vf_diffuse_loss
         
         # distance map loss
         dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -330,24 +329,13 @@ class FlowModule(LightningModule):
                 pred_cb_distogram=pred_cb_distogram, # non-scaled 
                 gt_pseudo_beta=noisy_batch['pseudo_beta'],
                 res_mask=noisy_batch['res_mask'],
-                neighbor_indices=neighbor_indices,
-                cdr_residues=cdr_residues,
+                neighbor_indices=None,
+                cdr_residues=None,
                 min_bin=self._model_cfg.distogram_head.min_bin,
                 max_bin=self._model_cfg.distogram_head.max_bin,
                 num_bins=self._model_cfg.distogram_head.num_bins
             )
             # distogram_loss = distogram_loss * scale_factor.squeeze()
-
-        # calculate pair feature loss (all atom contact prob)
-        contact_map_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        if training_cfg.aux_loss_use_local_pair_feat_loss and self._model_cfg.distogram_head.use_pair_head:
-            contact_map_loss = aa_contact_map_loss(
-                pred_aa_contact_map=pred_aa_contact_map,
-                renamed_atom14_gt_positions=renamed_dict['renamed_atom14_gt_positions'],
-                renamed_atom14_gt_exists=renamed_dict['renamed_atom14_gt_exists'],
-                neighbor_indices=neighbor_indices,
-                cdr_residues=cdr_residues
-            )
             
         # final layer backbone rmsd loss
         final_bb_loop_rmsd = compute_rmsd(
@@ -382,7 +370,7 @@ class FlowModule(LightningModule):
                     noisy_batch['atom14_gt_exists'],
                     noisy_batch['residue_index'],
                     noisy_batch['residx_atom14_to_atom37'],
-                    noisy_batch['loop_mask']
+                    interface_mask=None
                 )
             except Exception as e:
                 print(f"[Warning] all atom clash loss skipped due to error: {e}")
@@ -417,22 +405,16 @@ class FlowModule(LightningModule):
             c_n_ca_loss = bond_loss_info['c_n_ca_loss_mean']
 
 
-        # calculate prmsd (perform mini rollout with 10 timesteps)
-        prmsd_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        pde_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-
-
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
+        se3_vf_loss += distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
+
         auxiliary_loss = (
             dist_mat_loss * training_cfg.aux_loss_use_dist_mat_loss * training_cfg.aux_loss_dist_mat_loss_weight
             + bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
             + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
             + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
-            + distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
-            + contact_map_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_contact_map_weight
-
         )
 
         # calculate violation loss
@@ -449,30 +431,31 @@ class FlowModule(LightningModule):
             & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
         )
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
-        auxiliary_loss = torch.clamp(auxiliary_loss, max=18)
+        auxiliary_loss = torch.clamp(auxiliary_loss, max=4)
 
         violation_loss *= (
             (r3_t[:, 0] > training_cfg.viol_loss_t_pass)
             & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
         )
-    
-        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss + pde_loss * training_cfg.aux_loss_pde_loss_weight
+        violation_loss *= self._exp_cfg.training.viol_loss_weight 
+
+        se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss
 
         return {
             "trans_loss": trans_loss,
-            "auxiliary_loss": auxiliary_loss,
             "rots_vf_loss": rots_vf_loss,
+            "distogram_loss": distogram_loss,
             "se3_vf_loss": se3_vf_loss,
+            "auxiliary_loss": auxiliary_loss,
+            'dist_mat_loss': dist_mat_loss,
             "bb_atom_loss": bb_atom_loss,
             'sc_atom_loss': sc_atom_loss,
+            'final_layer_bb_atom_loss': final_layer_rmsd,
+            'local_dist_mat_loss': local_dist_mat_loss,
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
-            'dist_mat_loss': dist_mat_loss,
-            'local_dist_mat_loss': local_dist_mat_loss,
-            'pde_loss': pde_loss,
-            'distogram_loss': distogram_loss,
-            'contact_map_loss': contact_map_loss,
             'bond_length_loss': bond_length_loss,
+            'violation_loss': violation_loss
         }
 
     def validation_step(self, batch: Any, batch_idx: int):
@@ -485,13 +468,13 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
-        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = self.interpolant.sample(
+        atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs = self.interpolant.sample(
             num_batch,
             num_res,
             self.model,
             batch
         )
-        
+
         pred_positions_37 = []
         pred_positions = du.to_numpy(pred_positions)
         for i in range(pred_positions.shape[0]):
@@ -500,14 +483,14 @@ class FlowModule(LightningModule):
         
         pred_positions = np.stack(pred_positions_37)
         batch_metrics = []
+        
+        sample_dir = os.path.join(
+            self.checkpoint_dir,
+            f'{pdb_id}_len_{num_res}'
+        )
+        os.makedirs(sample_dir, exist_ok=True)
 
         for i in range(num_batch):
-            sample_dir = os.path.join(
-                self.checkpoint_dir,
-                f'{pdb_id}_len_{num_res}'
-            )
-            os.makedirs(sample_dir, exist_ok=True)
-
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
             b_factors = prmsd_final[i].cpu().numpy()
@@ -528,9 +511,48 @@ class FlowModule(LightningModule):
                 b_factors=b_factors
             )
             
-            # print(f'contact_map: {contact_map[i].shape}')
-            # print(f'gt_cb_contact_map: {gt_cb_contact_map[i].shape}')
 
+        # distogram 시각화
+        # gt distogram 시각화 
+        gt_cb_distogram = calc_distogram(  
+            batch['pseudo_beta'],
+            min_bin=2.0,
+            max_bin=22.0,
+            num_bins=64
+        ) # (B, L, L, num_bins), one-hot
+        gt_cb_dist = eu.dist_map_from_distogram(gt_cb_distogram, do_softmax=False).squeeze()
+        eu.visualize_dist_map(
+            gt_cb_dist, 
+            os.path.join(sample_dir, "gt_cb_distogram.png"), 
+            title=f"{pdb_id.upper()} True Cβ Distogram",
+            anchor_residues=batch['anchor_residues'],
+            mark_cdr=True
+            )
+        
+        # pred distogram 시각화 
+        for i in range(len(pair_outputs)):
+            dist_map_pairformer = eu.dist_map_from_distogram(pair_outputs[i]) # (B, N, N)
+            for b in range(dist_map_pairformer.shape[0]):
+                eu.visualize_dist_map(
+                    dist_map_pairformer[b], 
+                    os.path.join(sample_dir, f"graph_tri_cb_distogram_layer_{i}_batch_{b}.png"), 
+                    title=f"{pdb_id.upper()} Graph Triangle layer {i} Cβ Distogram",
+                    anchor_residues=None,
+                    mark_cdr=False
+                    )
+
+                # gt distogram과 pairformer distogram 차이 
+                diff_distance_map = np.abs(gt_cb_dist - dist_map_pairformer[b])
+
+                eu.visualize_dist_map(
+                    diff_distance_map, 
+                    os.path.join(sample_dir, f"diff_gt_pred_layer_{i}_batch_{b}.png"), 
+                    title=f"{pdb_id.upper()} |True - Graph Triangle layer {i}|",
+                    anchor_residues=None,
+                    mark_cdr=False,
+                    cmap='hot'
+                    )
+        
             if isinstance(self.logger, WandbLogger):
                 self.validation_epoch_samples.append(
                     [saved_path, self.global_step, wandb.Molecule(saved_path)]
@@ -544,6 +566,14 @@ class FlowModule(LightningModule):
                 dim=(-1, -2)
             ) / (torch.sum(diffuse_mask, dim=-1) * 3)
             trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
+
+            frame_mask = diffuse_mask * (1 - loop_mask)
+            trans_frame_loss = torch.sum(
+                trans_error ** 2 * frame_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(diffuse_mask, dim=-1) * 3)
+            trans_diffuse_loss_dict = {'trans_frame_loss': trans_frame_loss**0.5}
             batch_metrics.append(trans_diffuse_loss_dict)
 
             # calculate trans loop loss (rmsd)
@@ -630,7 +660,7 @@ class FlowModule(LightningModule):
             key,
             value,
             on_step=True,
-            on_epoch=False,
+            on_epoch=True,
             prog_bar=True,
             batch_size=None,
             sync_dist=False,
@@ -808,7 +838,7 @@ class FlowModule(LightningModule):
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
         if self.save_file:
-            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence = interpolant.sample(
+            atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs = interpolant.sample(
                 num_batch, 
                 sample_length, 
                 self.model,

@@ -308,8 +308,6 @@ class Interpolant:
             trans_0=None,
             rotmats_0=None,
             verbose=False,
-            save_all_repr=False,
-            rollout=False
         ):
 
         motif_scaffolding = True
@@ -429,6 +427,7 @@ class Interpolant:
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
+        pair_outputs = model_out['pair_outputs']
         clean_traj.append(
             (pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu())
         )
@@ -438,20 +437,11 @@ class Interpolant:
         atom37_traj = all_atom.transrot_to_atom37(prot_traj, batch["res_mask"])
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, batch["res_mask"])
 
-        input_for_confidence = model_out['input_for_confidence']
         prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
         prmsd_final = prmsd
 
-        if not save_all_repr:
-            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, input_for_confidence
-        else:
-            all_input_for_confidence = {
-                "atom14_gt_positions": batch["atom14_gt_positions"],
-                "atom14_gt_exists": batch["atom14_gt_exists"],
-                "pred_positions": model_out['all_atom_preds']['positions'],
-                "input_for_confidence": input_for_confidence
-            }
-            return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, all_input_for_confidence
+        return atom37_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs
+
     
     def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
         # Select motif

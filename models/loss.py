@@ -1074,11 +1074,11 @@ def local_distance_loss(
     return dist_mat_loss, neighbor_indices, cdr_residues
 
 def b_carbon_distogram_loss(
-    pred_cb_distogram: torch.Tensor,  # (O-2, B, L, L, 64)
+    pred_cb_distogram: torch.Tensor,  # (O-1, B, L, L, 64)
     gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
     res_mask: torch.Tensor,
-    neighbor_indices,
-    cdr_residues: torch.Tensor, # (N)
+    neighbor_indices: torch.Tensor=None,
+    cdr_residues: torch.Tensor=None, # (N)
     eps: float = 1e-10,
     min_bin=2.0,
     max_bin=22.0,
@@ -1105,30 +1105,28 @@ def b_carbon_distogram_loss(
     loss = torch.sum(masked_loss, dim=(1,2)) / (torch.sum(edge_mask, dim=(1,2)) + eps)
 
     # local loss  
-    local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
-    local_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
-    local_masked_loss = local_loss_per_pair * local_mask
-    local_loss = torch.sum(local_masked_loss, dim=(1,2)) / (torch.sum(local_mask, dim=(1,2)) + eps)
-
-    return local_loss + loss
+    if neighbor_indices != None and cdr_residues != None:
+        local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
+        local_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
+        local_masked_loss = local_loss_per_pair * local_mask
+        local_loss = torch.sum(local_masked_loss, dim=(1,2)) / (torch.sum(local_mask, dim=(1,2)) + eps)
+        loss += local_loss
+    return loss
     
 
 def aa_contact_map_loss(
     pred_aa_contact_map: torch.Tensor,  # (B, L, L, 14)
     renamed_atom14_gt_positions: torch.Tensor,  # (B, L, 14, 3)
     renamed_atom14_gt_exists: torch.Tensor, # (B, L, 14)
-    neighbor_indices: torch.Tensor, # (N)
-    cdr_residues: torch.Tensor, # (N)
+    neighbor_indices: torch.Tensor=None, # (N)
+    cdr_residues: torch.Tensor=None, # (N)
     distance_threshold: float = 10.0,
     eps: float = 1e-10
 ):
 
     device = pred_aa_contact_map.device
     B, L, _, _ = pred_aa_contact_map.shape
-    assert torch.all(cdr_residues < L), f"cdr_residues index out of bounds: max={cdr_residues.max()}, L={L}"
-    assert torch.all(neighbor_indices < L), f"neighbor_indices index out of bounds: max={neighbor_indices.max()}, L={L}"
-    assert not torch.isnan(pred_aa_contact_map).any(), "NaN in prediction"
-    assert not torch.isinf(pred_aa_contact_map).any(), "Inf in prediction"
+
     # make pairwise all atom contact map 
     pair_indices = list(combinations_with_replacement(range(14), 2))  # 총 105쌍
     i_idx = torch.tensor([i for i, j in pair_indices], device=device)
@@ -1164,12 +1162,14 @@ def aa_contact_map_loss(
     loss = torch.sum(masked_loss, dim=(1,2,3)) / (torch.sum(edge_mask, dim=(1,2,3)) + eps)
 
     # calculate local loss
-    local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
-    local_loss_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
-    local_masked_loss = local_loss_per_pair * local_loss_mask
-    local_loss = torch.sum(local_masked_loss, dim=(1,2,3)) / (torch.sum(local_loss_mask, dim=(1,2,3)) + eps)
-
-    return loss + local_loss
+    if neighbor_indices != None and cdr_residues != None:
+        local_loss_per_pair = loss_per_pair[:, cdr_residues][:, :, neighbor_indices]
+        local_loss_mask = edge_mask[:, cdr_residues][:, :, neighbor_indices]
+        local_masked_loss = local_loss_per_pair * local_loss_mask
+        local_loss = torch.sum(local_masked_loss, dim=(1,2,3)) / (torch.sum(local_loss_mask, dim=(1,2,3)) + eps)
+        loss += local_loss
+        
+    return loss 
 
 def compute_vdw_clash_loss(coords, atom_14_mask, aatype, repulsion_only=True):
     """

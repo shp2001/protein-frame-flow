@@ -11,6 +11,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from motif_scaffolding import save_motif_segments
 from openfold.utils import rigid_utils as ru
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class LengthDataset(torch.utils.data.Dataset):
     def __init__(self, samples_cfg):
@@ -304,15 +305,59 @@ def flatten_dict(raw_dict):
             flattened.append((k, v))
     return flattened
 
-def visualize_distogram(distance_map, save_path):
-    distance_map = distance_map.detach().cpu().numpy()
+def dist_map_from_distogram(
+        distogram_logit, 
+        min_bin=2.0,
+        max_bin=22.0,
+        do_softmax=True
+        ):
+    if do_softmax:
+        probs = torch.softmax(distogram_logit, dim=-1).detach().cpu().numpy()  # shape: (B, N, N, 32)
+    else:
+        probs = distogram_logit.detach().cpu().numpy()
+        
+    num_bins = distogram_logit.shape[-1]  # 32
+    bin_edges = np.linspace(min_bin, max_bin, num_bins + 1)  # (33,)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
+
+    bin_centers = bin_centers.reshape(1, 1, 1, -1)  # shape: (1, 1, 1, 32)
+    
+    # expected distance 계산
+    expected_dmap = np.sum(probs * bin_centers, axis=-1)  # shape: (B, N, N)
+
+    return expected_dmap
+
+def visualize_dist_map(
+        dist_map, # (N, N)
+        save_path,
+        title,
+        anchor_residues=None, # 1-dim List
+        mark_cdr=False,
+        cmap='viridis'
+        ):
+
     plt.figure(figsize=(6, 5))
-    plt.imshow(distance_map, cmap='viridis')
-    plt.colorbar(label='Predicted Distance Error(Å)')
-    plt.title('H3 CDR Predicted Distance Error')
-    plt.suptitle(f'Average PDE: {np.mean(distance_map):.4f} Å', fontsize=10, y=0.92)
+    plt.imshow(dist_map, cmap=cmap)
+    plt.colorbar(label='Expected Distance (Å)')
+    plt.title(title)
     plt.xlabel('Residue Index')
     plt.ylabel('Residue Index')
+
+    if mark_cdr and anchor_residues is not None:
+        ax = plt.gca()
+        N = dist_map.shape[0]
+        for i in range(len(anchor_residues)//2):
+            start = anchor_residues[2*i] + 1
+            end = anchor_residues[2*i + 1] - 1
+            width = end - start + 1
+
+            # 행 강조: 전체 x축에 대해 특정 y 범위에 박스
+            rect_row = patches.Rectangle(
+                (0, start), N, width,
+                linewidth=1.0, edgecolor='red', facecolor='none', linestyle='-', alpha=0.8
+            )
+            ax.add_patch(rect_row)
+
     plt.tight_layout()
 
     # 이미지 저장
