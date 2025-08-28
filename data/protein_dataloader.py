@@ -193,13 +193,13 @@ class LengthBatcher:
                 print(f"sampled_monomer", len(monomer_sample['cluster']))
                 cluster_sample = pd.concat([cluster_sample, monomer_sample])
                  
-            # stage 2
-            general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
-            if len(general_df) > cluster_sample.shape[0]: 
-                general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
-                    cluster_sample.shape[0], random_state=random_seed, replace=False
-                )
-                cluster_sample = pd.concat([cluster_sample, general_sample])
+            # # stage 2
+            # general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
+            # if len(general_df) > cluster_sample.shape[0]: 
+            #     general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
+            #         cluster_sample.shape[0], random_state=random_seed, replace=False
+            #     )
+            #     cluster_sample = pd.concat([cluster_sample, general_sample])
             
             index_list = cluster_sample['index'].tolist()
             self._num_batches = len(index_list) 

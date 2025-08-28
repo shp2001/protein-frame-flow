@@ -21,9 +21,9 @@ model:
     relpos_k: 64
     relpos_dim: 73
     feat_dim: 64
-    num_bins: 32
+    num_bins: 64
     min_bin: 2
-    max_bin: 22
+    max_bin: 48
     self_condition: True
     embed_ref_pos: True
     embed_chain: False
@@ -72,9 +72,9 @@ model:
     
   distogram_head: 
     use_pair_head: True
-    min_bin: 2
-    max_bin: 22
-    num_bins: 64
+    min_bin: ${model.edge_features.min_bin}
+    max_bin: ${model.edge_features.max_bin}
+    num_bins: ${model.edge_features.num_bins}
 
   angle:
     c_resnet: 256
@@ -93,7 +93,7 @@ model:
     use_confidence: False
     c_s: ${model.node_embed_size}
     c_z: ${model.edge_embed_size}
-    num_bins: 32
+    num_bins: ${model.edge_features.num_bins}
 
   initialization:
     zero_init_condition_transition: False

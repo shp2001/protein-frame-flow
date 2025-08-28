@@ -1081,8 +1081,8 @@ def b_carbon_distogram_loss(
     cdr_residues: torch.Tensor=None, # (N)
     eps: float = 1e-10,
     min_bin=2.0,
-    max_bin=22.0,
-    num_bins=64
+    max_bin=64.0,
+    num_bins=128
 ):
     '''
     pred_cb_distogram: softmax를 취한 결과 
