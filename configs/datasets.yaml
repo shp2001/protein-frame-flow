@@ -16,9 +16,6 @@ shared:
   # masking scheduling 
   init_masking_prob: 0.3 
   masking_increase_ratio: 0.02
-
-  use_general: False 
-
 scope_dataset:
   seed: ${shared.seed}
   csv_path: ./metadata/scope_metadata.csv
@@ -36,7 +33,6 @@ scope_dataset:
   filter:
     max_num_res: 200
     min_num_res: 60
-    use_general: ${shared.use_general}
 
   # Scaffolding
   min_motif_percent: ${shared.min_motif_percent}
@@ -45,7 +41,7 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano_no_general.csv
+  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano.csv
   valid_csv_path: /home/psh/data/valid/meta/metadata.csv
 
   train_cluster_path: /home/psh/data/train/wantigen_70_loop_final_train.json
@@ -71,11 +67,10 @@ pdb_dataset:
   
   # Filtering
   filter:
-    max_num_res: 2000
-    min_num_res: 100
+    max_num_res: 290
+    min_num_res: 260
     max_coil_percent: 1.0
     rog_quantile: 1.0
-    use_general: ${shared.use_general}
     # oligomeric: ['monomeric', 'heteromer']
     # num_chains: [2,3,4,5,6,7]
 

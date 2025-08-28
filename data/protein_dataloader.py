@@ -130,7 +130,7 @@ class ProteinData(LightningDataModule):
             sampler=DistributedSampler(self._valid_dataset, shuffle=False),
             num_workers=2,
             prefetch_factor=2,
-            persistent_workers=False,
+            persistent_workers=True,
             collate_fn=self.collate_fn,
         )
 
@@ -140,7 +140,7 @@ class ProteinData(LightningDataModule):
             sampler=DistributedSampler(self._predict_dataset, shuffle=False),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
-            persistent_workers=False,
+            persistent_workers=True,
             collate_fn=self.collate_fn,
         )
 
@@ -193,13 +193,13 @@ class LengthBatcher:
                 print(f"sampled_monomer", len(monomer_sample['cluster']))
                 cluster_sample = pd.concat([cluster_sample, monomer_sample])
                  
-            # stage 2
-            general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
-            if len(general_df) > cluster_sample.shape[0]: 
-                general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
-                    cluster_sample.shape[0], random_state=random_seed, replace=False
-                )
-                cluster_sample = pd.concat([cluster_sample, general_sample])
+            # # stage 2
+            # general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
+            # if len(general_df) > cluster_sample.shape[0]: 
+            #     general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
+            #         cluster_sample.shape[0], random_state=random_seed, replace=False
+            #     )
+            #     cluster_sample = pd.concat([cluster_sample, general_sample])
             
             index_list = cluster_sample['index'].tolist()
             self._num_batches = len(index_list) 
