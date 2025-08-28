@@ -503,7 +503,7 @@ class FlowModule(LightningModule):
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
-                file_path=os.path.join(sample_dir, pdb_id+'.pdb'),
+                file_path=os.path.join(sample_dir, pdb_id+'.pbd'),
                 aatype=batch['aatype'].cpu(),
                 chain_index=batch['chain_idx'].cpu(),
                 no_indexing=False,
@@ -511,124 +511,114 @@ class FlowModule(LightningModule):
                 b_factors=b_factors
             )
             
-        if isinstance(self.logger, WandbLogger):
-            self.validation_epoch_samples.append(
-                [saved_path, self.global_step, wandb.Molecule(saved_path)]
+
+        # distogram 시각화
+        # gt distogram 시각화 
+        gt_cb_distogram = calc_distogram(  
+            batch['pseudo_beta'],
+            min_bin=2.0,
+            max_bin=22.0,
+            num_bins=64
+        ) # (B, L, L, num_bins), one-hot
+        gt_cb_dist = eu.dist_map_from_distogram(gt_cb_distogram, do_softmax=False).squeeze()
+        eu.visualize_dist_map(
+            gt_cb_dist, 
+            os.path.join(sample_dir, "gt_cb_distogram.png"), 
+            title=f"{pdb_id.upper()} True Cβ Distogram",
+            anchor_residues=batch['anchor_residues'],
+            mark_cdr=True
             )
+        
+        # pred distogram 시각화 
+        for i in range(len(pair_outputs)):
+            dist_map_pair = eu.dist_map_from_distogram(pair_outputs[i], do_softmax=False) # (B, N, N)
+            for b in range(dist_map_pair.shape[0]):
+                eu.visualize_dist_map(
+                    dist_map_pair[b], 
+                    os.path.join(sample_dir, f"graph_tri_cb_distogram_layer_{i}_batch_{b}.png"), 
+                    title=f"{pdb_id.upper()} Graph Triangle layer {i} Cβ Distogram",
+                    anchor_residues=None,
+                    mark_cdr=False
+                    )
 
-        # calculate trans diffuse loss (rmsd)
-        gt_trans_1 = batch['trans_1']
-        trans_error = (gt_trans_1 - pred_trans_1) 
-        trans_diffuse_loss = torch.sum(
-            trans_error ** 2 * diffuse_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(diffuse_mask, dim=-1) * 3)
-        trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
-        batch_metrics.append(trans_diffuse_loss_dict)
+                # gt distogram과 pairformer distogram 차이 
+                diff_distance_map = np.abs(gt_cb_dist - dist_map_pair[b])
 
-        frame_mask = diffuse_mask * (1 - loop_mask)
-        trans_frame_loss = torch.sum(
-            trans_error ** 2 * frame_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(diffuse_mask, dim=-1) * 3)
-        trans_diffuse_loss_dict = {'trans_frame_loss': trans_frame_loss**0.5}
-        batch_metrics.append(trans_diffuse_loss_dict)
+                eu.visualize_dist_map(
+                    diff_distance_map, 
+                    os.path.join(sample_dir, f"diff_gt_pred_layer_{i}_batch_{b}.png"), 
+                    title=f"{pdb_id.upper()} |True - Graph Triangle layer {i}|",
+                    anchor_residues=None,
+                    mark_cdr=False,
+                    cmap='hot'
+                    )
+        
+            if isinstance(self.logger, WandbLogger):
+                self.validation_epoch_samples.append(
+                    [saved_path, self.global_step, wandb.Molecule(saved_path)]
+                )
 
-        # calculate trans loop loss (rmsd)
-        trans_loop_loss = torch.sum(
-            trans_error ** 2 * loop_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(loop_mask, dim=-1) * 3)
-        trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
-        batch_metrics.append(trans_loop_loss_dict)
+            # calculate trans diffuse loss (rmsd)
+            gt_trans_1 = batch['trans_1']
+            trans_error = (gt_trans_1 - pred_trans_1) 
+            trans_diffuse_loss = torch.sum(
+                trans_error ** 2 * diffuse_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(diffuse_mask, dim=-1) * 3)
+            trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
 
-        # calcuclate trans loss (h3 rmsd)
-        b, N = loop_mask.shape
-        h3_mask = torch.zeros_like(loop_mask)
-        count = 0
-        for i in range(b):
-            count = 0  
-            in_group = False  
-            group_start = None  
-            
-            # 연속된 1들의 그룹을 추적
-            for j in range(N):
-                if loop_mask[i, j] == 1:
-                    if not in_group:  # 새로운 그룹 시작
-                        group_start = j
-                        in_group = True
-                else:
-                    if in_group:  # 그룹이 끝나는 지점
-                        count += 1
-                        # 세 번째 그룹만 남기고 나머지 그룹은 0
-                        if count == 3:
-                            h3_mask[i, group_start:j] = 1
-                        in_group = False
-            
-        # calculate h3 trans loss (rmsd)
+            frame_mask = diffuse_mask * (1 - loop_mask)
+            trans_frame_loss = torch.sum(
+                trans_error ** 2 * frame_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(diffuse_mask, dim=-1) * 3)
+            trans_diffuse_loss_dict = {'trans_frame_loss': trans_frame_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
 
-        h3_trans_loss = torch.sum(
-            trans_error ** 2 * h3_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(h3_mask, dim=-1) * 3)
-        h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
+            # calculate trans loop loss (rmsd)
+            trans_loop_loss = torch.sum(
+                trans_error ** 2 * loop_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(loop_mask, dim=-1) * 3)
+            trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
+            batch_metrics.append(trans_loop_loss_dict)
 
-        batch_metrics.append(h3_trans_loss_dict)
+            # calcuclate trans loss (h3 rmsd)
+            b, N = loop_mask.shape
+            h3_mask = torch.zeros_like(loop_mask)
+            count = 0
+            for i in range(b):
+                count = 0  
+                in_group = False  
+                group_start = None  
+                
+                # 연속된 1들의 그룹을 추적
+                for j in range(N):
+                    if loop_mask[i, j] == 1:
+                        if not in_group:  # 새로운 그룹 시작
+                            group_start = j
+                            in_group = True
+                    else:
+                        if in_group:  # 그룹이 끝나는 지점
+                            count += 1
+                            # 세 번째 그룹만 남기고 나머지 그룹은 0
+                            if count == 3:
+                                h3_mask[i, group_start:j] = 1
+                            in_group = False
+                
+            # calculate h3 trans loss (rmsd)
+
+            h3_trans_loss = torch.sum(
+                trans_error ** 2 * h3_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(h3_mask, dim=-1) * 3)
+            h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
+
+            batch_metrics.append(h3_trans_loss_dict)
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
-
-        # # distogram 시각화
-        # # gt distogram 시각화 
-
-        # gt_cb_distogram = calc_distogram(  
-        #     batch['pseudo_beta'],
-        #     min_bin=self._model_cfg.distogram_head.min_bin,
-        #     max_bin=self._model_cfg.distogram_head.max_bin,
-        #     num_bins=self._model_cfg.distogram_head.num_bins
-        # ) # (B, L, L, num_bins), one-hot
-        # gt_cb_dist = eu.dist_map_from_distogram(
-        #     gt_cb_distogram,
-        #     min_bin=self._model_cfg.distogram_head.min_bin,
-        #     max_bin=self._model_cfg.distogram_head.max_bin,
-        #     do_softmax=False).squeeze()
-        # eu.visualize_dist_map(
-        #     gt_cb_dist, 
-        #     os.path.join(sample_dir, "gt_cb_distogram.png"), 
-        #     title=f"{pdb_id.upper()} True Cβ Distogram",
-        #     anchor_residues=batch['anchor_residues'],
-        #     mark_cdr=True
-        #     )
-        
-        # # pred distogram 시각화 
-        # for i in range(len(pair_outputs)):
-        #     dist_map_pair = eu.dist_map_from_distogram(
-        #         pair_outputs[i], 
-        #         min_bin=self._model_cfg.distogram_head.min_bin,
-        #         max_bin=self._model_cfg.distogram_head.max_bin,
-        #         do_softmax=False
-        #         ) # (B, N, N)
-        #     for b in range(dist_map_pair.shape[0]):
-        #         eu.visualize_dist_map(
-        #             dist_map_pair[b], 
-        #             os.path.join(sample_dir, f"graph_tri_cb_distogram_layer_{i}_batch_{b}.png"), 
-        #             title=f"{pdb_id.upper()} Graph Triangle layer {i} Cβ Distogram",
-        #             anchor_residues=None,
-        #             mark_cdr=False
-        #             )
-
-        #         # gt distogram과 pairformer distogram 차이 
-        #         diff_distance_map = np.abs(gt_cb_dist - dist_map_pair[b])
-
-        #         eu.visualize_dist_map(
-        #             diff_distance_map, 
-        #             os.path.join(sample_dir, f"diff_gt_pred_layer_{i}_batch_{b}.png"), 
-        #             title=f"{pdb_id.upper()} |True - Graph Triangle layer {i}|",
-        #             anchor_residues=None,
-        #             mark_cdr=False,
-        #             cmap='hot'
-        #             )
-
         
     def on_validation_epoch_end(self):
         if len(self.validation_epoch_samples) > 0:

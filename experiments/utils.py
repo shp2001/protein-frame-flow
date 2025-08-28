@@ -308,7 +308,7 @@ def flatten_dict(raw_dict):
 def dist_map_from_distogram(
         distogram_logit, 
         min_bin=2.0,
-        max_bin=64.0,
+        max_bin=22.0,
         do_softmax=True
         ):
     if do_softmax:

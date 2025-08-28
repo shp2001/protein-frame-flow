@@ -140,7 +140,7 @@ experiment:
     aux_loss_sc_atom_loss_weight: 0.5 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
     aux_loss_local_dist_mat_loss_weight: 0.5 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_distogram_weight: 0.25 # 6.0 -> 2.0 ~ 3.0
+    aux_loss_distogram_weight: 0.5 # 6.0 -> 2.0 ~ 3.0
     aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
 
     viol_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.01
@@ -153,7 +153,7 @@ experiment:
     viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.0.2_angle_0_shift_0_motif_com_only_ab
+    name: CDRFlow_v2.0.2_angle_0_shift_0
     project: v2.0.0
   optimizer:
     warmup_steps: 0
