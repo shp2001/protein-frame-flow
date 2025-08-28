@@ -516,11 +516,15 @@ class FlowModule(LightningModule):
         # gt distogram 시각화 
         gt_cb_distogram = calc_distogram(  
             batch['pseudo_beta'],
-            min_bin=2.0,
-            max_bin=22.0,
-            num_bins=64
+            min_bin=self._model_cfg.distogram_head.min_bin,
+            max_bin=self._model_cfg.distogram_head.max_bin,
+            num_bins=self._model_cfg.distogram_head.num_bins,
         ) # (B, L, L, num_bins), one-hot
-        gt_cb_dist = eu.dist_map_from_distogram(gt_cb_distogram, do_softmax=False).squeeze()
+        gt_cb_dist = eu.dist_map_from_distogram(
+            gt_cb_distogram, 
+            min_bin=self._model_cfg.distogram_head.min_bin,
+            max_bin=self._model_cfg.distogram_head.max_bin,
+            do_softmax=False).squeeze()
         eu.visualize_dist_map(
             gt_cb_dist, 
             os.path.join(sample_dir, "gt_cb_distogram.png"), 
@@ -531,7 +535,12 @@ class FlowModule(LightningModule):
         
         # pred distogram 시각화 
         for i in range(len(pair_outputs)):
-            dist_map_pair = eu.dist_map_from_distogram(pair_outputs[i], do_softmax=False) # (B, N, N)
+            dist_map_pair = eu.dist_map_from_distogram(
+                pair_outputs[i], 
+                min_bin=self._model_cfg.distogram_head.min_bin,
+                max_bin=self._model_cfg.distogram_head.max_bin,
+                do_softmax=False
+                ) # (B, N, N)
             for b in range(dist_map_pair.shape[0]):
                 eu.visualize_dist_map(
                     dist_map_pair[b], 
