@@ -127,10 +127,11 @@ class ProteinData(LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self._valid_dataset,
-            sampler=DistributedSampler(self._valid_dataset, shuffle=False),
-            num_workers=2,
-            prefetch_factor=2,
-            persistent_workers=True,
+            batch_size=1,
+            shuffle=False,
+            num_workers=0,
+            prefetch_factor=None,
+            persistent_workers=False,
             collate_fn=self.collate_fn,
         )
 
