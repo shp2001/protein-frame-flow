@@ -177,8 +177,10 @@ class BaseDataset(Dataset):
 
     @abc.abstractmethod
     def _filter_metadata(self, raw_csv: pd.DataFrame) -> pd.DataFrame:
-        pass
-
+        if not self._dataset_cfg.use_general:
+            raw_csv = raw_csv[raw_csv['mode'] != 'general']
+        return raw_csv
+    
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
         
@@ -383,6 +385,8 @@ class ScopeDataset(BaseDataset):
             filter_cfg.min_num_res,
             filter_cfg.max_num_res
         )
+        if not filter_cfg.use_general:
+            data_csv = data_csv[data_csv['mode'] != 'general']
         data_csv['oligomeric_detail'] = 'monomeric'
         return data_csv
 
@@ -438,5 +442,6 @@ class PdbDataset(BaseDataset):
         data_csv = raw_csv
         data_csv = _length_filter(
             data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
-
+        if not filter_cfg.use_general:
+            data_csv = data_csv[data_csv['mode'] != 'general']
         return data_csv
