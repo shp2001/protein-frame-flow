@@ -117,7 +117,7 @@ experiment:
     rotation_loss_weights: 1.0
 
     aux_loss_weight: 0.3
-    viol_loss_weight: 0.1
+    viol_loss_weight: 0.3
     aux_loss_use_dist_mat_loss: True
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False

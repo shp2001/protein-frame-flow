@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v2.0.2_angle_0_shift_0
+#SBATCH -J CDRFlow_v2.0.2_motif_com
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:2
 #SBATCH --mem=128g

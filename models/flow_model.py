@@ -142,8 +142,6 @@ class FlowModel(nn.Module):
 
         for b in range(self._model_conf.num_blocks):
             cb_distogram = None
-            all_atom_contact_map = None 
-
             init_node_embed = node_embed
             
             # atom embed 
@@ -192,13 +190,8 @@ class FlowModel(nn.Module):
                     edge_embed = edge_embed * edge_mask[..., None]
                 if self._distogram_conf.use_pair_head:
                     cb_distogram = self.trunk[f'distogram_head_{b}'](edge_embed)
+                    pair_outputs.append(cb_distogram)
 
-
-            if cb_distogram != None:
-                pair_outputs.append(cb_distogram)
-
-            if all_atom_contact_map != None:
-                pair_outputs.append(all_atom_contact_map)
                 
             curr_rigids_unscaled = self.rigids_nm_to_ang(curr_rigids)
             local_atom_pos_pred = self.trunk[f"allatom_module_{b}"](node_embed, init_node_embed)

@@ -342,7 +342,7 @@ def collate_fn(batch):
         }
 
     # Center based on motif locations
-    motif_mask = 1 - cropped_batch['diffuse_mask'] # (B, L)
+    motif_mask = 1 - cropped_batch['loop_mask'] # (B, L)
     motif_1 = cropped_batch['trans_1'] * motif_mask[..., None] # (B, L, 3)
     motif_com = torch.sum(motif_1, dim=1) / (torch.sum(motif_mask, dim=1) + 1)[..., None] # (B, 3)
 

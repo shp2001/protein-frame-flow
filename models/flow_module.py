@@ -531,10 +531,10 @@ class FlowModule(LightningModule):
         
         # pred distogram 시각화 
         for i in range(len(pair_outputs)):
-            dist_map_pairformer = eu.dist_map_from_distogram(pair_outputs[i]) # (B, N, N)
-            for b in range(dist_map_pairformer.shape[0]):
+            dist_map_pair = eu.dist_map_from_distogram(pair_outputs[i], do_softmax=False) # (B, N, N)
+            for b in range(dist_map_pair.shape[0]):
                 eu.visualize_dist_map(
-                    dist_map_pairformer[b], 
+                    dist_map_pair[b], 
                     os.path.join(sample_dir, f"graph_tri_cb_distogram_layer_{i}_batch_{b}.png"), 
                     title=f"{pdb_id.upper()} Graph Triangle layer {i} Cβ Distogram",
                     anchor_residues=None,
@@ -542,7 +542,7 @@ class FlowModule(LightningModule):
                     )
 
                 # gt distogram과 pairformer distogram 차이 
-                diff_distance_map = np.abs(gt_cb_dist - dist_map_pairformer[b])
+                diff_distance_map = np.abs(gt_cb_dist - dist_map_pair[b])
 
                 eu.visualize_dist_map(
                     diff_distance_map, 
