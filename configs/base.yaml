@@ -145,9 +145,9 @@ experiment:
 
     viol_loss_all_atom_clash_loss_weight: 1.0 # 0.2 ~ 0.3 -> 0.01
     viol_loss_within_clash_loss_weight: 1.0 # 1.5 ~ 3.0 -> 0.1
-    viol_loss_bond_length_weight: 0.5  # 0.2 ~ 0.5 ->
-    viol_loss_ca_c_n_weight: 0.0 # 0.01 ->
-    viol_loss_c_n_ca_weight: 0.0 # 0.001~0.01 -> 
+    viol_loss_bond_length_weight: 1.0  # 0.2 ~ 0.5 ->
+    viol_loss_ca_c_n_weight: 0.5 # 0.01 ->
+    viol_loss_c_n_ca_weight: 0.5 # 0.001~0.01 -> 
 
     bb_aux_loss_t_pass: 0.3
     sc_aux_loss_t_pass: 0.8
@@ -155,7 +155,7 @@ experiment:
     sc_viol_loss_t_pass: 0.8
     
   wandb:
-    name: CDRFlow_v2.0.1_sc_loss_schedule
+    name: CDRFlow_v2.0.1_sc_loss_schedule_bond_angle
     project: v2.0.0
   optimizer:
     warmup_steps: 0

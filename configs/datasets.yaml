@@ -59,7 +59,7 @@ pdb_dataset:
   num_eval_lengths: ${shared.num_eval_lengths}
 
   # Cropping 
-  crop_ab: False
+  crop_ab: True
   ab_threshold: 40
   general_threshold: 40
   ab_max_num_res: 300
