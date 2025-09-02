@@ -407,36 +407,53 @@ class FlowModule(LightningModule):
 
         # calculate auxiliary loss 
         se3_vf_loss = trans_loss + rots_vf_loss
-        se3_vf_loss += distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
 
-        auxiliary_loss = (
+        bb_auxiliary_loss = (
             dist_mat_loss * training_cfg.aux_loss_use_dist_mat_loss * training_cfg.aux_loss_dist_mat_loss_weight
             + bb_atom_loss * training_cfg.aux_loss_use_bb_loss * training_cfg.aux_loss_bb_atom_loss_weight
-            + sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
-            + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
             + final_layer_rmsd * training_cfg.aux_loss_use_final_layer_rmsd * training_cfg.aux_loss_final_layer_rmsd_weight
+            + distogram_loss * training_cfg.aux_loss_use_local_pair_feat_loss * training_cfg.aux_loss_distogram_weight
+        )
+
+        sc_auxiliary_loss = (
+            sc_atom_loss * training_cfg.aux_loss_use_sc_atom_loss * training_cfg.aux_loss_sc_atom_loss_weight
+            + local_dist_mat_loss * training_cfg.aux_loss_use_local_dist_mat_loss * training_cfg.aux_loss_local_dist_mat_loss_weight
         )
 
         # calculate violation loss
-        violation_loss = (
-            all_atom_clash_loss * training_cfg.viol_loss_use_all_atom_clash_loss * training_cfg.viol_loss_all_atom_clash_loss_weight
-            + within_clash_loss * training_cfg.viol_loss_use_within_clash_loss * training_cfg.viol_loss_within_clash_loss_weight
+        bb_violation_loss = (
             + bond_length_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_bond_length_weight
             + ca_c_n_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_ca_c_n_weight 
             + c_n_ca_loss * training_cfg.viol_loss_use_bond_loss * training_cfg.viol_loss_c_n_ca_weight
         )
-
-        auxiliary_loss *= (
-            (r3_t[:, 0] > training_cfg.aux_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.aux_loss_t_pass)
+        sc_violation_loss = (
+            all_atom_clash_loss * training_cfg.viol_loss_use_all_atom_clash_loss * training_cfg.viol_loss_all_atom_clash_loss_weight 
+            + within_clash_loss * training_cfg.viol_loss_use_within_clash_loss * training_cfg.viol_loss_within_clash_loss_weight
         )
+
+        bb_auxiliary_loss *= (
+            (r3_t[:, 0] > training_cfg.bb_aux_loss_t_pass)
+            & (so3_t[:, 0] > training_cfg.bb_aux_loss_t_pass)
+        )
+
+        sc_auxiliary_loss *= (
+            (r3_t[:, 0] > training_cfg.sc_aux_loss_t_pass)
+            & (so3_t[:, 0] > training_cfg.sc_aux_loss_t_pass)
+        )
+
+        auxiliary_loss = bb_auxiliary_loss + sc_auxiliary_loss
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
         auxiliary_loss = torch.clamp(auxiliary_loss, max=4)
 
-        violation_loss *= (
-            (r3_t[:, 0] > training_cfg.viol_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.viol_loss_t_pass)
+        bb_violation_loss *= (
+            (r3_t[:, 0] > training_cfg.bb_viol_loss_t_pass)
+            & (so3_t[:, 0] > training_cfg.bb_viol_loss_t_pass)
         )
+        sc_violation_loss *= (
+            (r3_t[:, 0] > training_cfg.sc_viol_loss_t_pass)
+            & (so3_t[:, 0] > training_cfg.sc_viol_loss_t_pass)
+        )
+        violation_loss = bb_violation_loss + sc_violation_loss
         violation_loss *= self._exp_cfg.training.viol_loss_weight 
 
         se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss
