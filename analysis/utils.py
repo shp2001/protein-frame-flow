@@ -110,25 +110,25 @@ def get_cdr_and_neighbors(
     i_idx = torch.tensor([i for i, j in pair_indices], device=device)
     j_idx = torch.tensor([j for i, j in pair_indices], device=device)
 
-    atom_i = atom14_gt_positions[:, :, i_idx]  # (B, L, 105, 3)
-    atom_j = atom14_gt_positions[:, :, j_idx]  # (B, L, 105, 3)
+    atom_i = atom14_gt_positions[0, :, i_idx]  # (L, 105, 3)
+    atom_j = atom14_gt_positions[0, :, j_idx]  # (L, 105, 3)
 
-    atom_i = atom_i.unsqueeze(2)  # (B, L, 1, 105, 3)
-    atom_j = atom_j.unsqueeze(1)  # (B, 1, L, 105, 3)
-    gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (B, L, L, 105)
+    atom_i = atom_i.unsqueeze(1)  # (L, 1, 105, 3)
+    atom_j = atom_j.unsqueeze(0)  # (1, L, 105, 3)
+    gt_aa_distance_map = torch.norm(atom_i - atom_j, dim=-1)  # (L, L, 105)
 
     # make pairwise all atom contact map mask 
-    exists_i = atom14_gt_exists[:, :, i_idx]  # (B, L, 105)
-    exists_j = atom14_gt_exists[:, :, j_idx]  # (B, L, 105)
+    exists_i = atom14_gt_exists[0, :, i_idx]  # (L, 105)
+    exists_j = atom14_gt_exists[0, :, j_idx]  # (L, 105)
 
-    mask_i = exists_i.unsqueeze(2)  # (B, L, 1, 105)
-    mask_j = exists_j.unsqueeze(1)  # (B, 1, L, 105)
+    mask_i = exists_i.unsqueeze(1)  # (L, 1, 105)
+    mask_j = exists_j.unsqueeze(0)  # (1, L, 105)
 
-    edge_mask = mask_i * mask_j  # (B, L, L, 105)
+    edge_mask = mask_i * mask_j  # (L, L, 105)
 
     # find gt neighbors
-    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), gt_aa_distance_map) # (B, L, L, 105)
-    gt_neighbor_mask = torch.any((gt_aa_distance_map[0, cdr_residues] < distance_threshold), dim=-1)  # (N_cdr, N)
+    gt_aa_distance_map = torch.where(edge_mask == 0, torch.tensor(1000, device=device), gt_aa_distance_map) # (L, L, 105)
+    gt_neighbor_mask = torch.any((gt_aa_distance_map[cdr_residues] < distance_threshold), dim=-1)  # (N_cdr, N)
     gt_neighbor = torch.nonzero(gt_neighbor_mask)[:, -1]  # (N_nb,)
     neighbor_indices = torch.unique(gt_neighbor)
         
