@@ -321,21 +321,22 @@ class Interpolant:
 
         # Set-up initial prior samples
 
-        random_trans = _random_translations(trans_1.shape[0], self._cfg.max_shift, self._device)
-        random_rot = _random_rotation_matrices(trans_1.shape[0], self._cfg.max_angle_deg, device=self._device)
+        # random_trans = _random_translations(trans_1.shape[0], self._cfg.max_shift, self._device)
+        # random_rot = _random_rotation_matrices(trans_1.shape[0], self._cfg.max_angle_deg, device=self._device)
 
         if trans_0 is None:
             trans_0 = _centered_gaussian(num_batch, num_res, self._device)
             trans_0 = trans_0 * du.NM_TO_ANG_SCALE
             trans_0 = _trans_diffuse_mask(trans_0, batch["trans_1"], diffuse_mask)
-            batch['trans_template'] = _apply_random_transform_to_trans(trans_1, random_trans, random_rot, diffuse_mask)
+            # batch['trans_template'] = _apply_random_transform_to_trans(trans_1, random_trans, random_rot, diffuse_mask)
+            batch['trans_template'] = trans_1
 
         if rotmats_0 is None:
             rotmats_0 = _uniform_so3(num_batch, num_res, self._device)
             rotmats_0 = _rots_diffuse_mask(rotmats_0, rotmats_1, diffuse_mask)
-            batch['rotmats_template'] = _apply_random_transform_to_rotmats(rotmats_1, random_rot, diffuse_mask)
-        
-        
+            # batch['rotmats_template'] = _apply_random_transform_to_rotmats(rotmats_1, random_rot, diffuse_mask)
+            batch['rotmats_template'] = rotmats_1
+            
         logs_traj = defaultdict(list)
         if motif_scaffolding and self._cfg.twisting.use: # sampling / guidance
             assert trans_1.shape[0] == 1 # assume only one motif
