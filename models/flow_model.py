@@ -96,6 +96,7 @@ class FlowModel(nn.Module):
         rotmats_template = input_feats['rotmats_template']
         pair_init = input_feats['pair_init']
         aatype = input_feats['aatype']
+        ag_hotspot = input_feats['ag_hotspot']
         ref_feature_dict = input_feats['ref_feature_dict']
 
         # Initialize node and edge embeddings
@@ -104,7 +105,8 @@ class FlowModel(nn.Module):
             node_mask,
             diffuse_mask,
             loop_mask,
-            aatype
+            aatype,
+            ag_hotspot
         )
 
         if 'trans_sc' not in input_feats:
