@@ -327,7 +327,7 @@ class FlowModule(LightningModule):
         if training_cfg.aux_loss_use_local_pair_feat_loss and self._model_cfg.distogram_head.use_pair_head:
             distogram_loss = b_carbon_distogram_loss(
                 pred_cb_distogram=pred_cb_distogram, # non-scaled 
-                gt_pseudo_beta=noisy_batch['pseudo_beta'],
+                gt_pseudo_beta=noisy_batch['trans_1'],
                 res_mask=noisy_batch['res_mask'],
                 neighbor_indices=None,
                 cdr_residues=None,
