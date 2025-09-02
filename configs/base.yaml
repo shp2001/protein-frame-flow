@@ -151,11 +151,11 @@ experiment:
 
     bb_aux_loss_t_pass: 0.3
     sc_aux_loss_t_pass: 0.8
-    viol_loss_t_pass: 0.5
-    
+    bb_viol_loss_t_pass: 0.5
+    sc_viol_loss_t_pass: 0.8
     
   wandb:
-    name: CDRFlow_v2.0.2_only_ab_lr3e-4
+    name: CDRFlow_v2.0.1_sc_loss_schedule
     project: v2.0.0
   optimizer:
     warmup_steps: 0

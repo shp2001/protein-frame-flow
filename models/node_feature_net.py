@@ -11,7 +11,7 @@ class NodeFeatureNet(nn.Module):
         self.c_s = self._cfg.c_s
         self.c_pos_emb = self._cfg.c_pos_emb
         self.c_timestep_emb = self._cfg.c_timestep_emb
-        embed_size = self._cfg.c_timestep_emb + 1 + 1 + 21
+        embed_size = self._cfg.c_timestep_emb + 1 + 1 + 21 + 6
         if self._cfg.embed_chain:
             embed_size += self._cfg.c_pos_emb
         self.linear = nn.Linear(embed_size, self.c_s)

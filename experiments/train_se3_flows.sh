@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_v2.0.2_only_ab_lr3e-4
+#SBATCH -J CDRFlow_v2.0.1_sc_loss_schedule
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=100g
