@@ -7,7 +7,7 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler, dist
 
-from data.motif_index import embed_relpos
+from data.motif_index import embed_relpos, get_ag_hotspot
 from data import featurizer
 
 import analysis.utils as au 
@@ -105,6 +105,14 @@ class ProteinData(LightningDataModule):
         cropped_batch['cdr_residues'] = cdr_residues
         cropped_batch['neighbor_indices'] = neighbor_indices
         cropped_batch['anchor_residues'] = anchor_residues
+
+        cropped_batch['ag_hotspot'] = get_ag_hotspot(
+            cropped_batch['pseudo_beta'],
+            cropped_batch['loop_mask'],
+            cropped_batch['chain_index'],
+            cropped_batch['mode'],
+            threshold=5
+        )
         return cropped_batch
 
     

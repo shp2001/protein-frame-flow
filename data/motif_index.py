@@ -329,10 +329,10 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, mode='
     # ag이 max_ag_len 이상인 경우 cropping   
     else:
         distance_map = get_distance_map(trans_1)
-        h3_anchor = find_anchor(cdr_mask, only_h3=True)
+        loop_residues = torch.nonzero(cdr_mask, as_tuple=False).squeeze(-1)
         
         distance_vectors = []
-        for i in h3_anchor:
+        for i in loop_residues:
             distance_vectors.append(distance_map[i])
 
         distance_vectors = torch.stack(distance_vectors)
@@ -506,3 +506,36 @@ def embed_relpos(residue_index, seq_list):
                     sym_id)
     
     return relpos_emb, asym_id, entity_id, sym_id
+
+def get_ag_hotspot(pseudo_beta, loop_mask, chain_index, mode, threshold=5.0):
+    B, L, _ = pseudo_beta.shape
+    device = pseudo_beta.device
+
+    # 1. distance map (B, L, L)
+    dist_map = torch.cdist(pseudo_beta, pseudo_beta)  # (B, L, L)
+    # 2. loop 시작/끝 anchor (batch마다 동일하므로 첫 번째만 사용)
+    anchors = find_anchor(loop_mask[0].cpu().numpy(), only_h3=False)
+    loops = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
+
+    # 3. antigen residue 마스크 (역시 모든 batch 동일)
+    chains = torch.unique_consecutive(chain_index[0])
+    if mode == "nanobody":
+        ag_chains = chains[1:]
+    elif mode == "ab":
+        ag_chains = chains[2:]
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+    ag_residues = torch.isin(chain_index[0], ag_chains)  # (L,)
+
+    # 4. loop-Ag contact 체크
+    hotspot = torch.zeros((B, L, 6), dtype=torch.float, device=device)
+    ag_idx = torch.where(ag_residues)[0]
+
+    for i, (s, e) in enumerate(loops):
+        loop_idx = torch.arange(s, e, device=device)
+        # 거리 행렬에서 loop vs antigen 부분만 추출
+        d = dist_map[:, loop_idx][:, :, ag_residues]   # (B, len(loop), num_ag)
+        contact = (d < threshold).any(dim=1)           # (B, num_ag)
+        hotspot[:, ag_idx, i] = contact.float()
+
+    return hotspot  # (B, L, num_loops)

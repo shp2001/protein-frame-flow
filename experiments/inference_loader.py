@@ -13,7 +13,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import embed_relpos, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor
+from data.motif_index import embed_relpos, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor, get_ag_hotspot
 from data import residue_constants as rc
 
 from itertools import accumulate
@@ -359,6 +359,13 @@ def collate_fn(batch):
     cropped_batch['original_chain_idx'] = feat['chain_idx']
     cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
 
+    cropped_batch['ag_hotspot'] = get_ag_hotspot(
+        cropped_batch['pseudo_beta'],
+        cropped_batch['loop_mask'],
+        cropped_batch['chain_index'],
+        cropped_batch['mode'],
+        threshold=5
+    )
     return cropped_batch
 
 
