@@ -489,3 +489,29 @@ def manage_missing_batch(xyz, mask):
         new_xyz[i] = torch.where(mask_expanded, xyz[i], nearest_residue_coords)
 
     return new_xyz
+
+def atom_flatten(coords, mask):
+    '''
+    coords: [B, L, 14, 3]
+    mask:   [B, L, 14]
+
+    return: [B, L_atom, 3]
+    '''
+    B, L = coords.shape[:2]
+    coords = coords.reshape(B, L*14, 3)
+    mask = mask.reshape(B, L*14)
+    flatten_atom = coords[:, mask[0].bool(), :]
+    return flatten_atom
+
+def atom_unflatten(flatten_atom, mask):
+    '''
+    flatten_atom: [B, L_atom, 3]
+    mask: [B, L, 14]
+
+    return: coords_reconstructed [B, L, 14, 3]
+    '''
+    B, L, A = mask.shape  # A = 14
+    L_atom = mask[0].sum().item()
+    coords_reconstructed = torch.zeros(B, L, A, 3, device=flatten_atom.device, dtype=flatten_atom.dtype)
+    coords_reconstructed[mask.bool()] = flatten_atom.reshape(B * L_atom, 3)
+    return coords_reconstructed
