@@ -887,7 +887,10 @@ def compute_all_atom_clash_loss(
         atom14_atom_exists,
         residue_index,
         residx_atom14_to_atom37,
-        interface_mask):
+        interface_mask,
+        overlap_tolerance_soft,
+        overlap_tolerance_hard
+        ):
 
     atomtype_radius = [
         rc.van_der_waals_radius[name[0]]
@@ -904,7 +907,9 @@ def compute_all_atom_clash_loss(
         atom14_atom_exists=atom14_atom_exists,
         atom14_atom_radius=atom14_atom_radius,
         residue_index=residue_index,
-        interface_mask=interface_mask
+        interface_mask=interface_mask,
+        overlap_tolerance_soft=overlap_tolerance_soft,
+        overlap_tolerance_hard=overlap_tolerance_hard
     )
 
     # between residue clashes = {
@@ -918,8 +923,9 @@ def compute_within_clash_loss(
         atom14_pred_positions,
         atom14_atom_exists,
         interface_mask,
-        aatype):
-
+        aatype,
+        tighten_bounds_for_loss
+        ):
     restype_atom14_bounds = rc.make_atom14_dists_bounds()
     atom14_dists_lower_bound = atom14_pred_positions.new_tensor(
         restype_atom14_bounds["lower_bound"]
@@ -933,6 +939,7 @@ def compute_within_clash_loss(
         atom14_atom_exists,
         atom14_dists_lower_bound,
         atom14_dists_upper_bound,
+        tighten_bounds_for_loss
     )['per_atom_loss_sum'] # ([B, N, 14])
 
     mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))

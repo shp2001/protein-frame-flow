@@ -723,8 +723,8 @@ def between_residue_bond_loss(
     pred_atom_mask: torch.Tensor,  # (*, N, 37/14)
     residue_index: torch.Tensor,  # (*, N)
     aatype: torch.Tensor,  # (*, N)
-    tolerance_factor_soft=12.0,
-    tolerance_factor_hard=12.0,
+    tolerance_factor_soft=5.0,
+    tolerance_factor_hard=3.0,
     eps=1e-6,
 ) -> Dict[str, torch.Tensor]:
     """Flat-bottom loss to penalize structural violations between residues.
@@ -883,8 +883,8 @@ def between_residue_clash_loss(
     atom14_atom_radius: torch.Tensor,
     residue_index: torch.Tensor,
     interface_mask: torch.Tensor,
-    overlap_tolerance_soft=1.5,
-    overlap_tolerance_hard=1.5,
+    overlap_tolerance_soft=1.0,
+    overlap_tolerance_hard=0.5,
     eps=1e-10,
 ) -> Dict[str, torch.Tensor]:
     """Loss to penalize steric clashes between residues.
@@ -1044,7 +1044,7 @@ def within_residue_violations(
     atom14_atom_exists: torch.Tensor,
     atom14_dists_lower_bound: torch.Tensor,
     atom14_dists_upper_bound: torch.Tensor,
-    tighten_bounds_for_loss=0.0,
+    tighten_bounds_for_loss=0.5,
     eps=1e-10,
 ) -> Dict[str, torch.Tensor]:
     """Loss to penalize steric clashes within residues.

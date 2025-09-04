@@ -322,30 +322,27 @@ class FlowModule(LightningModule):
         batch_size = gt_atom14_pos.shape[0]
         all_atom_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.viol_loss_use_all_atom_clash_loss:
-            try:
-                all_atom_clash_loss = compute_all_atom_clash_loss(
-                    model_output['all_atom_preds']['positions'][-1],
-                    noisy_batch['atom14_gt_exists'],
-                    noisy_batch['residue_index'],
-                    noisy_batch['residx_atom14_to_atom37'],
-                    interface_mask=None
-                )
-            except Exception as e:
-                print(f"[Warning] all atom clash loss skipped due to error: {e}")
-                all_atom_clash_loss = torch.zeros(batch_size).to(device)
+            all_atom_clash_loss = compute_all_atom_clash_loss(
+                model_output['all_atom_preds']['positions'][-1],
+                noisy_batch['atom14_gt_exists'],
+                noisy_batch['residue_index'],
+                noisy_batch['residx_atom14_to_atom37'],
+                interface_mask=None,
+                overlap_tolerance_soft=1.0,
+                overlap_tolerance_hard=0.6
+            )
+
 
         within_clash_loss = torch.zeros(batch_size, device=device)
         if training_cfg.viol_loss_use_within_clash_loss:
-            try:
-                within_clash_loss = compute_within_clash_loss(
-                    model_output['all_atom_preds']['positions'][-1],
-                    noisy_batch['atom14_gt_exists'],
-                    noisy_batch['loop_mask'],
-                    noisy_batch['aatype']
-                    )   
-            except Exception as e:
-                print(f"[Warning] within clash loss skipped due to error: {e}")
-                within_clash_loss = torch.zeros(batch_size).to(device)
+            
+            within_clash_loss = compute_within_clash_loss(
+                model_output['all_atom_preds']['positions'][-1],
+                noisy_batch['atom14_gt_exists'],
+                noisy_batch['loop_mask'],
+                noisy_batch['aatype'],
+                0.5
+                )   
 
         # bond loss 
         bond_length_loss = torch.zeros(batch_size, device=device)
