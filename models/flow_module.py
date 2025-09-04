@@ -5,23 +5,18 @@ import math
 
 import os
 import random
-import wandb
 import numpy as np
 import pandas as pd
 import logging
 import torch.distributed as dist
 from pytorch_lightning import LightningModule
-from analysis import metrics 
 from analysis import utils as au
 from models.flow_model import FlowModel, ConfidenceModel
 from models import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
 from data import all_atom
-from data import so3_utils
-from data import residue_constants
 from experiments import utils as eu
-from pytorch_lightning.loggers.wandb import WandbLogger
 from models.loss import *
 from openfold.utils.loss import between_residue_bond_loss
 import sys 
@@ -141,6 +136,8 @@ class FlowModule(LightningModule):
         training_cfg = self._exp_cfg.training
         loss_loop_mask = noisy_batch['res_mask'] * noisy_batch['loop_mask']
         loss_diffuse_mask = noisy_batch['res_mask'] * noisy_batch['diffuse_mask']
+        loss_atom_mask = noisy_batch['atom_diffuse_mask']
+
         if torch.any(torch.sum(loss_loop_mask, dim=-1) < 1):
             raise ValueError('Empty batch encountered')
         num_batch, num_res = loss_loop_mask.shape
@@ -148,30 +145,20 @@ class FlowModule(LightningModule):
 
         # Ground truth labels
         gt_trans_1 = noisy_batch['trans_1']
-        gt_rotmats_1 = noisy_batch['rotmats_1']
-        rotmats_t = noisy_batch['rotmats_t']
+        r_1 = noisy_batch['r_1']
         gt_atom14_pos = noisy_batch['atom14_gt_positions'].clone()
         alt_atom14_pos = noisy_batch['atom14_alt_gt_positions'].clone()
         gt_pseudo_beta = noisy_batch['pseudo_beta'].clone()
 
         print("raw_path", noisy_batch['raw_path'])
-        
-        gt_rot_vf = so3_utils.calc_rot_vf(
-            rotmats_t, gt_rotmats_1.type(torch.float32))
-        # if torch.any(torch.isnan(gt_rot_vf)):
-        #     raise ValueError('NaN encountered in gt_rot_vf')
 
         # Timestep used for normalization.
-        r3_t = noisy_batch['r3_t']
-        so3_t = noisy_batch['so3_t']
+        t = noisy_batch['t']
         r3_norm_scale = 1 - torch.min(
-            r3_t[..., None], torch.tensor(training_cfg.t_normalize_clip))
-        so3_norm_scale = 1 - torch.min(
-            so3_t[..., None], torch.tensor(training_cfg.t_normalize_clip))
+            t[..., None], torch.tensor(training_cfg.t_normalize_clip))
         
         gt_atom14_pos = gt_atom14_pos * training_cfg.bb_atom_scale / r3_norm_scale[..., None] # scaling 
         gt_bb_atoms = gt_atom14_pos[:, :, :3] # scaling 
-
         alt_atom14_pos = alt_atom14_pos * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
         gt_pseudo_beta = gt_pseudo_beta * training_cfg.bb_atom_scale / r3_norm_scale
 
@@ -179,9 +166,8 @@ class FlowModule(LightningModule):
         # Model output predictions.
         model_output = self.model(noisy_batch)
         pred_trans_1 = model_output['pred_trans'].clone()
-        pred_rotmats_1 = model_output['pred_rotmats'].clone()
+        pred_r_1 = model_output['pred_r_1'].clone()
         pred_atom_14_list = model_output['all_atom_preds']['positions'].clone()
-
         if self._model_cfg.distogram_head.use_pair_head:
             pred_cb_distogram = model_output['pair_outputs'] # (O, B, L, L) <- contact prob
             pred_cb_distogram = torch.stack(pred_cb_distogram, dim=0)
@@ -190,53 +176,25 @@ class FlowModule(LightningModule):
         pred_bb_atoms = pred_atom_14_list[-1, :, :, :3]
 
         
-        pred_rots_vf = so3_utils.calc_rot_vf(rotmats_t, pred_rotmats_1)
-        # if torch.any(torch.isnan(pred_rots_vf)):
-        #     raise ValueError('NaN encountered in pred_rots_vf')
-
         # Get the renamed ground truth 
         renamed_dict = compute_renamed_ground_truth(
             noisy_batch,
             atom14_pred_positions=model_output['all_atom_preds']["positions"][-1]
             )
 
-        alt_naming_is_better = renamed_dict['alt_naming_is_better'].clone()
         renamed_atom14_gt_exists = renamed_dict['renamed_atom14_gt_exists'].clone()
         renamed_atom14_gt_positions = renamed_dict['renamed_atom14_gt_positions'] * training_cfg.bb_atom_scale / r3_norm_scale[..., None]
 
         # Translation VF loss
-        trans_error = (gt_trans_1 - pred_trans_1) / r3_norm_scale * training_cfg.trans_scale
+        r3_error = (r_1 - pred_r_1) / r3_norm_scale * training_cfg.trans_scale
 
-        loss_loop_denom = torch.sum(loss_loop_mask, dim=-1) * 3
-        trans_loop_loss = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_loop_mask[..., None],
+        loss_atom_denom = torch.sum(loss_atom_mask, dim=-1) * 3
+        r3_loss = training_cfg.translation_loss_weight * torch.sum(
+            r3_error ** 2 * loss_atom_mask[..., None],
             dim=(-1, -2)
-        ) / loss_loop_denom
-        trans_loop_loss = torch.clamp(trans_loop_loss, max=10)
+        ) / loss_atom_denom
+        r3_loss = torch.clamp(r3_loss, max=20)
 
-        loss_diffuse_denom = torch.sum(loss_diffuse_mask, dim=-1) * 3
-        trans_diffuse_loss = training_cfg.translation_loss_weight * torch.sum(
-            trans_error ** 2 * loss_diffuse_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_diffuse_denom
-        trans_diffuse_loss = torch.clamp(trans_diffuse_loss, max=10)
-
-        trans_loss = trans_diffuse_loss
-
-        # Rotation VF loss
-        rots_vf_error = (gt_rot_vf - pred_rots_vf) / so3_norm_scale
-        rots_vf_loop_loss = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_loop_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_loop_denom
-
-        rots_vf_diffuse_loss = training_cfg.rotation_loss_weights * torch.sum(
-            rots_vf_error ** 2 * loss_diffuse_mask[..., None],
-            dim=(-1, -2)
-        ) / loss_diffuse_denom
-
-        rots_vf_loss = rots_vf_diffuse_loss
-        
         # distance map loss
         dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.aux_loss_use_dist_mat_loss:
@@ -406,7 +364,7 @@ class FlowModule(LightningModule):
 
 
         # calculate auxiliary loss 
-        se3_vf_loss = trans_loss + rots_vf_loss
+        se3_vf_loss = r3_loss
 
         bb_auxiliary_loss = (
             dist_mat_loss * training_cfg.aux_loss_use_dist_mat_loss * training_cfg.aux_loss_dist_mat_loss_weight
@@ -432,26 +390,22 @@ class FlowModule(LightningModule):
         )
 
         bb_auxiliary_loss *= (
-            (r3_t[:, 0] > training_cfg.bb_aux_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.bb_aux_loss_t_pass)
+            (t[:, 0] > training_cfg.bb_aux_loss_t_pass)
         )
 
         sc_auxiliary_loss *= (
-            (r3_t[:, 0] > training_cfg.sc_aux_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.sc_aux_loss_t_pass)
+            (t[:, 0] > training_cfg.sc_aux_loss_t_pass)
         )
 
         auxiliary_loss = bb_auxiliary_loss + sc_auxiliary_loss
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
-        auxiliary_loss = torch.clamp(auxiliary_loss, max=4)
+        auxiliary_loss = torch.clamp(auxiliary_loss, max=10)
 
         bb_violation_loss *= (
-            (r3_t[:, 0] > training_cfg.bb_viol_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.bb_viol_loss_t_pass)
+            (t[:, 0] > training_cfg.bb_viol_loss_t_pass)
         )
         sc_violation_loss *= (
-            (r3_t[:, 0] > training_cfg.sc_viol_loss_t_pass)
-            & (so3_t[:, 0] > training_cfg.sc_viol_loss_t_pass)
+            (t[:, 0] > training_cfg.sc_viol_loss_t_pass)
         )
         violation_loss = bb_violation_loss + sc_violation_loss
         violation_loss *= self._exp_cfg.training.viol_loss_weight 
@@ -459,8 +413,7 @@ class FlowModule(LightningModule):
         se3_vf_loss = se3_vf_loss + auxiliary_loss + violation_loss
 
         return {
-            "trans_loss": trans_loss,
-            "rots_vf_loss": rots_vf_loss,
+            "r3_loss": r3_loss,
             "distogram_loss": distogram_loss,
             "se3_vf_loss": se3_vf_loss,
             "auxiliary_loss": auxiliary_loss,
@@ -472,6 +425,8 @@ class FlowModule(LightningModule):
             'all_atom_clash_loss': all_atom_clash_loss,
             'within_clash_loss': within_clash_loss,
             'bond_length_loss': bond_length_loss,
+            'ca_c_n_loss': ca_c_n_loss,
+            'c_n_ca_loss': c_n_ca_loss,
             'violation_loss': violation_loss
         }
 
@@ -485,8 +440,6 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
         atom37_traj, clean_atom37_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs = self.interpolant.sample(
-            num_batch,
-            num_res,
             self.model,
             batch
         )
@@ -527,57 +480,6 @@ class FlowModule(LightningModule):
                 b_factors=b_factors
             )
             
-
-        # distogram 시각화
-        # gt distogram 시각화 
-        gt_cb_distogram = calc_distogram(  
-            batch['pseudo_beta'],
-            min_bin=self._model_cfg.distogram_head.min_bin,
-            max_bin=self._model_cfg.distogram_head.max_bin,
-            num_bins=self._model_cfg.distogram_head.num_bins,
-        ) # (B, L, L, num_bins), one-hot
-        gt_cb_dist = eu.dist_map_from_distogram(
-            gt_cb_distogram, 
-            min_bin=self._model_cfg.distogram_head.min_bin,
-            max_bin=self._model_cfg.distogram_head.max_bin,
-            do_softmax=False).squeeze()
-        eu.visualize_dist_map(
-            gt_cb_dist, 
-            os.path.join(sample_dir, "gt_cb_distogram.png"), 
-            title=f"{pdb_id.upper()} True Cβ Distogram",
-            anchor_residues=batch['anchor_residues'],
-            mark_cdr=True
-            )
-        
-        # pred distogram 시각화 
-        for i in range(len(pair_outputs)):
-            dist_map_pair = eu.dist_map_from_distogram(
-                pair_outputs[i], 
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                do_softmax=False
-                ) # (B, N, N)
-            for b in range(dist_map_pair.shape[0]):
-                eu.visualize_dist_map(
-                    dist_map_pair[b], 
-                    os.path.join(sample_dir, f"graph_tri_cb_distogram_layer_{i}_batch_{b}.png"), 
-                    title=f"{pdb_id.upper()} Graph Triangle layer {i} Cβ Distogram",
-                    anchor_residues=None,
-                    mark_cdr=False
-                    )
-
-                # gt distogram과 pairformer distogram 차이 
-                diff_distance_map = np.abs(gt_cb_dist - dist_map_pair[b])
-
-                eu.visualize_dist_map(
-                    diff_distance_map, 
-                    os.path.join(sample_dir, f"diff_gt_pred_layer_{i}_batch_{b}.png"), 
-                    title=f"{pdb_id.upper()} |True - Graph Triangle layer {i}|",
-                    anchor_residues=None,
-                    mark_cdr=False,
-                    cmap='hot'
-                    )
-
         # calculate trans diffuse loss (rmsd)
         gt_trans_1 = batch['trans_1']
         trans_error = (gt_trans_1 - pred_trans_1) 
@@ -639,7 +541,7 @@ class FlowModule(LightningModule):
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
-                
+
     def on_validation_epoch_end(self):
         if len(self.validation_epoch_samples) > 0:
             self.logger.log_table(
@@ -661,7 +563,7 @@ class FlowModule(LightningModule):
                 rank_zero_only=False
             )
         self.validation_epoch_metrics.clear()
-
+        torch.cuda.empty_cache()
     # def on_after_backward(self):
     #     # 모든 파라미터에 대해 gradient 값 확인
     #     for name, param in self.named_parameters():
@@ -719,7 +621,7 @@ class FlowModule(LightningModule):
             self.is_loss_nan = True
             return None 
         
-        num_batch = batch_losses['trans_loss'].shape[0]
+        num_batch = batch_losses['se3_vf_loss'].shape[0]
         total_losses = {
             k: torch.mean(v) for k,v in batch_losses.items()
         }
@@ -728,21 +630,13 @@ class FlowModule(LightningModule):
                 f"train/{k}", v, prog_bar=False, batch_size=num_batch)
 
         # Losses to track. Stratified across t.
-        so3_t = torch.squeeze(noisy_batch['so3_t'])
+        t = torch.squeeze(noisy_batch['t'])
         self._log_scalar(
-            "train/so3_t",
-            np.mean(du.to_numpy(so3_t)),
-            prog_bar=False, batch_size=num_batch)
-        r3_t = torch.squeeze(noisy_batch['r3_t'])
-        self._log_scalar(
-            "train/r3_t",
-            np.mean(du.to_numpy(r3_t)),
+            "train/t",
+            np.mean(du.to_numpy(t)),
             prog_bar=False, batch_size=num_batch)
         for loss_name, loss_dict in batch_losses.items():
-            if loss_name == 'rots_vf_loss':
-                batch_t = so3_t
-            else:
-                batch_t = r3_t
+            batch_t = t
             stratified_losses = mu.t_stratified_loss(
                 batch_t, loss_dict, loss_name=loss_name)
             for k,v in stratified_losses.items():
@@ -859,8 +753,6 @@ class FlowModule(LightningModule):
             os.makedirs(sample_root_dir, exist_ok=True)
         if self.save_file:
             atom37_traj, model_traj, pred_positions, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs = interpolant.sample(
-                num_batch, 
-                sample_length, 
                 self.model,
                 batch
             )

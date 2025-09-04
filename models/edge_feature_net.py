@@ -3,7 +3,6 @@ from torch import nn
 
 from models.utils import calc_distogram, calc_unit_vector
 from data.utils import create_rigid
-from Protenix.protenix.model.modules.transformer import RefPosEmbedder
 
 class EdgeFeatureNet(nn.Module):
 
@@ -21,8 +20,7 @@ class EdgeFeatureNet(nn.Module):
 
         # total_edge_feats = self.feat_dim * 3 + self._cfg.num_bins * 2
         total_edge_feats = self.feat_dim
-        if self._cfg.ref_pos_dim: 
-            total_edge_feats += self._cfg.ref_pos_dim
+
         if self._cfg.embed_chain:
             total_edge_feats += 1
         if self._cfg.embed_loop_mask:
@@ -38,8 +36,6 @@ class EdgeFeatureNet(nn.Module):
             if self._cfg.self_condition:
                 total_edge_feats += 3 
         
-        self.ref_pos_embedder = RefPosEmbedder(c_atompair=self.ref_pos_dim)
-
         self.edge_embedder = nn.Sequential(
             nn.Linear(total_edge_feats, self.c_z),
             nn.ReLU(),
@@ -56,8 +52,8 @@ class EdgeFeatureNet(nn.Module):
                 trans_template, trans_sc,
                 rotmats_template, rotmats_sc, 
                 p_mask, diffuse_mask, loop_mask, 
-                pair_init,
-                input_feature_dict):
+                pair_init
+                ):
         """
         trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
                                 If not, it is cdr_masked (cdr masked to the closeast residues) value 
@@ -65,10 +61,6 @@ class EdgeFeatureNet(nn.Module):
         # [b, n_res, c_z]
         relpos_feats = self.embed_relpos(pair_init)
         all_edge_feats = [relpos_feats]
-
-        if self._cfg.embed_ref_pos:
-            ref_pos = self.ref_pos_embedder(input_feature_dict)
-            all_edge_feats.append(ref_pos)
 
         if self._cfg.embed_loop_mask:
             loop_feat = (1-loop_mask[:, :, None]) * (1-loop_mask[:, None, :]) # cdr: 0 non_cdr: 1 -> 하나라도 cdr이면 0 아니면 1

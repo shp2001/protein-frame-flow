@@ -9,6 +9,7 @@ from torch.utils.data.distributed import DistributedSampler, dist
 
 from data.motif_index import embed_relpos, get_ag_hotspot
 from data import featurizer
+from data import utils as du 
 
 import analysis.utils as au 
 from itertools import accumulate
@@ -72,8 +73,8 @@ class ProteinData(LightningDataModule):
             cropped_batch['diffuse_mask'][:, 0] = 0
         if cropped_batch['diffuse_mask'][0, -1] == 1:
             cropped_batch['diffuse_mask'][:, -1] = 0
-        
-        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = \
+
+        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
         cropped_batch['ref_feature_dict'] = {
             'ref_space_uid': ref_space_uid,
@@ -82,7 +83,6 @@ class ProteinData(LightningDataModule):
             'ref_element': ref_element,
             'ref_charge': ref_charge,
             'ref_atom_name_chars': ref_atom_name_chars,
-            'ref_rigid_frame': ref_rigid_frame
         }
 
         # Center based on motif locations
@@ -109,10 +109,16 @@ class ProteinData(LightningDataModule):
         cropped_batch['ag_hotspot'] = get_ag_hotspot(
             cropped_batch['pseudo_beta'],
             cropped_batch['loop_mask'],
-            cropped_batch['chain_index'],
-            cropped_batch['mode'],
+            cropped_batch['diffuse_mask'],
             threshold=5
         )
+
+        # create atom diffuse_mask 
+        atom_diffuse_mask = cropped_batch['atom14_gt_exists'].clone() # (B, L, 14)
+        atom_diffuse_mask[..., :3] *= cropped_batch["diffuse_mask"].unsqueeze(-1)
+        cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
+        cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
+        
         return cropped_batch
 
     
@@ -123,26 +129,25 @@ class ProteinData(LightningDataModule):
                 sampler_cfg=self.sampler_cfg,
                 metadata_csv=self._train_dataset.csv,
                 rank=rank,
-                num_replicas=num_replicas
+                num_replicas=num_replicas,
             ),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=False,
             persistent_workers=True if self.loader_cfg.num_workers > 0 else False,
-            collate_fn=self.collate_fn
+            collate_fn=self.collate_fn,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self._valid_dataset,
             batch_size=1,
-            shuffle=False,
-            num_workers=0,
-            prefetch_factor=None,
-            persistent_workers=False,
+            sampler=DistributedSampler(self._valid_dataset, shuffle=False),
+            num_workers=2,
+            prefetch_factor=2,
+            persistent_workers=True,
             collate_fn=self.collate_fn,
         )
-
     def predict_dataloader(self):
         return DataLoader(
             self._predict_dataset,

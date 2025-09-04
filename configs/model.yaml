@@ -1,22 +1,36 @@
 model:
-  node_embed_size: 256
-  edge_embed_size: 128
-  num_blocks: 4
+  c_s: 384
+  c_token: 768
+  c_z: 128
+  num_blocks: 3
   symmetric: False
   scaling_nm_ang: False 
   
   node_features:
-    c_s: ${model.node_embed_size}
+    c_s: 384
     c_pos_emb: 128
     c_timestep_emb: 128
     max_num_res: 2000
     timestep_int: 1000
     embed_chain: False
 
+    aa_enc:
+      c_token: 384
+      has_s_z: False
+      c_atom: 128
+      c_atompair: 16
+      c_s: ${model.c_s}
+      c_z: 128
+      n_blocks: 2
+      n_heads: 4
+      n_queries: 32
+      n_keys: 128
+      blocks_per_ckpt: null
+
   edge_features:
     single_bias_transition_n: 2
-    c_s: ${model.node_embed_size}
-    c_p: ${model.edge_embed_size}
+    c_s: ${model.c_s}
+    c_p: ${model.c_z}
     ref_pos_dim: 16
     relpos_k: 64
     relpos_dim: 73
@@ -33,32 +47,48 @@ model:
     embed_distogram: True
 
   aa_enc:
-    c_token: ${model.node_embed_size}
+    c_token: ${model.c_token}
     has_s_z: True
     c_atom: 128
     c_atompair: 16
-    c_s: ${model.node_embed_size}
+    c_s: ${model.c_s}
     c_z: 128
     n_blocks: 2
     n_heads: 4
     n_queries: 32
     n_keys: 128
-    blocks_per_ckpt: 2
+    blocks_per_ckpt: null
 
-  ipa:
-    c_s: ${model.node_embed_size}
-    c_z: ${model.edge_embed_size}
-    c_hidden: 16
-    no_heads: 8
-    no_qk_points: 8
-    no_v_points: 12
-    seq_tfmr_num_heads: 4
-    seq_tfmr_num_layers: 2
+  diffusion_transformer:
+    c_token: ${model.c_token}
+    c_s: ${model.c_s}
+    c_z: 128
+    n_blocks: 12
+    n_heads: 16
+    drop_path_rate: 0
+    blocks_per_ckpt: null
+  
+  aa_decoder:
+    c_token: ${model.c_token}
+    c_atom: 128
+    c_atompair: 16
+    blocks_per_ckpt: null
+    n_blocks: 3
+    n_heads: 4
+    n_queries: 32
+    n_keys: 128
+
+  distogram_head: 
+    c_z: 128
+    use_pair_head: True
+    min_bin: 2
+    max_bin: 64
+    num_bins: 64
 
   local_triangle_attention_new:
     enable: True # true
-    c_s: ${model.node_embed_size}
-    c_z: ${model.edge_embed_size}
+    c_s: ${model.c_token}
+    c_z: ${model.c_z}
     c_rbf: 64
     c_gate_s: 16
     c_hidden: 128
@@ -70,29 +100,10 @@ model:
     inf: 1e9
     pair_dropout: 0.25
     
-  distogram_head: 
-    use_pair_head: True
-    min_bin: 2
-    max_bin: 64
-    num_bins: 64
-
-  angle:
-    c_resnet: 256
-    no_resnet_blocks: 2
-    no_angles: 7
-    epsilon: 1.0e-07
-    use_original_sm: true
-
-  all_atom:
-    n_blocks: 2
-    d_single: 256
-    d_hidden: 128
-    atom_num: 14
-    
   confidence_head:
     use_confidence: False
-    c_s: ${model.node_embed_size}
-    c_z: ${model.edge_embed_size}
+    c_s: ${model.c_s}
+    c_z: ${model.c_z}
     num_bins: 32
 
   initialization:

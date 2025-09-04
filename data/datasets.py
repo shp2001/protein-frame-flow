@@ -437,8 +437,8 @@ class PdbDataset(BaseDataset):
         filter_cfg = self.dataset_cfg.filter
         data_csv = raw_csv
 
-        if self._is_training:
-            data_csv = _length_filter(
-                data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
+        # if self._is_training:
+        data_csv = _length_filter(
+            data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
 
         return data_csv

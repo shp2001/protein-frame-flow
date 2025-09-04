@@ -83,7 +83,7 @@ class Experiment:
             enable_model_summary=True,
             strategy='ddp',
             devices=self._exp_cfg.num_devices,
-            gradient_clip_val=1.0
+            gradient_clip_val=0.5
         )
 
         trainer.fit(

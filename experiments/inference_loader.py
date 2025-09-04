@@ -330,7 +330,7 @@ def collate_fn(batch):
         cropped_batch[key] = torch.stack(cropped_batch[key], dim=0)  
 
 
-    ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos, ref_rigid_frame = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
+    ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
     cropped_batch['ref_feature_dict'] = {
         'ref_space_uid': ref_space_uid,
         'ref_element': ref_element,
@@ -338,7 +338,6 @@ def collate_fn(batch):
         'ref_atom_name_chars': ref_atom_name_chars,
         'atom_to_token_idx': atom_to_token_idx,
         'ref_pos': ref_pos,
-        'ref_rigid_frame': ref_rigid_frame
         }
 
     # Center based on motif locations
@@ -362,10 +361,17 @@ def collate_fn(batch):
     cropped_batch['ag_hotspot'] = get_ag_hotspot(
         cropped_batch['pseudo_beta'],
         cropped_batch['loop_mask'],
-        cropped_batch['chain_index'],
-        cropped_batch['mode'],
+        cropped_batch['diffuse_mask'],
         threshold=5
     )
+
+    # create atom diffuse_mask 
+    atom_diffuse_mask = cropped_batch['atom14_gt_exists'].clone() # (B, L, 14)
+    atom_diffuse_mask[..., :3] *= cropped_batch["diffuse_mask"].unsqueeze(-1)
+    cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
+    cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
+    cropped_batch['r_1_alt'] = du.atom_flatten(cropped_batch['atom14_alt_gt_positions'], cropped_batch['atom14_gt_exists'])
+
     return cropped_batch
 
 

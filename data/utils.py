@@ -492,26 +492,38 @@ def manage_missing_batch(xyz, mask):
 
 def atom_flatten(coords, mask):
     '''
-    coords: [B, L, 14, 3]
+    coords: [B, L, 14, F] or [B, L, 14]
     mask:   [B, L, 14]
 
-    return: [B, L_atom, 3]
+    return: [B, L_atom, F] or [B, L_atom]
     '''
-    B, L = coords.shape[:2]
-    coords = coords.reshape(B, L*14, 3)
-    mask = mask.reshape(B, L*14)
-    flatten_atom = coords[:, mask[0].bool(), :]
-    return flatten_atom
+    B, L, A = mask.shape
+    # coords를 항상 4D로 맞춤
+    coords_4d = coords.unsqueeze(-1) if coords.dim() == 3 else coords
+    F = coords_4d.shape[-1]
 
-def atom_unflatten(flatten_atom, mask):
-    '''
-    flatten_atom: [B, L_atom, 3]
-    mask: [B, L, 14]
+    # flatten
+    coords_4d = coords_4d.reshape(B, L*A, F)
+    mask_2d = mask.reshape(B, L*A)
+    flatten = coords_4d[:, mask_2d[0].bool(), :]  # (B, L_atom, F)
 
-    return: coords_reconstructed [B, L, 14, 3]
+    # 원래 차원으로 되돌리기
+    return flatten.view(B, -1) if coords.dim() == 3 else flatten
+
+
+def atom_unflatten(flatten, mask):
     '''
-    B, L, A = mask.shape  # A = 14
-    L_atom = mask[0].sum().item()
-    coords_reconstructed = torch.zeros(B, L, A, 3, device=flatten_atom.device, dtype=flatten_atom.dtype)
-    coords_reconstructed[mask.bool()] = flatten_atom.reshape(B * L_atom, 3)
-    return coords_reconstructed
+    flatten: [B, L_atom, F] or [B, L_atom]
+    mask:    [B, L, 14]
+
+    return: [B, L, 14, F] or [B, L, 14]
+    '''
+    B, L, A = mask.shape
+    flatten_3d = flatten.unsqueeze(-1) if flatten.dim() == 2 else flatten
+    F = flatten_3d.shape[-1]
+
+    L_atom = int(mask[0].sum().item()) 
+    coords_recon = torch.zeros(B, L, A, F, device=flatten.device, dtype=flatten.dtype)
+    coords_recon[mask.bool()] = flatten_3d.reshape(B*L_atom, F)
+
+    return coords_recon.view(B, L, A) if flatten.dim() == 2 else coords_recon
