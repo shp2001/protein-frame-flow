@@ -1,81 +1,17 @@
-W0904 17:01:11.948000 139955321448256 torch/distributed/run.py:757] 
-W0904 17:01:11.948000 139955321448256 torch/distributed/run.py:757] *****************************************
-W0904 17:01:11.948000 139955321448256 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W0904 17:01:11.948000 139955321448256 torch/distributed/run.py:757] *****************************************
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 193, 3, 3])) that is different to the input size (torch.Size([3, 3, 193, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 193, 11, 3])) that is different to the input size (torch.Size([3, 3, 193, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 264, 3, 3])) that is different to the input size (torch.Size([3, 2, 264, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 264, 11, 3])) that is different to the input size (torch.Size([3, 2, 264, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 294, 3, 3])) that is different to the input size (torch.Size([3, 2, 294, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 294, 11, 3])) that is different to the input size (torch.Size([3, 2, 294, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 205, 3, 3])) that is different to the input size (torch.Size([3, 3, 205, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 205, 11, 3])) that is different to the input size (torch.Size([3, 3, 205, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 3, 3])) that is different to the input size (torch.Size([3, 3, 243, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 11, 3])) that is different to the input size (torch.Size([3, 3, 243, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 301, 3, 3])) that is different to the input size (torch.Size([3, 2, 301, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 301, 11, 3])) that is different to the input size (torch.Size([3, 2, 301, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 11, 128, 3, 3])) that is different to the input size (torch.Size([3, 11, 128, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 11, 128, 11, 3])) that is different to the input size (torch.Size([3, 11, 128, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 231, 3, 3])) that is different to the input size (torch.Size([3, 2, 231, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 231, 11, 3])) that is different to the input size (torch.Size([3, 2, 231, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 225, 3, 3])) that is different to the input size (torch.Size([3, 2, 225, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 225, 11, 3])) that is different to the input size (torch.Size([3, 2, 225, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 228, 3, 3])) that is different to the input size (torch.Size([3, 2, 228, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 228, 11, 3])) that is different to the input size (torch.Size([3, 2, 228, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 186, 3, 3])) that is different to the input size (torch.Size([3, 4, 186, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 186, 11, 3])) that is different to the input size (torch.Size([3, 4, 186, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 252, 3, 3])) that is different to the input size (torch.Size([3, 2, 252, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 252, 11, 3])) that is different to the input size (torch.Size([3, 2, 252, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 310, 3, 3])) that is different to the input size (torch.Size([3, 2, 310, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 310, 11, 3])) that is different to the input size (torch.Size([3, 2, 310, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
+W0905 12:16:53.711000 140714593552192 torch/distributed/run.py:757] 
+W0905 12:16:53.711000 140714593552192 torch/distributed/run.py:757] *****************************************
+W0905 12:16:53.711000 140714593552192 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0905 12:16:53.711000 140714593552192 torch/distributed/run.py:757] *****************************************
 Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/2
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 137, 3, 3])) that is different to the input size (torch.Size([3, 4, 137, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 137, 11, 3])) that is different to the input size (torch.Size([3, 4, 137, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 341, 3, 3])) that is different to the input size (torch.Size([3, 2, 341, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 341, 11, 3])) that is different to the input size (torch.Size([3, 2, 341, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 157, 3, 3])) that is different to the input size (torch.Size([3, 4, 157, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 157, 11, 3])) that is different to the input size (torch.Size([3, 4, 157, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
 wandb: wandb version 0.21.3 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20250904_170152-gbpygstu
+wandb: Run data is saved locally in ./wandb/run-20250905_121735-pnxjofwp
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run CDRFlow_v2.3.0_weight_scaling
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/v2.0.0
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.0.0/runs/gbpygstu
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.0.0/runs/pnxjofwp
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/plugins/environments/slurm.py:168: PossibleUserWarning: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /home/psh/protein-frame-flow/experiments/train_s ...
   rank_zero_warn(
 GPU available: True (cuda), used: True
@@ -88,7 +24,7 @@ distributed_backend=nccl
 All distributed processes registered. Starting with 2 processes
 ----------------------------------------------------------------------------------------------------
 
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.0_weight_scaling/2025-09-04_17-01-19 exists and is not empty.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.0_weight_scaling/2025-09-05_12-17-02 exists and is not empty.
   rank_zero_warn(f"Checkpoint directory {dirpath} exists and is not empty.")
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1]
 LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
@@ -111,14 +47,66 @@ LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
 /home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
@@ -127,103 +115,435 @@ LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
   residue_index = torch.tensor(residue_index)
 /home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 184, 3, 3])) that is different to the input size (torch.Size([3, 3, 184, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  residue_index = torch.tensor(residue_index)
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 174, 3, 3])) that is different to the input size (torch.Size([3, 4, 174, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 184, 11, 3])) that is different to the input size (torch.Size([3, 3, 184, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 174, 11, 3])) that is different to the input size (torch.Size([3, 4, 174, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 323, 3, 3])) that is different to the input size (torch.Size([3, 2, 323, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 204, 3, 3])) that is different to the input size (torch.Size([3, 4, 204, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 323, 11, 3])) that is different to the input size (torch.Size([3, 2, 323, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 204, 11, 3])) that is different to the input size (torch.Size([3, 4, 204, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 3, 3])) that is different to the input size (torch.Size([3, 3, 243, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:212: UserWarning: You called `self.log('train/length', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 4. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:212: UserWarning: You called `self.log('train/batch_size', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 350, 3, 3])) that is different to the input size (torch.Size([3, 2, 350, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 11, 3])) that is different to the input size (torch.Size([3, 3, 243, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 350, 11, 3])) that is different to the input size (torch.Size([3, 2, 350, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 165, 3, 3])) that is different to the input size (torch.Size([3, 3, 165, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 256, 3, 3])) that is different to the input size (torch.Size([3, 4, 256, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 165, 11, 3])) that is different to the input size (torch.Size([3, 3, 165, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 256, 11, 3])) that is different to the input size (torch.Size([3, 4, 256, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 153, 3, 3])) that is different to the input size (torch.Size([3, 8, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 153, 11, 3])) that is different to the input size (torch.Size([3, 8, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:301: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:302: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
-/home/psh/protein-frame-flow/data/motif_index.py:422: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  residue_index = torch.tensor(residue_index)
 /home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 226, 3, 3])) that is different to the input size (torch.Size([3, 2, 226, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
 /home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 226, 11, 3])) that is different to the input size (torch.Size([3, 2, 226, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 349, 3, 3])) that is different to the input size (torch.Size([3, 2, 349, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 2. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 259, 3, 3])) that is different to the input size (torch.Size([3, 2, 259, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(
-/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 349, 11, 3])) that is different to the input size (torch.Size([3, 2, 349, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 259, 11, 3])) that is different to the input size (torch.Size([3, 2, 259, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 128, 3, 3])) that is different to the input size (torch.Size([3, 4, 128, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 128, 11, 3])) that is different to the input size (torch.Size([3, 4, 128, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 153, 3, 3])) that is different to the input size (torch.Size([3, 4, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 153, 11, 3])) that is different to the input size (torch.Size([3, 4, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 350, 3, 3])) that is different to the input size (torch.Size([3, 2, 350, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 350, 11, 3])) that is different to the input size (torch.Size([3, 2, 350, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 128, 3, 3])) that is different to the input size (torch.Size([3, 4, 128, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 128, 11, 3])) that is different to the input size (torch.Size([3, 4, 128, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 256, 3, 3])) that is different to the input size (torch.Size([3, 4, 256, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 256, 11, 3])) that is different to the input size (torch.Size([3, 4, 256, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 339, 3, 3])) that is different to the input size (torch.Size([3, 2, 339, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 339, 11, 3])) that is different to the input size (torch.Size([3, 2, 339, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 152, 3, 3])) that is different to the input size (torch.Size([3, 4, 152, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 152, 11, 3])) that is different to the input size (torch.Size([3, 4, 152, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 227, 3, 3])) that is different to the input size (torch.Size([3, 2, 227, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 227, 11, 3])) that is different to the input size (torch.Size([3, 2, 227, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 218, 3, 3])) that is different to the input size (torch.Size([3, 3, 218, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 218, 11, 3])) that is different to the input size (torch.Size([3, 3, 218, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 153, 3, 3])) that is different to the input size (torch.Size([3, 4, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 153, 11, 3])) that is different to the input size (torch.Size([3, 4, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 243, 3, 3])) that is different to the input size (torch.Size([3, 2, 243, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 243, 11, 3])) that is different to the input size (torch.Size([3, 2, 243, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 277, 3, 3])) that is different to the input size (torch.Size([3, 2, 277, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 277, 11, 3])) that is different to the input size (torch.Size([3, 2, 277, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 163, 3, 3])) that is different to the input size (torch.Size([3, 5, 163, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 163, 11, 3])) that is different to the input size (torch.Size([3, 5, 163, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 5. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 140, 3, 3])) that is different to the input size (torch.Size([3, 4, 140, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 140, 11, 3])) that is different to the input size (torch.Size([3, 4, 140, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 204, 3, 3])) that is different to the input size (torch.Size([3, 5, 204, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 204, 11, 3])) that is different to the input size (torch.Size([3, 5, 204, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 224, 3, 3])) that is different to the input size (torch.Size([3, 3, 224, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 224, 11, 3])) that is different to the input size (torch.Size([3, 3, 224, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 3. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 258, 3, 3])) that is different to the input size (torch.Size([3, 2, 258, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 258, 11, 3])) that is different to the input size (torch.Size([3, 2, 258, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 204, 3, 3])) that is different to the input size (torch.Size([3, 4, 204, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 204, 11, 3])) that is different to the input size (torch.Size([3, 4, 204, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 153, 3, 3])) that is different to the input size (torch.Size([3, 7, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 153, 11, 3])) that is different to the input size (torch.Size([3, 7, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 7. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 198, 3, 3])) that is different to the input size (torch.Size([3, 3, 198, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 198, 11, 3])) that is different to the input size (torch.Size([3, 3, 198, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 312, 3, 3])) that is different to the input size (torch.Size([3, 2, 312, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 312, 11, 3])) that is different to the input size (torch.Size([3, 2, 312, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 168, 3, 3])) that is different to the input size (torch.Size([3, 8, 168, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 168, 11, 3])) that is different to the input size (torch.Size([3, 8, 168, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 345, 3, 3])) that is different to the input size (torch.Size([3, 2, 345, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 345, 11, 3])) that is different to the input size (torch.Size([3, 2, 345, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 228, 3, 3])) that is different to the input size (torch.Size([3, 2, 228, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 145, 3, 3])) that is different to the input size (torch.Size([3, 4, 145, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 228, 11, 3])) that is different to the input size (torch.Size([3, 2, 228, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 145, 11, 3])) that is different to the input size (torch.Size([3, 4, 145, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 144, 3, 3])) that is different to the input size (torch.Size([3, 4, 144, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 144, 11, 3])) that is different to the input size (torch.Size([3, 4, 144, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 151, 3, 3])) that is different to the input size (torch.Size([3, 4, 151, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 151, 11, 3])) that is different to the input size (torch.Size([3, 4, 151, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 141, 3, 3])) that is different to the input size (torch.Size([3, 4, 141, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 141, 11, 3])) that is different to the input size (torch.Size([3, 4, 141, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 9, 153, 3, 3])) that is different to the input size (torch.Size([3, 9, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 9, 153, 11, 3])) that is different to the input size (torch.Size([3, 9, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 9. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 3, 3])) that is different to the input size (torch.Size([3, 3, 243, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 243, 11, 3])) that is different to the input size (torch.Size([3, 3, 243, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 138, 3, 3])) that is different to the input size (torch.Size([3, 4, 138, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 138, 11, 3])) that is different to the input size (torch.Size([3, 4, 138, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 287, 3, 3])) that is different to the input size (torch.Size([3, 2, 287, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 287, 11, 3])) that is different to the input size (torch.Size([3, 2, 287, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 317, 3, 3])) that is different to the input size (torch.Size([3, 2, 317, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 317, 11, 3])) that is different to the input size (torch.Size([3, 2, 317, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 136, 3, 3])) that is different to the input size (torch.Size([3, 4, 136, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 136, 11, 3])) that is different to the input size (torch.Size([3, 4, 136, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 268, 3, 3])) that is different to the input size (torch.Size([3, 2, 268, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 268, 11, 3])) that is different to the input size (torch.Size([3, 2, 268, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 148, 3, 3])) that is different to the input size (torch.Size([3, 4, 148, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 148, 11, 3])) that is different to the input size (torch.Size([3, 4, 148, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 153, 3, 3])) that is different to the input size (torch.Size([3, 5, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 153, 11, 3])) that is different to the input size (torch.Size([3, 5, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 304, 3, 3])) that is different to the input size (torch.Size([3, 2, 304, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 304, 11, 3])) that is different to the input size (torch.Size([3, 2, 304, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 146, 3, 3])) that is different to the input size (torch.Size([3, 4, 146, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 146, 11, 3])) that is different to the input size (torch.Size([3, 4, 146, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 139, 3, 3])) that is different to the input size (torch.Size([3, 4, 139, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 139, 11, 3])) that is different to the input size (torch.Size([3, 4, 139, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 325, 3, 3])) that is different to the input size (torch.Size([3, 2, 325, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 325, 11, 3])) that is different to the input size (torch.Size([3, 2, 325, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 307, 3, 3])) that is different to the input size (torch.Size([3, 2, 307, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 307, 11, 3])) that is different to the input size (torch.Size([3, 2, 307, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 141, 3, 3])) that is different to the input size (torch.Size([3, 4, 141, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 141, 11, 3])) that is different to the input size (torch.Size([3, 4, 141, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 221, 3, 3])) that is different to the input size (torch.Size([3, 2, 221, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 221, 11, 3])) that is different to the input size (torch.Size([3, 2, 221, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 152, 3, 3])) that is different to the input size (torch.Size([3, 4, 152, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 152, 11, 3])) that is different to the input size (torch.Size([3, 4, 152, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 153, 3, 3])) that is different to the input size (torch.Size([3, 7, 153, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 153, 11, 3])) that is different to the input size (torch.Size([3, 7, 153, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 272, 3, 3])) that is different to the input size (torch.Size([3, 2, 272, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 272, 11, 3])) that is different to the input size (torch.Size([3, 2, 272, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 278, 3, 3])) that is different to the input size (torch.Size([3, 2, 278, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 278, 11, 3])) that is different to the input size (torch.Size([3, 2, 278, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 293, 3, 3])) that is different to the input size (torch.Size([3, 2, 293, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 293, 11, 3])) that is different to the input size (torch.Size([3, 2, 293, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 157, 3, 3])) that is different to the input size (torch.Size([3, 4, 157, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 157, 11, 3])) that is different to the input size (torch.Size([3, 4, 157, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 142, 3, 3])) that is different to the input size (torch.Size([3, 4, 142, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 142, 11, 3])) that is different to the input size (torch.Size([3, 4, 142, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 124, 3, 3])) that is different to the input size (torch.Size([3, 7, 124, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 7, 124, 11, 3])) that is different to the input size (torch.Size([3, 7, 124, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 219, 3, 3])) that is different to the input size (torch.Size([3, 3, 219, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 219, 11, 3])) that is different to the input size (torch.Size([3, 3, 219, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 199, 3, 3])) that is different to the input size (torch.Size([3, 4, 199, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 199, 11, 3])) that is different to the input size (torch.Size([3, 4, 199, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 262, 3, 3])) that is different to the input size (torch.Size([3, 2, 262, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 262, 11, 3])) that is different to the input size (torch.Size([3, 2, 262, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 342, 3, 3])) that is different to the input size (torch.Size([3, 2, 342, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 342, 11, 3])) that is different to the input size (torch.Size([3, 2, 342, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 191, 3, 3])) that is different to the input size (torch.Size([3, 3, 191, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 191, 11, 3])) that is different to the input size (torch.Size([3, 3, 191, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 251, 3, 3])) that is different to the input size (torch.Size([3, 2, 251, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 251, 11, 3])) that is different to the input size (torch.Size([3, 2, 251, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 222, 3, 3])) that is different to the input size (torch.Size([3, 2, 222, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 222, 11, 3])) that is different to the input size (torch.Size([3, 2, 222, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 135, 3, 3])) that is different to the input size (torch.Size([3, 4, 135, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 135, 11, 3])) that is different to the input size (torch.Size([3, 4, 135, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 300, 3, 3])) that is different to the input size (torch.Size([3, 2, 300, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 300, 11, 3])) that is different to the input size (torch.Size([3, 2, 300, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 128, 3, 3])) that is different to the input size (torch.Size([3, 5, 128, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 128, 11, 3])) that is different to the input size (torch.Size([3, 5, 128, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 235, 3, 3])) that is different to the input size (torch.Size([3, 3, 235, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 235, 11, 3])) that is different to the input size (torch.Size([3, 3, 235, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 137, 3, 3])) that is different to the input size (torch.Size([3, 4, 137, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 137, 11, 3])) that is different to the input size (torch.Size([3, 4, 137, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 263, 3, 3])) that is different to the input size (torch.Size([3, 2, 263, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 263, 11, 3])) that is different to the input size (torch.Size([3, 2, 263, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 143, 3, 3])) that is different to the input size (torch.Size([3, 4, 143, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 143, 11, 3])) that is different to the input size (torch.Size([3, 4, 143, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 313, 3, 3])) that is different to the input size (torch.Size([3, 2, 313, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 313, 11, 3])) that is different to the input size (torch.Size([3, 2, 313, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 224, 3, 3])) that is different to the input size (torch.Size([3, 2, 224, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 224, 11, 3])) that is different to the input size (torch.Size([3, 2, 224, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 290, 3, 3])) that is different to the input size (torch.Size([3, 2, 290, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 290, 11, 3])) that is different to the input size (torch.Size([3, 2, 290, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 160, 3, 3])) that is different to the input size (torch.Size([3, 8, 160, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 8, 160, 11, 3])) that is different to the input size (torch.Size([3, 8, 160, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 8. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 221, 3, 3])) that is different to the input size (torch.Size([3, 5, 221, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 5, 221, 11, 3])) that is different to the input size (torch.Size([3, 5, 221, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 155, 3, 3])) that is different to the input size (torch.Size([3, 4, 155, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 155, 11, 3])) that is different to the input size (torch.Size([3, 4, 155, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 12, 134, 3, 3])) that is different to the input size (torch.Size([3, 12, 134, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 12, 134, 11, 3])) that is different to the input size (torch.Size([3, 12, 134, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 12. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 210, 3, 3])) that is different to the input size (torch.Size([3, 3, 210, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 210, 11, 3])) that is different to the input size (torch.Size([3, 3, 210, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 295, 3, 3])) that is different to the input size (torch.Size([3, 2, 295, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 295, 11, 3])) that is different to the input size (torch.Size([3, 2, 295, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 145, 3, 3])) that is different to the input size (torch.Size([3, 4, 145, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 145, 11, 3])) that is different to the input size (torch.Size([3, 4, 145, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 147, 3, 3])) that is different to the input size (torch.Size([3, 4, 147, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 147, 11, 3])) that is different to the input size (torch.Size([3, 4, 147, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 197, 3, 3])) that is different to the input size (torch.Size([3, 4, 197, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 197, 11, 3])) that is different to the input size (torch.Size([3, 4, 197, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 251, 3, 3])) that is different to the input size (torch.Size([3, 3, 251, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 251, 11, 3])) that is different to the input size (torch.Size([3, 3, 251, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 232, 3, 3])) that is different to the input size (torch.Size([3, 2, 232, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 232, 11, 3])) that is different to the input size (torch.Size([3, 2, 232, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 224, 3, 3])) that is different to the input size (torch.Size([3, 2, 224, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 224, 11, 3])) that is different to the input size (torch.Size([3, 2, 224, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 168, 3, 3])) that is different to the input size (torch.Size([3, 3, 168, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 168, 11, 3])) that is different to the input size (torch.Size([3, 3, 168, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 259, 3, 3])) that is different to the input size (torch.Size([3, 2, 259, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 259, 11, 3])) that is different to the input size (torch.Size([3, 2, 259, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 223, 3, 3])) that is different to the input size (torch.Size([3, 3, 223, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 3, 223, 11, 3])) that is different to the input size (torch.Size([3, 3, 223, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 180, 3, 3])) that is different to the input size (torch.Size([3, 4, 180, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 180, 11, 3])) that is different to the input size (torch.Size([3, 4, 180, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 274, 3, 3])) that is different to the input size (torch.Size([3, 2, 274, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 274, 11, 3])) that is different to the input size (torch.Size([3, 2, 274, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 255, 3, 3])) that is different to the input size (torch.Size([3, 2, 255, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 255, 11, 3])) that is different to the input size (torch.Size([3, 2, 255, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 182, 3, 3])) that is different to the input size (torch.Size([3, 4, 182, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 182, 11, 3])) that is different to the input size (torch.Size([3, 4, 182, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 296, 3, 3])) that is different to the input size (torch.Size([3, 2, 296, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 296, 11, 3])) that is different to the input size (torch.Size([3, 2, 296, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 158, 3, 3])) that is different to the input size (torch.Size([3, 4, 158, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 158, 11, 3])) that is different to the input size (torch.Size([3, 4, 158, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 279, 3, 3])) that is different to the input size (torch.Size([3, 2, 279, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 2, 279, 11, 3])) that is different to the input size (torch.Size([3, 2, 279, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 176, 3, 3])) that is different to the input size (torch.Size([3, 4, 176, 3, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  mse = nn.functional.mse_loss(
+/home/psh/protein-frame-flow/models/loss.py:316: UserWarning: Using a target size (torch.Size([1, 4, 176, 11, 3])) that is different to the input size (torch.Size([3, 4, 176, 11, 3])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
   mse = nn.functional.mse_loss(

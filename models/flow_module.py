@@ -211,7 +211,7 @@ class FlowModule(LightningModule):
             pair_dist_mask = pair_dist_mask.float()
 
             # loss 계산
-            dist_mat_loss = torch.sum((gt_pair_dists - pred_pair_dists)**2 * pair_dist_mask, dim=(1,2))
+            dist_mat_loss = torch.sum(torch.abs(gt_pair_dists - pred_pair_dists) * pair_dist_mask, dim=(1,2))
             dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1,2)) + 1)
 
         # local Pairwise distance loss (final layer만 계산)
@@ -341,7 +341,7 @@ class FlowModule(LightningModule):
                 noisy_batch['atom14_gt_exists'],
                 noisy_batch['loop_mask'],
                 noisy_batch['aatype'],
-                0.5
+                0
                 )   
 
         # bond loss 

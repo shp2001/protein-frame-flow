@@ -117,7 +117,7 @@ experiment:
     rotation_loss_weights: 1.0
 
     aux_loss_weight: 0.2
-    viol_loss_weight: 1.0
+    viol_loss_weight: 0.2
     aux_loss_use_dist_mat_loss: True
     aux_loss_use_bb_loss: True
     aux_loss_use_pair_loss: False
@@ -135,7 +135,7 @@ experiment:
     min_bin: 0
     max_bin: 10 
 
-    aux_loss_dist_mat_loss_weight: 1.0
+    aux_loss_dist_mat_loss_weight: 0.5
     aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
     aux_loss_sc_atom_loss_weight: 0.5 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
     aux_loss_final_layer_rmsd_weight: 1.0 
