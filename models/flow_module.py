@@ -20,6 +20,8 @@ from experiments import utils as eu
 from models.loss import *
 from openfold.utils.loss import between_residue_bond_loss
 import sys 
+import json 
+
 sys.stdout.flush()
 
 class FlowModule(LightningModule):
@@ -783,11 +785,27 @@ class FlowModule(LightningModule):
                 prmsd = prmsds[i]
                 bb_traj = bb_trajs[i]
                 os.makedirs(sample_dir, exist_ok=True)
+
+                # save crop idx for inference 
+                crop_idx = batch['crop_idx'][0]
+                torch.save(crop_idx, os.path.join(sample_dir, 'crop_idx.pt'))
+
+                # save rmsd info 
+                rmsd_info = eu.calculate_rmsd_info(
+                    trans_1[i],
+                    pred_trans_1[i],
+                    batch['loop_mask'][i],
+                    batch['diffuse_mask'][i]
+                )
+
+                with open(os.path.join(sample_dir, 'cdr_rmsd.json'), "w") as f:
+                    json.dump(rmsd_info, f, indent=4)
+
+                # save structure data 
                 aatype = du.to_numpy(batch['aatype'][i].int())
                 chain_idx = du.to_numpy(batch['chain_idx'][i].int())
                 diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
 
-                # save structure data 
                 _ = eu.save_traj(
                     sample=pred_position, # (L, 37, 3)
                     bb_prot_traj=bb_traj, 

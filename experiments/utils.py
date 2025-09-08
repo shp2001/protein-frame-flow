@@ -362,3 +362,63 @@ def visualize_dist_map(
 
     # 이미지 저장
     plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능
+
+
+def kabsch_align_full(P, Q, Q_all):
+    Pc = P.mean(dim=0, keepdim=True)
+    Qc = Q.mean(dim=0, keepdim=True)
+    P_centered = P - Pc
+    Q_centered = Q - Qc
+
+    H = Q_centered.T @ P_centered
+    U, _, Vt = torch.linalg.svd(H)
+    R = Vt.T @ U.T
+    if torch.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+
+    Q_all_aligned = (Q_all - Qc) @ R + Pc
+    return Q_all_aligned
+
+
+def calculate_rmsd_info(gt_trans, pred_trans, loop_mask, diffuse_mask):
+    """
+    gt_trans: (L, 3)
+    pred_trans: (L, 3)
+    loop_mask: (L,) 0/1 mask
+    diffuse_mask: (L,) 0/1 mask (1=antibody, 0=antigen)
+    """
+    # 1. framework 영역 추출 (diffuse_mask==1 & loop_mask==0)
+    framework_idx = torch.nonzero((diffuse_mask==1) & (loop_mask==0), as_tuple=True)[0]
+    gt_framework = gt_trans[framework_idx]
+    pred_framework = pred_trans[framework_idx]
+
+    # 2. 전체 좌표 정렬
+    pred_trans_aligned = kabsch_align_full(gt_framework, pred_framework, pred_trans)
+
+    # 3. loop 구간 추출
+    loop_mask_np = loop_mask.cpu().numpy() if isinstance(loop_mask, torch.Tensor) else loop_mask
+    loop_indices = []
+    in_loop = False
+    for i, val in enumerate(loop_mask_np):
+        if val == 1 and not in_loop:
+            start = i
+            in_loop = True
+        elif val == 0 and in_loop:
+            loop_indices.append((start, i))
+            in_loop = False
+    if in_loop:
+        loop_indices.append((start, len(loop_mask_np)))
+    assert len(loop_indices) == 6, f"loop가 6개가 아님: {len(loop_indices)}개 발견됨"
+
+    # 4. loop별 RMSD 계산
+    loop_names = ["h1_rms", "h2_rms", "h3_rms", "l1_rms", "l2_rms", "l3_rms"]
+    rmsd_info = {}
+    for (start, end), name in zip(loop_indices, loop_names):
+        gt_loop = gt_trans[start:end, :]
+        pred_loop = pred_trans_aligned[start:end, :]
+        diff = gt_loop - pred_loop
+        rmsd = torch.sqrt(torch.mean(diff.pow(2)))
+        rmsd_info[name] = rmsd.item()
+
+    return rmsd_info
