@@ -38,7 +38,7 @@ class NodeFeatureNet(nn.Module):
             single,
             diffuse_mask[..., None],
             loop_mask[..., None],
-            ag_hotspot,
+            ag_hotspot[..., None],
             self.embed_t(r3_t, res_mask),
             a_token
         ]

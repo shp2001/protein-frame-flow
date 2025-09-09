@@ -85,15 +85,23 @@ class ProteinData(LightningDataModule):
             'ref_atom_name_chars': ref_atom_name_chars,
         }
 
-        # Center based on motif locations
-        motif_mask = 1 - cropped_batch['loop_mask'] # (B, L)
-        motif_1 = cropped_batch['trans_1'] * motif_mask[..., None] # (B, L, 3)
-        motif_com = torch.sum(motif_1, dim=1) / (torch.sum(motif_mask, dim=1) + 1)[..., None] # (B, 3)
+        # get epitope region 
+        cropped_batch['ag_hotspot'] = get_ag_hotspot(
+            cropped_batch['pseudo_beta'],
+            cropped_batch['loop_mask'],
+            cropped_batch['diffuse_mask'],
+            threshold=5
+        )
 
-        cropped_batch["trans_1"] = cropped_batch['trans_1'] - motif_com[:, None, :] # (B, L, 3)
-        cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
-        cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
-        cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
+        # Center based on motif locations
+        epitope_mask = cropped_batch['ag_hotspot'] # (B, L)
+        epitope_1 = cropped_batch['trans_1'] * epitope_mask[..., None] # (B, L, 3)
+        epitope_com = torch.sum(epitope_1, dim=1) / (torch.sum(epitope_mask, dim=1) + 1)[..., None] # (B, 3)
+
+        cropped_batch["trans_1"] = cropped_batch['trans_1'] - epitope_com[:, None, :] # (B, L, 3)
+        cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - epitope_com[:, None, None, :] # (B, L, 14, 3)
+        cropped_batch['atom14_alt_gt_positions'] = cropped_batch['atom14_alt_gt_positions'] - epitope_com[:, None, None, :] # (B, L, 14, 3)
+        cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - epitope_com[:, None, :] # (B, L, 3)
         
         # get interface index 
         cdr_residues, neighbor_indices, anchor_residues = au.get_cdr_and_neighbors(
@@ -105,13 +113,6 @@ class ProteinData(LightningDataModule):
         cropped_batch['cdr_residues'] = cdr_residues
         cropped_batch['neighbor_indices'] = neighbor_indices
         cropped_batch['anchor_residues'] = anchor_residues
-
-        cropped_batch['ag_hotspot'] = get_ag_hotspot(
-            cropped_batch['pseudo_beta'],
-            cropped_batch['loop_mask'],
-            cropped_batch['diffuse_mask'],
-            threshold=5
-        )
 
         # create atom diffuse_mask 
         atom_diffuse_mask = cropped_batch['atom14_gt_exists'].clone() # (B, L, 14)

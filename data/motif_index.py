@@ -535,4 +535,4 @@ def get_ag_hotspot(pseudo_beta, loop_mask, diffuse_mask, threshold=5.0):
     ag_idx = torch.where(ag_mask)[0]
     hotspot[:, ag_idx] = contact.float()
 
-    return hotspot.unsqueeze(-1)  # (B, L, 1)
+    return hotspot  # (B, L)

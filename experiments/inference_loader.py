@@ -340,10 +340,16 @@ def collate_fn(batch):
         'ref_pos': ref_pos,
         }
 
+    cropped_batch['ag_hotspot'] = get_ag_hotspot(
+        cropped_batch['pseudo_beta'],
+        cropped_batch['loop_mask'],
+        cropped_batch['diffuse_mask'],
+        threshold=5
+    )
     # Center based on motif locations
-    motif_mask = 1 - cropped_batch['loop_mask'] # (B, L)
-    motif_1 = cropped_batch['trans_1'] * motif_mask[..., None] # (B, L, 3)
-    motif_com = torch.sum(motif_1, dim=1) / (torch.sum(motif_mask, dim=1) + 1)[..., None] # (B, 3)
+    epitope_mask = cropped_batch['ag_hotspot'] # (B, L)
+    epitope_1 = cropped_batch['trans_1'] * epitope_mask[..., None] # (B, L, 3)
+    motif_com = torch.sum(epitope_1, dim=1) / (torch.sum(epitope_mask, dim=1) + 1)[..., None] # (B, 3)
 
     cropped_batch["trans_1"] = cropped_batch['trans_1'] - motif_com[:, None, :] # (B, L, 3)
     cropped_batch['atom14_gt_positions'] = cropped_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
@@ -357,13 +363,6 @@ def collate_fn(batch):
     cropped_batch['original_aatype'] = feat['aatype']
     cropped_batch['original_chain_idx'] = feat['chain_idx']
     cropped_batch['original_diffuse_mask'] = feat['diffuse_mask']
-
-    cropped_batch['ag_hotspot'] = get_ag_hotspot(
-        cropped_batch['pseudo_beta'],
-        cropped_batch['loop_mask'],
-        cropped_batch['diffuse_mask'],
-        threshold=5
-    )
 
     # create atom diffuse_mask 
     atom_diffuse_mask = cropped_batch['atom14_gt_exists'].clone() # (B, L, 14)
