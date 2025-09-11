@@ -8,11 +8,13 @@ import numpy as np
 import pandas as pd
 from analysis import utils as au
 from data import utils as du
+from data import residue_constants as rc 
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from motif_scaffolding import save_motif_segments
 from openfold.utils import rigid_utils as ru
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import pickle 
 
 class LengthDataset(torch.utils.data.Dataset):
     def __init__(self, samples_cfg):
@@ -424,22 +426,18 @@ def calculate_rmsd_info(gt_trans, pred_trans, loop_mask, diffuse_mask):
 
     return rmsd_info
 
-import os
-import pickle
-import data.residue_constants as rc
-
-def modify_residue_in_cdr(src_pkl, target_dir, cdr_sequence,
-                          rel_pos=1, new_resname="TRP"):
+def modify_residues_in_cdr(src_pkl, target_dir, cdr_sequence, mutations):
     """
-    특정 CDR 서브시퀀스 내에서 residue를 바꾸고
+    특정 CDR 서브시퀀스 내에서 여러 residue를 바꾸고
     aatype, atom_mask를 업데이트한 뒤 새로운 pkl 파일로 저장하는 함수.
 
     Args:
         src_pkl (str): 원본 pkl 파일 경로
         target_dir (str): 수정된 pkl 저장 디렉토리
         cdr_sequence (str): CDR 서브시퀀스 (1-letter 코드)
-        rel_pos (int): target 내 상대 위치 (0-based)
-        new_resname (str): 교체할 residue (3-letter 코드)
+        mutations (list of tuple): [(rel_pos, new_resname), ...]
+            - rel_pos (int): target 내 상대 위치 (0-based)
+            - new_resname (str): 교체할 residue (3-letter 코드)
     """
     # 원본 pkl 읽기
     data = du.read_pkl(src_pkl, use_torch=True)
@@ -459,14 +457,15 @@ def modify_residue_in_cdr(src_pkl, target_dir, cdr_sequence,
     if start_idx == -1:
         raise ValueError("target 시퀀스를 찾을 수 없습니다.")
 
-    replace_idx = start_idx + rel_pos
-
-    # aatype 업데이트
-    aatype[replace_idx] = rc.resname_to_idx[new_resname]
-
-    # atom_mask 업데이트
-    new_mask = rc.restype_atom37_mask[aatype[replace_idx]]
-    atom_mask[replace_idx] = new_mask
+    # 여러 residue 교체
+    for rel_pos, new_resname in mutations:
+        replace_idx = start_idx + rel_pos
+        # aatype 업데이트
+        aatype[replace_idx] = rc.resname_to_idx[new_resname]
+        # atom_mask 업데이트
+        new_mask = rc.restype_atom37_mask[aatype[replace_idx]]
+        atom_mask[replace_idx] = new_mask
+        print(f"변경: global_idx={replace_idx}, new_resname={new_resname}")
 
     # data 업데이트
     data["aatype"] = aatype
@@ -475,7 +474,10 @@ def modify_residue_in_cdr(src_pkl, target_dir, cdr_sequence,
     # 저장 경로 만들기
     os.makedirs(target_dir, exist_ok=True)
     base_name = os.path.basename(src_pkl)
-    save_path = os.path.join(target_dir, base_name.replace('.pkl', f"_{rel_pos}_{new_resname}.pkl"))
+
+    # 파일 이름에 모든 변이 표시
+    mut_str = "_".join([f"{pos}{name}" for pos, name in mutations])
+    save_path = os.path.join(target_dir, base_name.replace(".pkl", f"_{mut_str}.pkl"))
 
     with open(save_path, "wb") as f:
         pickle.dump(data, f)
