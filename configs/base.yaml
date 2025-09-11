@@ -104,8 +104,8 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 4
-  warm_start: null
+  num_devices: 2
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.1.1/2025-09-09_16-51-49/last.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -116,7 +116,7 @@ experiment:
     t_normalize_clip: 0.9
     rotation_loss_weights: 1.0
 
-    aux_loss_weight: 1.0
+    aux_loss_weight: 0.5
     viol_loss_weight: 0.1
     aux_loss_use_dist_mat_loss: True
     aux_loss_use_bb_loss: True
@@ -149,19 +149,19 @@ experiment:
     viol_loss_ca_c_n_weight: 0.0 # 0.01 ->
     viol_loss_c_n_ca_weight: 0.0 # 0.001~0.01 -> 
 
-    bb_aux_loss_t_pass: 0.25
-    sc_aux_loss_t_pass: 0.25
-    bb_viol_loss_t_pass: 0.5
-    sc_viol_loss_t_pass: 0.5
+    bb_aux_loss_t_pass: 0.1
+    sc_aux_loss_t_pass: 0.1
+    bb_viol_loss_t_pass: 0.3
+    sc_viol_loss_t_pass: 0.3
     
   wandb:
     name: CDRFlow_v2.3.1.1
     project: v2.0.0
   optimizer:
     warmup_steps: 0
-    decay_steps: 70_000
+    decay_steps: 140_000
     min_lr: 1e-4
-    max_lr: 1e-3
+    max_lr: 2e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

@@ -195,7 +195,7 @@ class FlowModule(LightningModule):
             r3_error ** 2 * loss_atom_mask[..., None],
             dim=(-1, -2)
         ) / loss_atom_denom
-        r3_loss = torch.clamp(r3_loss, max=20)
+        r3_loss = torch.clamp(r3_loss, max=40)
 
         # distance map loss
         dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -242,17 +242,17 @@ class FlowModule(LightningModule):
                 compute_unmasked=False,
                 mask_clamp=30
                 )
-            bb_diffuse_loss = compute_rmsd(
-                pred_atom_14_list,
-                renamed_atom14_gt_positions,
-                mask=noisy_batch['diffuse_mask'],
-                atom14_gt_exists=renamed_atom14_gt_exists,
-                mode='bb',
-                data_mode=noisy_batch['mode'],
-                compute_unmasked=False,
-                mask_clamp=30
-                )   
-            bb_atom_loss = (bb_loop_loss + bb_diffuse_loss) / 2       
+            # bb_diffuse_loss = compute_rmsd(
+            #     pred_atom_14_list,
+            #     renamed_atom14_gt_positions,
+            #     mask=noisy_batch['diffuse_mask'],
+            #     atom14_gt_exists=renamed_atom14_gt_exists,
+            #     mode='bb',
+            #     data_mode=noisy_batch['mode'],
+            #     compute_unmasked=False,
+            #     mask_clamp=30
+            #     )   
+            bb_atom_loss = bb_loop_loss       
 
         # sc atom loss (final layer만 계산)
         sc_atom_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -269,18 +269,18 @@ class FlowModule(LightningModule):
                 mask_clamp=30
                 ) # compute side chain mse of loops and their neighbors 
 
-            sc_diffuse_loss = compute_rmsd(
-                pred_atom_14_list,
-                renamed_atom14_gt_positions,
-                mask=noisy_batch['diffuse_mask'],
-                atom14_gt_exists=renamed_atom14_gt_exists,
-                mode='sc',
-                data_mode=noisy_batch['mode'],
-                compute_unmasked=True,
-                mask_clamp=30
-                ) # compute side chain mse of whole chains 
+            # sc_diffuse_loss = compute_rmsd(
+            #     pred_atom_14_list,
+            #     renamed_atom14_gt_positions,
+            #     mask=noisy_batch['diffuse_mask'],
+            #     atom14_gt_exists=renamed_atom14_gt_exists,
+            #     mode='sc',
+            #     data_mode=noisy_batch['mode'],
+            #     compute_unmasked=True,
+            #     mask_clamp=30
+            #     ) # compute side chain mse of whole chains 
             
-            sc_atom_loss = (sc_loop_loss + sc_diffuse_loss) / 2
+            sc_atom_loss = sc_loop_loss
 
         # calculate pair feature loss (beta carbon contact prob)
         distogram_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
@@ -307,16 +307,16 @@ class FlowModule(LightningModule):
             data_mode=noisy_batch['mode'],
             compute_unmasked=False,
             )
-        final_bb_diffuse_rmsd = compute_rmsd(
-            pred_atom_14_list[-1].unsqueeze(0),
-            renamed_atom14_gt_positions,
-            mask=noisy_batch['diffuse_mask'],
-            atom14_gt_exists=renamed_atom14_gt_exists,
-            mode='bb',
-            data_mode=noisy_batch['mode'],
-            compute_unmasked=False,
-            )
-        final_layer_rmsd = (final_bb_loop_rmsd + final_bb_diffuse_rmsd) / 2
+        # final_bb_diffuse_rmsd = compute_rmsd(
+        #     pred_atom_14_list[-1].unsqueeze(0),
+        #     renamed_atom14_gt_positions,
+        #     mask=noisy_batch['diffuse_mask'],
+        #     atom14_gt_exists=renamed_atom14_gt_exists,
+        #     mode='bb',
+        #     data_mode=noisy_batch['mode'],
+        #     compute_unmasked=False,
+        #     )
+        final_layer_rmsd = final_bb_loop_rmsd
         final_layer_rmsd = final_layer_rmsd * (training_cfg.aux_loss_bb_atom_loss_weight/2)
         
 
@@ -398,7 +398,7 @@ class FlowModule(LightningModule):
 
         auxiliary_loss = bb_auxiliary_loss + sc_auxiliary_loss
         auxiliary_loss *= self._exp_cfg.training.aux_loss_weight
-        auxiliary_loss = torch.clamp(auxiliary_loss, max=10)
+        auxiliary_loss = torch.clamp(auxiliary_loss, max=40)
 
         bb_violation_loss *= (
             (t[:, 0] > training_cfg.bb_viol_loss_t_pass)
