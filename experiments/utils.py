@@ -7,6 +7,7 @@ import GPUtil
 import numpy as np
 import pandas as pd
 from analysis import utils as au
+from data import utils as du
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from motif_scaffolding import save_motif_segments
 from openfold.utils import rigid_utils as ru
@@ -422,3 +423,62 @@ def calculate_rmsd_info(gt_trans, pred_trans, loop_mask, diffuse_mask):
         rmsd_info[name] = rmsd.item()
 
     return rmsd_info
+
+import os
+import pickle
+import data.residue_constants as rc
+
+def modify_residue_in_cdr(src_pkl, target_dir, cdr_sequence,
+                          rel_pos=1, new_resname="TRP"):
+    """
+    특정 CDR 서브시퀀스 내에서 residue를 바꾸고
+    aatype, atom_mask를 업데이트한 뒤 새로운 pkl 파일로 저장하는 함수.
+
+    Args:
+        src_pkl (str): 원본 pkl 파일 경로
+        target_dir (str): 수정된 pkl 저장 디렉토리
+        cdr_sequence (str): CDR 서브시퀀스 (1-letter 코드)
+        rel_pos (int): target 내 상대 위치 (0-based)
+        new_resname (str): 교체할 residue (3-letter 코드)
+    """
+    # 원본 pkl 읽기
+    data = du.read_pkl(src_pkl, use_torch=True)
+
+    aatype = data["aatype"].copy()
+    atom_mask = data["atom_mask"].copy()   # (L, 37)
+
+    # idx → 1-letter 매핑 준비
+    idx_to_resname = {i: r for r, i in rc.resname_to_idx.items()}
+    idx_to_aa = {i: rc.restype_3to1.get(res, "X") for i, res in idx_to_resname.items()}
+
+    # 전체 시퀀스 (1-letter)
+    seq_full = "".join([idx_to_aa[int(i)] for i in aatype])
+
+    # target 시퀀스 찾기
+    start_idx = seq_full.find(cdr_sequence)
+    if start_idx == -1:
+        raise ValueError("target 시퀀스를 찾을 수 없습니다.")
+
+    replace_idx = start_idx + rel_pos
+
+    # aatype 업데이트
+    aatype[replace_idx] = rc.resname_to_idx[new_resname]
+
+    # atom_mask 업데이트
+    new_mask = rc.restype_atom37_mask[aatype[replace_idx]]
+    atom_mask[replace_idx] = new_mask
+
+    # data 업데이트
+    data["aatype"] = aatype
+    data["atom_mask"] = atom_mask
+
+    # 저장 경로 만들기
+    os.makedirs(target_dir, exist_ok=True)
+    base_name = os.path.basename(src_pkl)
+    save_path = os.path.join(target_dir, base_name.replace('.pkl', f"_{rel_pos}_{new_resname}.pkl"))
+
+    with open(save_path, "wb") as f:
+        pickle.dump(data, f)
+
+    print(f"✅ 저장 완료: {save_path}")
+    return save_path
