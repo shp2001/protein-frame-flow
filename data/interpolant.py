@@ -15,24 +15,9 @@ def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
     return noise - torch.mean(noise, dim=-2, keepdims=True)
 
-def _uniform_so3(num_batch, num_res, device):
-    return torch.tensor(
-        Rotation.random(num_batch*num_res).as_matrix(),
-        device=device,
-        dtype=torch.float32,
-    ).reshape(num_batch, num_res, 3, 3)
-
 def _r_diffuse_mask(r_t, r_1, atom_diffuse_mask):
     return r_t * atom_diffuse_mask[..., None] + r_1 * (1 - atom_diffuse_mask[..., None])
 
-def _trans_diffuse_mask(trans_t, trans_1, diffuse_mask):
-    return trans_t * diffuse_mask[..., None] + trans_1 * (1 - diffuse_mask[..., None])
-
-def _rots_diffuse_mask(rotmats_t, rotmats_1, diffuse_mask):
-    return (
-        rotmats_t * diffuse_mask[..., None, None]
-        + rotmats_1 * (1 - diffuse_mask[..., None, None])
-    )
 
 
 class Interpolant:
@@ -209,7 +194,7 @@ class Interpolant:
             # Take reverse step
             r_t_2 = self._trans_euler_step(
                 d_t, t_1, pred_r_1, r_t_1)
-
+            r_t_2 = _r_diffuse_mask(r_t_2, r_1, atom_diffuse_mask)
             prot_traj.append(r_t_2)
             t_1 = t_2
 

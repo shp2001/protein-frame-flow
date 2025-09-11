@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.1.1/2025-09-10_17-24-40/epoch=106-step=153331.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.1.1/2025-09-10_17-24-40/epoch=139-step=200620.ckpt
   use_gpu: True
   num_gpus: 1
 
