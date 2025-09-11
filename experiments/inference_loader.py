@@ -279,9 +279,9 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=350,
+                                                    max_len=380,
                                                     seq_list=feat['chain_seq_list'],
-                                                    crop_ab=True
+                                                    crop_ab=False
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
@@ -369,7 +369,6 @@ def collate_fn(batch):
     atom_diffuse_mask[..., :3] *= cropped_batch["diffuse_mask"].unsqueeze(-1)
     cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
     cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
-    cropped_batch['r_1_alt'] = du.atom_flatten(cropped_batch['atom14_alt_gt_positions'], cropped_batch['atom14_gt_exists'])
 
     return cropped_batch
 

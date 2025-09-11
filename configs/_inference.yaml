@@ -15,7 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.0.0_angle_20_shift_5_motif_com_num_bins/2025-08-28_23-42-22/epoch=74-step=107475.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.1.1/2025-09-10_17-24-40/epoch=106-step=153331.ckpt
   use_gpu: True
   num_gpus: 1
 
@@ -87,7 +87,7 @@ inference:
     samples_per_target: 100
 
     # Batch size when sampling from the model
-    batch_size: 1
+    batch_size: 5
     num_workers: 8
     prefetch_factor: 4
 
