@@ -452,39 +452,6 @@ class FlowModule(LightningModule):
         trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
         batch_metrics.append(trans_loop_loss_dict)
 
-        # calcuclate trans loss (h3 rmsd)
-        b, N = loop_mask.shape
-        h3_mask = torch.zeros_like(loop_mask)
-        count = 0
-        for i in range(b):
-            count = 0  
-            in_group = False  
-            group_start = None  
-            
-            # 연속된 1들의 그룹을 추적
-            for j in range(N):
-                if loop_mask[i, j] == 1:
-                    if not in_group:  # 새로운 그룹 시작
-                        group_start = j
-                        in_group = True
-                else:
-                    if in_group:  # 그룹이 끝나는 지점
-                        count += 1
-                        # 세 번째 그룹만 남기고 나머지 그룹은 0
-                        if count == 3:
-                            h3_mask[i, group_start:j] = 1
-                        in_group = False
-            
-        # calculate h3 trans loss (rmsd)
-
-        h3_trans_loss = torch.sum(
-            trans_error ** 2 * h3_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(h3_mask, dim=-1) * 3)
-        h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
-
-        batch_metrics.append(h3_trans_loss_dict)
-
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
 

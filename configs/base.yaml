@@ -141,7 +141,7 @@ experiment:
     sc_viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.3.2
+    name: CDRFlow_v2.3.2_general
     project: v2.3.2
   optimizer:
     warmup_steps: 0
@@ -161,7 +161,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/h3_trans_loss
+    monitor: valid/trans_loop_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

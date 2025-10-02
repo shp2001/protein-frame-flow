@@ -41,11 +41,12 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano.csv
-  valid_csv_path: /home/psh/data/valid/meta/metadata.csv
+  train_csv_path: /home/psh/data/general/meta/metadata_train.csv
+  valid_csv_path: /home/psh/data/general/meta/metadata_valid.csv
 
-  train_cluster_path: /home/psh/data/train/wantigen_70_loop_final_train.json
-  valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
+  train_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
+  valid_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
+
 
   max_cache_size: ${shared.max_cache_size}
   cache_num_res: 10000000
@@ -67,8 +68,8 @@ pdb_dataset:
   
   # Filtering
   filter:
-    max_num_res: 2000
-    min_num_res: 100
+    max_num_res: 400
+    min_num_res: 300
     max_coil_percent: 1.0
     rog_quantile: 1.0
     # oligomeric: ['monomeric', 'heteromer']
