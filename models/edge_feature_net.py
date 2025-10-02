@@ -207,6 +207,7 @@ class EdgeFeatureNet(nn.Module):
         if self._cfg.embed_unit_vector:
             rigid_t = create_rigid(rotmats_template, trans_template)
             unit_vec_t = calc_unit_vector(rigid_t)
+            unit_vec_t = unit_vec_t * loop_mask_2d[..., None]
             unit_vec_t = unit_vec_t * diag_mask[..., None]
             all_edge_feats.append(unit_vec_t)
 
