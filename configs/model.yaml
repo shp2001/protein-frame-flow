@@ -51,7 +51,7 @@ model:
     n_heads: 16
     c_z: ${model.c_z}
     c_s: ${model.c_s}
-    blocks_per_ckpt: 2
+    blocks_per_ckpt: null
     dropout: 0.2
 
   conditioning:
