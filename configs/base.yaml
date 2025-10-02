@@ -104,7 +104,7 @@ experiment:
   warm_start_cfg_override: False
   training:
     mask_plddt: True
-    r3_loss_weight: 1.0
+    r3_loss_weight: 2.0
     atom_scale: 0.1
     r3_scale: 0.1
     t_normalize_clip: 0.9
@@ -121,19 +121,19 @@ experiment:
     loop_bb_loss_weight: 1.0 
     # side chain
     use_loop_sc_loss: True
-    loop_sc_loss_weight: 1.0
+    loop_sc_loss_weight: 0.5
     use_local_dist_mat_loss: True
-    local_dist_mat_loss_weight: 1.0 
+    local_dist_mat_loss_weight: 0.5
     # violation_backbone 
     use_bond_loss: True 
     bond_length_loss_weight: 1.0 
     c_n_ca_loss_weight: 1.0 
     ca_c_n_loss_weight: 1.0 
     # violation_side chain
-    use_all_atom_clash_loss: True
+    use_all_atom_clash_loss: False
     all_atom_clash_loss_weight: 1.0
     use_within_clash_loss: True
-    within_clash_loss_weight: 1.0
+    within_clash_loss_weight: 0.1
 
     bb_aux_loss_t_pass: 0.25
     sc_aux_loss_t_pass: 0.5
