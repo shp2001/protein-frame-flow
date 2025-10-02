@@ -7,7 +7,7 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler, dist
 
-from data.motif_index import embed_relpos, get_ag_hotspot
+from data.motif_index import get_relpos_input, get_ag_hotspot
 from data import featurizer
 from data import utils as du 
 
@@ -54,11 +54,12 @@ class ProteinData(LightningDataModule):
 
                     cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
-            relpos_emb, asym_id, entity_id, sym_id = embed_relpos(cropped_feat['residue_index'], cropped_feat['chain_seq_list'])
-            cropped_feat['pair_init'] = relpos_emb
-            cropped_feat['csv_idx'] = feat['csv_idx']
+            asym_id, entity_id, sym_id = get_relpos_input(cropped_feat['chain_seq_list'])
+            cropped_feat['asym_id'] = torch.tensor(asym_id)
+            cropped_feat['entity_id'] = torch.tensor(entity_id)
+            cropped_feat['sym_id'] = torch.tensor(sym_id)
             cropped_feat['crop_idx'] = torch.tensor(feat['crop_idx'])
-            
+            cropped_feat['csv_idx'] = feat['csv_idx']
             del cropped_feat['chain_seq_list']
             cropped_batch.append(cropped_feat)
 
@@ -69,10 +70,6 @@ class ProteinData(LightningDataModule):
 
         cropped_batch['mode'] = feat['mode']
         cropped_batch['raw_path'] = feat['raw_path']
-        if cropped_batch['diffuse_mask'][0, 0] == 1:
-            cropped_batch['diffuse_mask'][:, 0] = 0
-        if cropped_batch['diffuse_mask'][0, -1] == 1:
-            cropped_batch['diffuse_mask'][:, -1] = 0
 
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
@@ -120,6 +117,8 @@ class ProteinData(LightningDataModule):
         cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
         cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
         
+        # edge mask 
+        cropped_batch["edge_mask"] = cropped_batch['res_mask'][:, None] * cropped_batch['res_mask'][:, :, None]
         return cropped_batch
 
     

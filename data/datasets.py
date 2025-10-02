@@ -83,9 +83,10 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     chain_feats = data_transforms.get_chi_angles(chain_feats)
     chain_feats = data_transforms.get_backbone_frames(chain_feats)
     chain_feats['pseudo_beta'] = data_transforms.pseudo_beta_fn(
-                                                                chain_feats['aatype'],
-                                                                chain_feats['all_atom_positions'],
-                                                                None)
+        chain_feats['aatype'],
+        chain_feats['all_atom_positions'],
+        None
+        )
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
     res_mask[chain_feats['aatype'] == 20] = 0

@@ -888,8 +888,6 @@ def compute_all_atom_clash_loss(
         residue_index,
         residx_atom14_to_atom37,
         interface_mask,
-        overlap_tolerance_soft,
-        overlap_tolerance_hard
         ):
 
     atomtype_radius = [
@@ -908,8 +906,6 @@ def compute_all_atom_clash_loss(
         atom14_atom_radius=atom14_atom_radius,
         residue_index=residue_index,
         interface_mask=interface_mask,
-        overlap_tolerance_soft=overlap_tolerance_soft,
-        overlap_tolerance_hard=overlap_tolerance_hard
     )
 
     # between residue clashes = {
@@ -924,7 +920,6 @@ def compute_within_clash_loss(
         atom14_atom_exists,
         interface_mask,
         aatype,
-        tighten_bounds_for_loss
         ):
     restype_atom14_bounds = rc.make_atom14_dists_bounds()
     atom14_dists_lower_bound = atom14_pred_positions.new_tensor(
@@ -938,8 +933,7 @@ def compute_within_clash_loss(
         atom14_pred_positions,
         atom14_atom_exists,
         atom14_dists_lower_bound,
-        atom14_dists_upper_bound,
-        tighten_bounds_for_loss
+        atom14_dists_upper_bound
     )['per_atom_loss_sum'] # ([B, N, 14])
 
     mean_loss = torch.sum(within_residue_clashes * atom14_atom_exists, dim=(1,2)) / (1e-6 + torch.sum(atom14_atom_exists, dim=(1,2)))
@@ -1080,9 +1074,9 @@ def local_distance_loss(
     dist_mat_loss = dist_mat_loss / (torch.sum(local_loss_mask, dim=(-1,-2,-3)) + 1) # (B)
     return dist_mat_loss, neighbor_indices, cdr_residues
 
-def b_carbon_distogram_loss(
-    pred_cb_distogram: torch.Tensor,  # (O-1, B, L, L, 64)
-    gt_pseudo_beta: torch.Tensor,     # (B, L, 3)
+def calc_distogram_loss(
+    pred_distogram: torch.Tensor,  # (O-1, B, L, L, 64)
+    gt_pos: torch.Tensor,     # (B, L, 3)
     res_mask: torch.Tensor,
     neighbor_indices: torch.Tensor=None,
     cdr_residues: torch.Tensor=None, # (N)
@@ -1095,15 +1089,15 @@ def b_carbon_distogram_loss(
     pred_cb_distogram: softmax를 취한 결과 
     '''
     # 1. Ground truth distogram 계산 (one-hot 인코딩 포함)
-    gt_cb_distogram = calc_distogram(  
-        gt_pseudo_beta,
+    gt_distogram = calc_distogram(  
+        gt_pos,
         min_bin=min_bin,
         max_bin=max_bin,
         num_bins=num_bins
     ).unsqueeze(0) # (B, L, L, 64), one-hot
 
     # 2. Cross entropy: - sum y * log p
-    loss_per_pair = -torch.sum(gt_cb_distogram * torch.log(pred_cb_distogram + eps), dim=-1)  # (O-2, B, L, L)
+    loss_per_pair = -torch.sum(gt_distogram * torch.log(pred_distogram + eps), dim=-1)  # (O-2, B, L, L)
     loss_per_pair = torch.mean(loss_per_pair, dim=0) # (B, L, L)
 
     # total loss 

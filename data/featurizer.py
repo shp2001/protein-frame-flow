@@ -129,13 +129,13 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         transformed_res_coords = random_transform(res_coords)
         ref_pos.extend(transformed_res_coords.tolist())
 
-    ref_atom_name_chars = atom_name_chars_encoded(atom_list)
     ref_space_uid = torch.tensor(ref_space_uid).unsqueeze(0).repeat(B,1)
     ref_element = torch.tensor(ref_element).unsqueeze(0).repeat(B,1,1)
     ref_charge = torch.tensor(ref_charge).unsqueeze(0).repeat(B,1) 
-    ref_atom_name_chars = torch.tensor(ref_atom_name_chars).unsqueeze(0).repeat(B,1,1,1) 
-    atom_to_token_idx = torch.tensor(atom_to_token_idx)
-
+    ref_atom_name_chars = torch.tensor(
+        atom_name_chars_encoded(atom_list)
+        ).unsqueeze(0).repeat(B,1,1,1) 
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
-
+    atom_to_token_idx = torch.tensor(atom_to_token_idx)
+    
     return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos

@@ -1,5 +1,4 @@
 import sys
-import os
 import torch 
 
 from os.path import splitext, basename
@@ -401,7 +400,6 @@ def assign_chain_sym(chain_seq_list):
 
     return result
 
-
 def one_hot(x, v_bins):
     reshaped_bins = v_bins.view(((1,) * len(x.shape)) + (len(v_bins),))
     diffs = x[..., None] - reshaped_bins
@@ -409,103 +407,21 @@ def one_hot(x, v_bins):
 
     return torch.nn.functional.one_hot(am, num_classes=len(v_bins)).float()
 
-
-def relpos(
-    residue_index,
-    asym_id,
-    entity_id,
-    sym_id,
-    max_relative_idx=32,
-    max_relative_chain=2
-    ):
-
-    residue_index = torch.tensor(residue_index)
-    device = residue_index.device
-    asym_id = torch.tensor(asym_id)
-    entity_id = torch.tensor(entity_id)
-    sym_id = torch.tensor(sym_id)
-
-    pos = residue_index
-    asym_id_same = (asym_id[..., None] == asym_id[..., None, :])
-    offset = pos[..., None] - pos[..., None, :]
-
-    clipped_offset = torch.clamp(
-        offset + max_relative_idx, 0, 2 * max_relative_idx
-    )
-
-    rel_feats = []
-
-    final_offset = torch.where(
-        asym_id_same, 
-        clipped_offset,
-        (2 * max_relative_idx + 1) * 
-        torch.ones_like(clipped_offset)
-    )
-
-    boundaries = torch.arange(
-        start=0, end=2 * max_relative_idx + 2
-    ).to(device)
-
-    rel_pos = one_hot(
-        final_offset,
-        boundaries,
-    )
-
-    rel_feats.append(rel_pos)
-    entity_id_same = (entity_id[..., None] == entity_id[..., None, :])
-    rel_feats.append(entity_id_same[..., None].to(dtype=rel_pos.dtype))
-    rel_sym_id = sym_id[..., None] - sym_id[..., None, :]
-
-    max_rel_chain = max_relative_chain
-    clipped_rel_chain = torch.clamp(
-        rel_sym_id + max_rel_chain,
-        0,
-        2 * max_rel_chain,
-    )
-
-    final_rel_chain = torch.where(
-        entity_id_same,
-        clipped_rel_chain,
-        (2 * max_rel_chain + 1) *
-        torch.ones_like(clipped_rel_chain)
-    )
-
-    boundaries = torch.arange(
-        start=0, end=2 * max_rel_chain + 2
-    ).to(device)
-    rel_chain = one_hot(
-        final_rel_chain,
-        boundaries,
-    )
-
-    rel_feats.append(rel_chain)
-    rel_feat = torch.cat(rel_feats, dim=-1)
-    return rel_feat
-
-def embed_relpos(residue_index, seq_list):
-    # AlphaFold-Miultimer
-    # Based on OpenFold utils/tensor_utils.py
+def get_relpos_input(seq_list):
     chain_entity = assign_chain_entity(seq_list)
     chain_sym = assign_chain_sym(seq_list)
     chain_len_list = [len(seq) for seq in seq_list]
 
-    asym_id = []
-    entity_id = []
-    sym_id = []
+    asym_id = [] # 서로 다른 체인이면 무조건 다른 id  
+    entity_id = [] # 동일한 시퀀스의 체인이면 동일한 id 
+    sym_id = [] # 동일한 시퀀스의 체인 상에서 몇 번째 체인인지. 즉 같은 시퀀스의 체인들을 구분 
     for i, chain_len in enumerate(chain_len_list):
         for _ in range(chain_len):
             asym_id.append(i)
             entity_id.append(chain_entity[i])
             sym_id.append(chain_sym[i])
-
-
-    relpos_emb = relpos(    
-                    residue_index,
-                    asym_id,
-                    entity_id,
-                    sym_id)
     
-    return relpos_emb, asym_id, entity_id, sym_id
+    return asym_id, entity_id, sym_id
 
 def get_ag_hotspot(pseudo_beta, loop_mask, diffuse_mask, threshold=5.0):
     """

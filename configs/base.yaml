@@ -29,7 +29,7 @@ data:
     
 interpolant:
   min_t: 1e-2
-  sample_t_mode: logit_normal # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
+  sample_t_mode: uniform # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
   max_angle_deg: 0
   max_shift: 0
   twisting:
@@ -60,10 +60,7 @@ interpolant:
     num_timesteps: 30
     do_sde: False
 
-  self_condition: ${model.edge_features.self_condition}
-  save_traj: True 
-  scaling_nm_ang: ${model.scaling_nm_ang}
-  use_prmsd: ${model.confidence_head.use_confidence}
+  save_traj: False 
 
 mini_rollout:
   min_t: 1e-2
@@ -96,72 +93,61 @@ mini_rollout:
     do_sde: False
 
   use_prmsd: ${model.confidence_head.use_confidence}
-  self_condition: ${model.edge_features.self_condition}
-  save_traj: True 
-  scaling_nm_ang: ${model.scaling_nm_ang}
+  save_traj: False 
   
 experiment:
   add_modules: False
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.0.0/CDRFlow_v2.3.1.1/2025-09-09_16-51-49/last.ckpt
+  warm_start: null
   warm_start_cfg_override: False
   training:
     mask_plddt: True
-    bb_atom_scale: 0.1
-    sc_atom_scale: 0.1
-    trans_scale: 0.1
-    translation_loss_weight: 1.0 # 1.0~1.5 -> 2.0~3.0
+    r3_loss_weight: 1.0
+    atom_scale: 0.1
+    r3_scale: 0.1
     t_normalize_clip: 0.9
-    rotation_loss_weights: 1.0
 
-    aux_loss_weight: 0.5
+    aux_loss_weight: 1.0
     viol_loss_weight: 0.1
-    aux_loss_use_dist_mat_loss: True
-    aux_loss_use_bb_loss: True
-    aux_loss_use_pair_loss: False
-    aux_loss_use_chi_loss: False
-    aux_loss_use_sc_atom_loss: True
-    aux_loss_use_final_layer_rmsd: True
-    aux_loss_use_local_dist_mat_loss: True 
-    aux_loss_use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
 
-    viol_loss_use_all_atom_clash_loss: True
-    viol_loss_use_within_clash_loss: True
-    viol_loss_use_bond_loss: True 
+    use_local_pair_feat_loss: ${model.distogram_head.use_pair_head}
+    distogram_loss_weight: 0.05 
+    # backbone
+    use_dist_mat_loss: True
+    dist_mat_loss_weight: 1.0
+    use_loop_bb_loss: True
+    loop_bb_loss_weight: 1.0 
+    # side chain
+    use_loop_sc_loss: True
+    loop_sc_loss_weight: 1.0
+    use_local_dist_mat_loss: True
+    local_dist_mat_loss_weight: 1.0 
+    # violation_backbone 
+    use_bond_loss: True 
+    bond_length_loss_weight: 1.0 
+    c_n_ca_loss_weight: 1.0 
+    ca_c_n_loss_weight: 1.0 
+    # violation_side chain
+    use_all_atom_clash_loss: True
+    all_atom_clash_loss_weight: 1.0
+    use_within_clash_loss: True
+    within_clash_loss_weight: 1.0
 
-    aux_loss_use_confidence_loss: ${model.confidence_head.use_confidence}
-    min_bin: 0
-    max_bin: 10 
-
-    aux_loss_dist_mat_loss_weight: 0.5
-    aux_loss_bb_atom_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_sc_atom_loss_weight: 1.0 # 0.7 ~ 1.5 -> 0.3 ~ 0.6
-    aux_loss_final_layer_rmsd_weight: 1.0 
-    aux_loss_local_dist_mat_loss_weight: 1.0 # 1.0 ~ 2.0 -> 0.2 ~ 0.3
-    aux_loss_distogram_weight: 0.5 # 6.0 -> 2.0 ~ 3.0
-    aux_loss_contact_map_weight: 0.5 # 1.0 -> 0.1 ~ 0.2
-
-    viol_loss_all_atom_clash_loss_weight: 100 # 0.2 ~ 0.3 -> 0.01
-    viol_loss_within_clash_loss_weight: 0.1 # 1.5 ~ 3.0 -> 0.1
-    viol_loss_bond_length_weight: 1.0  # 0.2 ~ 0.5 ->
-    viol_loss_ca_c_n_weight: 0.0 # 0.01 ->
-    viol_loss_c_n_ca_weight: 0.0 # 0.001~0.01 -> 
-
-    bb_aux_loss_t_pass: 0.1
-    sc_aux_loss_t_pass: 0.1
-    bb_viol_loss_t_pass: 0.3
-    sc_viol_loss_t_pass: 0.3
+    bb_aux_loss_t_pass: 0.25
+    sc_aux_loss_t_pass: 0.5
+    bb_viol_loss_t_pass: 0.5
+    sc_viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.3.1.1
-    project: v2.0.0
+    name: CDRFlow_v2.3.2
+    project: v2.3.2
   optimizer:
     warmup_steps: 0
     decay_steps: 140_000
     min_lr: 1e-4
-    max_lr: 2e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

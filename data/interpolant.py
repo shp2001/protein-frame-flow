@@ -1,15 +1,7 @@
-from collections import defaultdict
 import torch
-from data import so3_utils
 from data import utils as du
-from scipy.spatial.transform import Rotation
 from data import all_atom
 import copy
-from torch import autograd
-from motif_scaffolding import twisting
-from models.loss import clash_potential
-
-from openfold.utils import rigid_utils
 
 def _centered_gaussian(num_batch, num_res, device):
     noise = torch.randn(num_batch, num_res, 3, device=device)
@@ -17,8 +9,6 @@ def _centered_gaussian(num_batch, num_res, device):
 
 def _r_diffuse_mask(r_t, r_1, atom_diffuse_mask):
     return r_t * atom_diffuse_mask[..., None] + r_1 * (1 - atom_diffuse_mask[..., None])
-
-
 
 class Interpolant:
 
@@ -28,14 +18,6 @@ class Interpolant:
         self._trans_cfg = cfg.trans
         self._sample_cfg = cfg.sampling
         self._igso3 = None
-
-    @property
-    def igso3(self):
-        if self._igso3 is None:
-            sigma_grid = torch.linspace(0.1, 1.5, 1000)
-            self._igso3 = so3_utils.SampleIGSO3(
-                1000, sigma_grid, cache_dir='.cache')
-        return self._igso3
 
     def set_device(self, device):
         self._device = device
@@ -98,46 +80,28 @@ class Interpolant:
         r_t = self._corrupt_r(r_1, t, atom_diffuse_mask)
         
         noisy_batch['r_t'] = r_t
-        noisy_batch['pair_init'] = batch['pair_init']
 
         return noisy_batch
     
-    def rot_sample_kappa(self, t):
-        if self._rots_cfg.sample_schedule == 'exp':
-            return 1 - torch.exp(-t*self._rots_cfg.exp_rate)
-        elif self._rots_cfg.sample_schedule == 'linear':
-            return t
-        else:
-            raise ValueError(
-                f'Invalid schedule: {self._rots_cfg.sample_schedule}')
 
-    def _trans_vector_field(self, t, trans_1, trans_t):
-        return (trans_1 - trans_t) / (1 - t)
+    def _r3_vector_field(self, t, r_1, r_t):
+        return (r_1 - r_t) / (1 - t)
 
-    def _trans_euler_step(self, d_t, t, trans_1, trans_t):
+    def _r3_euler_step(self, d_t, t, r_1, r_t):
         assert d_t > 0
-        trans_vf = self._trans_vector_field(t, trans_1, trans_t)
-        return trans_t + trans_vf * d_t
-
-    def _rots_euler_step(self, d_t, t, rotmats_1, rotmats_t):
-        if self._rots_cfg.sample_schedule == 'linear':
-            scaling = 1 / (1 - t)
-        elif self._rots_cfg.sample_schedule == 'exp':
-            scaling = self._rots_cfg.exp_rate
-        else:
-            raise ValueError(
-                f'Unknown sample schedule {self._rots_cfg.sample_schedule}')
-        return so3_utils.geodesic_t(
-            scaling * d_t, rotmats_1, rotmats_t)
+        trans_vf = self._r3_vector_field(t, r_1, r_t)
+        return r_t + trans_vf * d_t
 
     def sample(
             self,
             model,
             batch,
+            s_init, 
+            s_trunk, 
+            z_trunk,
             num_timesteps=None,
             verbose=False,
         ):
-
 
         diffuse_mask = batch['diffuse_mask']
         atom_diffuse_mask = batch['atom_diffuse_mask']
@@ -150,10 +114,6 @@ class Interpolant:
             motif_mask = motif_mask[None].expand((num_batch, -1))
 
         # Set-up initial prior samples
-
-        # random_trans = _random_translations(trans_1.shape[0], self._cfg.max_shift, self._device)
-        # random_rot = _random_rotation_matrices(trans_1.shape[0], self._cfg.max_angle_deg, device=self._device)
-
         r_0 = _centered_gaussian(num_batch, num_atom, self._device)
         r_0 = r_0 * du.NM_TO_ANG_SCALE
         r_0 = _r_diffuse_mask(r_0, r_1, atom_diffuse_mask)
@@ -178,21 +138,18 @@ class Interpolant:
             d_t = t_2 - t_1
 
             with torch.no_grad():
-                model_out = model(batch)
+                model_out = model.get_structure(batch, s_init, s_trunk, z_trunk)
 
             # Process model output.
+            pred_r_1 = model_out['pred_r_1']
             pred_trans_1 = model_out['pred_trans']
             pred_rotmats_1 = model_out['pred_rotmats']
-            pred_r_1 = model_out['pred_r_1']
+
 
             clean_traj.append((pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu()))
-            
-            if self._cfg.self_condition:
-                batch['trans_sc'] = pred_trans_1
-                batch['rotmats_sc'] = pred_rotmats_1
 
             # Take reverse step
-            r_t_2 = self._trans_euler_step(
+            r_t_2 = self._r3_euler_step(
                 d_t, t_1, pred_r_1, r_t_1)
             r_t_2 = _r_diffuse_mask(r_t_2, r_1, atom_diffuse_mask)
             prot_traj.append(r_t_2)
@@ -205,68 +162,16 @@ class Interpolant:
         batch['t'] = torch.ones((num_batch, 1), device=self._device) * t_1
 
         with torch.no_grad():
-            model_out = model(batch)
+            model_out = model.get_structure(batch, s_init, s_trunk, z_trunk)
                 
         pred_trans_1 = model_out['pred_trans']
         pred_rotmats_1 = model_out['pred_rotmats']
         pred_r_1 = model_out['pred_r_1']
-
-        pred_positions_14 = model_out['all_atom_preds']['positions'][-1]
-        pair_outputs = model_out['pair_outputs']
+        pred_positions_14 = model_out['pred_r_1_unflatten']
         clean_traj.append((pred_trans_1.detach().cpu(), pred_rotmats_1.detach().cpu()))
         prot_traj.append(pred_r_1)
 
         # Convert trajectories to atom37.
-        # atom37_traj = all_atom.transrot_to_atom37(prot_traj, batch["res_mask"])
         clean_atom37_traj = all_atom.transrot_to_atom37(clean_traj, batch["res_mask"])
 
-        prmsd = torch.zeros(batch['diffuse_mask'].shape[0], batch['diffuse_mask'].shape[1], device=batch['diffuse_mask'].device)
-        prmsd_final = prmsd
-
-        return prot_traj, clean_atom37_traj, pred_positions_14, prmsd_final, prmsd, pred_trans_1, pred_rotmats_1, pair_outputs
-
-    
-    def guidance(self, trans_t, rotmats_t, model_out, motif_mask, R_motif, trans_motif, Log_delta_R, delta_x, t, d_t, logs_traj):
-        # Select motif
-        motif_mask = motif_mask.clone()
-        trans_pred = model_out['pred_trans'][:, motif_mask]  # [B, motif_res, 3]
-        R_pred = model_out['pred_rotmats'][:, motif_mask]  # [B, motif_res, 3, 3]
-
-        # Proposal for marginalising motif rotation
-        F = twisting.motif_rots_vec_F(trans_motif, R_motif, self._cfg.twisting.num_rots, align=self._cfg.twisting.align, scale=self._cfg.twisting.scale_rots, device=self._device, dtype=torch.float32)
-
-        # Estimate p(motif|predicted_motif)
-        grad_Log_delta_R, grad_x_log_p_motif, logs = twisting.grad_log_lik_approx(R_pred, trans_pred, R_motif, trans_motif, Log_delta_R, delta_x, None, None, None, F, twist_potential_rot=self._cfg.twisting.potential_rot, twist_potential_trans=self._cfg.twisting.potential_trans)
-
-        with torch.no_grad():
-            # Choose scaling
-            t_trans = t
-            t_so3 = t
-            if self._cfg.twisting.scale_w_t == 'ot':
-                var_trans = ((1 - t_trans) / t_trans)[:, None]
-                var_rot = ((1 - t_so3) / t_so3)[:, None, None]
-            elif self._cfg.twisting.scale_w_t == 'linear':
-                var_trans = (1 - t)[:, None]
-                var_rot = (1 - t_so3)[:, None, None]
-            elif self._cfg.twisting.scale_w_t == 'constant':
-                num_batch = trans_pred.shape[0]
-                var_trans = torch.ones((num_batch, 1, 1)).to(R_pred.device)
-                var_rot = torch.ones((num_batch, 1, 1, 1)).to(R_pred.device)
-            var_trans = var_trans + self._cfg.twisting.obs_noise ** 2
-            var_rot = var_rot + self._cfg.twisting.obs_noise ** 2
-
-            trans_scale_t = self._cfg.twisting.scale / var_trans
-            rot_scale_t = self._cfg.twisting.scale / var_rot
-
-            # Compute update
-            trans_t, rotmats_t = twisting.step(trans_t, rotmats_t, grad_x_log_p_motif, grad_Log_delta_R, d_t, trans_scale_t, rot_scale_t, self._cfg.twisting.update_trans, self._cfg.twisting.update_rot)
-
-        # delete unsused arrays to prevent from any memory leak
-        del grad_Log_delta_R
-        del grad_x_log_p_motif
-        del Log_delta_R
-        del delta_x
-        for key, value in model_out.items():
-            model_out[key] = value.detach().requires_grad_(False)
-
-        return trans_t, rotmats_t, logs_traj
+        return prot_traj, clean_atom37_traj, pred_positions_14, pred_trans_1
