@@ -186,7 +186,7 @@ class FlowModule(LightningModule):
 
         loss_atom_denom = torch.sum(loss_atom_diffuse_mask, dim=-1) * 3
         r3_loss = training_cfg.r3_loss_weight * torch.sum(
-            r3_error ** 2 * loss_atom_diffuse_mask[..., None],
+            torch.abs(r3_error) * loss_atom_diffuse_mask[..., None],
             dim=(-1, -2)
         ) / loss_atom_denom
         r3_loss = torch.clamp(r3_loss, max=40)
@@ -256,7 +256,7 @@ class FlowModule(LightningModule):
 
         # local Pairwise distance loss (final layer만 계산)
         local_dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
-        if training_cfg.use_local_dist_mat_loss:
+        if training_cfg.use_local_dist_mat_loss and noisy_batch['mode'] not in ["monomer", "polymer"]:
             local_dist_mat_loss, neighbor_indices, cdr_residues = local_distance_loss(
                 pred_atom_14, # scaled 
                 renamed_atom14_gt_exists,
@@ -404,6 +404,11 @@ class FlowModule(LightningModule):
         for i in range(num_batch):
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
+
+            if batch['mode'] == 'polymer' or batch['mode'] == 'monomer':
+                unique_vals, mapped = torch.unique(batch['chain_idx'][0], return_inverse=True)
+                batch['chain_idx'] = mapped.unsqueeze(0).expand(b, -1)
+
             b_factors = None
             if b_factors is None:
                 b_factor_alt = diffuse_mask.cpu().numpy()
