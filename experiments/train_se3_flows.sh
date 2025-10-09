@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J v2.3.2_general
+#SBATCH -J v2.3.3_general
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:4
 #SBATCH --mem=200g
@@ -12,4 +12,4 @@
 echo "Running train_abb3.py"
 echo $CUDA_VISIBLE_DEVICES  # 여러 개 나와야 함
 torchrun --standalone --nnodes=1 --nproc_per_node=4 /home/psh/protein-frame-flow/experiments/train_se3_flows.py \
-    > /home/psh/protein-frame-flow/experiments/logs/v2.3.2_general.log 
+    > /home/psh/protein-frame-flow/experiments/logs/v2.3.3_general.log 
