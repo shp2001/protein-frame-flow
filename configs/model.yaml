@@ -43,7 +43,7 @@ model:
     embed_diag_mask: True
     embed_unit_vector: True
     embed_distogram_diag: True
-    embed_distogram_off_diag: True
+    embed_distogram_off_diag: False
 
   pairformer: 
     n_cycles: 3
