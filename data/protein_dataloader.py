@@ -87,7 +87,7 @@ class ProteinData(LightningDataModule):
             cropped_batch['pseudo_beta'],
             cropped_batch['loop_mask'],
             cropped_batch['diffuse_mask'],
-            threshold=5
+            threshold=8
         )
 
         # Center based on motif locations
