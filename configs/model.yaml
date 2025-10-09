@@ -33,17 +33,15 @@ model:
       num_bins: 64
       min_bin: 2
       max_bin: 22
-    distogram_off_diag:
-      num_bins: 10
-      min_bin: 2
-      max_bin: 22
+    contact_map_off_diag:
+      threshold: 20
 
     embed_ref_pos: True
     embed_loop_mask: True
     embed_diag_mask: True
     embed_unit_vector: True
     embed_distogram_diag: True
-    embed_distogram_off_diag: False
+    embed_contact_map_off_diag: True
 
   pairformer: 
     n_cycles: 3

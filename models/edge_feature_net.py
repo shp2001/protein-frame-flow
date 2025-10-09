@@ -125,8 +125,8 @@ class EdgeFeatureNet(nn.Module):
             total_edge_feats += 1
         if self._cfg.embed_distogram_diag:
             total_edge_feats += self._cfg.distogram_diag.num_bins
-        if self._cfg.embed_distogram_off_diag:
-            total_edge_feats += self._cfg.distogram_off_diag.num_bins
+        if self._cfg.embed_contact_map_off_diag:
+            total_edge_feats += 1
         if self._cfg.embed_unit_vector:
             total_edge_feats += 3 
 
@@ -193,16 +193,13 @@ class EdgeFeatureNet(nn.Module):
             distogram_diag = distogram_diag * diag_mask[..., None]
             all_edge_feats.append(distogram_diag)
 
-        if self._cfg.embed_distogram_off_diag:
-            distogram_off_diag = calc_distogram(
-                trans_template, 
-                min_bin=self._cfg.distogram_off_diag.min_bin,
-                max_bin=self._cfg.distogram_off_diag.max_bin, 
-                num_bins=self._cfg.distogram_off_diag.num_bins
-                )
-            distogram_off_diag = distogram_off_diag * loop_mask_2d[..., None]
-            distogram_off_diag = distogram_off_diag * (1-diag_mask)[..., None]
-            all_edge_feats.append(distogram_off_diag)
+        if self._cfg.embed_contact_map_off_diag:
+            dists_2d = torch.linalg.norm(
+                trans_template[:, :, None, :] - trans_template[:, None, :, :], axis=-1)[..., None] # (b, L, L, 1)
+            contact_map_off_diag = (dists_2d < self._cfg.contact_map_off_diag.threshold).int()
+            contact_map_off_diag = contact_map_off_diag * loop_mask_2d[..., None]
+            contact_map_off_diag = contact_map_off_diag * (1-diag_mask)[..., None]
+            all_edge_feats.append(contact_map_off_diag)
 
         if self._cfg.embed_unit_vector:
             rigid_t = create_rigid(rotmats_template, trans_template)
