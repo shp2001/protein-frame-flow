@@ -141,11 +141,11 @@ experiment:
     sc_viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.3.3_general
+    name: CDRFlow_v2.3.2.1_general
     project: v2.3.2
   optimizer:
     warmup_steps: 0
-    decay_steps: 300_000
+    decay_steps: 270_000
     min_lr: 1e-4
     max_lr: 1e-3
   trainer:
