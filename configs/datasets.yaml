@@ -41,11 +41,11 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/general/meta/metadata_train.csv
-  valid_csv_path: /home/psh/data/general/meta/metadata_valid.csv
+  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano.csv
+  valid_csv_path: /home/psh/data/valid/meta/metadata.csv
 
-  train_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
-  valid_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
+  train_cluster_path: /home/psh/data/train/wantigen_70_loop_final_train.json
+  valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
 
 
   max_cache_size: ${shared.max_cache_size}
