@@ -13,7 +13,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import embed_relpos, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor, get_ag_hotspot
+from data.motif_index import get_relpos_input, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor, get_ag_hotspot
 from data import residue_constants as rc
 
 from itertools import accumulate
@@ -279,7 +279,7 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=380,
+                                                    max_len=450,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=False
                                                     )
@@ -311,11 +311,11 @@ def collate_fn(batch):
                 cropped_feat[key] = ["".join(chain_seq) for chain_seq in cropped_seq_list]
 
         # make pair_init (relpos)
-        relpos_emb, asym_id, entity_id, sym_id = embed_relpos(
-            cropped_feat['residue_index'],
-            cropped_feat['chain_seq_list'])
-        
-        cropped_feat['pair_init'] = relpos_emb
+        asym_id, entity_id, sym_id = get_relpos_input(cropped_feat['chain_seq_list'])
+        cropped_feat['asym_id'] = torch.tensor(asym_id)
+        cropped_feat['entity_id'] = torch.tensor(entity_id)
+        cropped_feat['sym_id'] = torch.tensor(sym_id)
+
         cropped_feat['csv_idx'] = feat['csv_idx']
         cropped_feat['crop_idx'] = torch.tensor(cropped_feat['crop_idx'])
         cropped_feat['sample_id'] = torch.tensor(feat['sample_id'], device=feat['aatype'].device)
@@ -369,6 +369,9 @@ def collate_fn(batch):
     atom_diffuse_mask[..., :3] *= cropped_batch["diffuse_mask"].unsqueeze(-1)
     cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
     cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
+
+    # edge mask 
+    cropped_batch["edge_mask"] = cropped_batch['res_mask'][:, None] * cropped_batch['res_mask'][:, :, None]
 
     return cropped_batch
 

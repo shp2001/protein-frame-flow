@@ -100,7 +100,8 @@ def main(args):
             print(f'start to measure {filename}')
             
             for sample in os.listdir(pred_subdir):
-                
+                if 'sample' not in sample:
+                    continue                
                 predicted_filepath = os.path.join(pred_subdir, sample, 'sample_1.pdb')
                 only_ab_filepath = os.path.join(pred_subdir, sample, 'only_ab.pdb')
                 output_file = os.path.join(pred_subdir, sample, 'cdr_rmsd.json')

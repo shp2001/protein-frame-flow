@@ -54,6 +54,8 @@ class EvalRunner:
 
         # Read checkpoint and initialize module.
         if not self.use_prmsd:
+            # turn off the gradient checkpoint
+            self._cfg.model.pairformer.blocks_per_ckpt = None
             self._flow_module = FlowModule.load_from_checkpoint(
                 checkpoint_path=ckpt_path,
                 cfg=self._cfg,

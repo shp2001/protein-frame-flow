@@ -238,8 +238,9 @@ def save_traj(
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
 
     # Use b-factors to specify which residues are diffused.
-    if all(b_factors==0) == True:
-        b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
+    if b_factors is None:
+        b_factor_alt = diffuse_mask
+        b_factors = np.tile((b_factor_alt * 100)[:, None], (1, 37))
     
     else:
         b_factors = np.tile((b_factors)[:, None], (1, 37))
@@ -484,3 +485,59 @@ def modify_residues_in_cdr(src_pkl, target_dir, cdr_sequence, mutations):
 
     print(f"✅ 저장 완료: {save_path}")
     return save_path
+
+def dist_map_from_distogram(
+        distogram_logit, 
+        min_bin=2.0,
+        max_bin=32.0,
+        do_softmax=True
+        ):
+    if do_softmax:
+        probs = torch.softmax(distogram_logit, dim=-1).detach().cpu().numpy()  # shape: (B, N, N, 32)
+    else:
+        probs = distogram_logit.detach().cpu().numpy()
+        
+    num_bins = distogram_logit.shape[-1]  # 32
+    bin_edges = np.linspace(min_bin, max_bin, num_bins + 1)  # (33,)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2  # (32,)
+
+    bin_centers = bin_centers.reshape(1, 1, 1, -1)  # shape: (1, 1, 1, 32)
+    
+    # expected distance 계산
+    expected_dmap = np.sum(probs * bin_centers, axis=-1)  # shape: (B, N, N)
+
+    return expected_dmap
+
+def visualize_dist_map(
+        dist_map, # (N, N)
+        save_path,
+        title,
+        cdr_residues=None, # 1-dim List
+        mark_cdr=False,
+        cmap='viridis'
+        ):
+
+    plt.figure(figsize=(6, 5))
+    plt.imshow(dist_map, cmap=cmap)
+    plt.colorbar(label='Expected Distance (Å)')
+    plt.title(title)
+    plt.xlabel('Residue Index')
+    plt.ylabel('Residue Index')
+
+    if mark_cdr and cdr_residues is not None:
+        ax = plt.gca()
+        N = dist_map.shape[0]
+        for (start, end) in cdr_residues:
+            width = end - start + 1
+
+            # 행 강조: 전체 x축에 대해 특정 y 범위에 박스
+            rect_row = patches.Rectangle(
+                (0, start), N, width,
+                linewidth=1.0, edgecolor='red', facecolor='none', linestyle='-', alpha=0.8
+            )
+            ax.add_patch(rect_row)
+
+    plt.tight_layout()
+
+    # 이미지 저장
+    plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능
