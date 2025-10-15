@@ -665,8 +665,7 @@ class FlowModule(LightningModule):
         interpolant.set_device(device)
 
         num_batch = batch['sample_id'].shape[0]
-        pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
-
+        pdb_id = batch['processed_path'].split('/')[-1].replace('.pdb', '')
 
         sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):

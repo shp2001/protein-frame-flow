@@ -9,5 +9,5 @@
 
 echo "Measure CDR Metric.py"
 python -u -W ignore /home/psh/protein-frame-flow/experiments/measure_cdr_rmsd.py\
- --pred_dir /home/psh/protein-frame-flow/inference_outputs/CDRFlow_v2.3.1.1/2025-09-10_17-24-40/epoch=106-step=153331/run_2025-09-11_21-15-16\
+ --pred_dir /home/psh/protein-frame-flow/inference_outputs/CDRFlow_v2.3.2.1_stage_2/2025-10-14_00-20-37/epoch=63-step=91712_copy/run_2025-10-15_16-05-43\
  --label_dir /home/psh/benchmark_after210930/pdb_only_ab > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log

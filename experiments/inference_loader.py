@@ -184,6 +184,7 @@ class BaseDataset(Dataset):
         processed_row['masked_chain'] = masked_chain
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
+        processed_row['processed_path'] = path
         processed_row['mode'] = csv_row['mode']
         if use_cache:
             self._cache[path] = processed_row
@@ -291,7 +292,7 @@ def collate_fn(batch):
                             seq_list=feat['chain_seq_list']
                             )
 
-        not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'sample_id', 'mode']
+        not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'processed_path', 'sample_id', 'mode']
 
         for key in feat.keys():
             if key not in not_crop_key:
@@ -356,6 +357,7 @@ def collate_fn(batch):
     cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
 
     cropped_batch['raw_path'] = feat['raw_path']
+    cropped_batch['processed_path'] = feat['processed_path']
     cropped_batch['mode'] = feat['mode']
     cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
     cropped_batch['original_residx_atom37_to_atom14'] = feat['residx_atom37_to_atom14']

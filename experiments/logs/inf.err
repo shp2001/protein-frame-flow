@@ -3,3 +3,68 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 113, in run
+    sampler.run_sampling()
+  File "/home/psh/protein-frame-flow/experiments/inference_se3_flows.py", line 103, in run_sampling
+    trainer.predict(self._flow_module, dataloaders=dataloader)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 852, in predict
+    return call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 894, in _predict_impl
+    results = self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1018, in _run_stage
+    return self.predict_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/utilities.py", line 181, in _decorator
+    return loop_run(self, *args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/prediction_loop.py", line 110, in run
+    batch, batch_idx, dataloader_idx = next(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
+    self._fetch_next_batch(self.dataloader_iter)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
+    batch = next(iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
+    out = next(self._iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 123, in __next__
+    out = next(self.iterators[0])
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
+    data = self._next_data()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1326, in _next_data
+    return self._process_data(data)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
+    data.reraise()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
+    raise exception
+FileNotFoundError: Caught FileNotFoundError in DataLoader worker process 6.
+Original Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/data/utils.py", line 197, in read_pkl
+    with open(read_path, 'rb') as handle:
+FileNotFoundError: [Errno 2] No such file or directory: '/home/psh/benchmark_after210930/meta_modif/7ox1_A_B_G_15ARG_15PRO.pkl'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
+    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/psh/protein-frame-flow/experiments/inference_loader.py", line 230, in __getitem__
+    feats = self.process_csv_row(csv_row)
+  File "/home/psh/protein-frame-flow/experiments/inference_loader.py", line 183, in process_csv_row
+    processed_row = _process_csv_row(path, raw_path, scaffold_idx)
+  File "/home/psh/protein-frame-flow/experiments/inference_loader.py", line 28, in _process_csv_row
+    processed_feats = du.read_pkl(processed_file_path)
+  File "/home/psh/protein-frame-flow/data/utils.py", line 202, in read_pkl
+    raise(e)
+  File "/home/psh/protein-frame-flow/data/utils.py", line 193, in read_pkl
+    with open(read_path, 'rb') as handle:
+FileNotFoundError: [Errno 2] No such file or directory: '/home/psh/benchmark_after210930/meta_modif/7ox1_A_B_G_15ARG_15PRO.pkl'
+
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

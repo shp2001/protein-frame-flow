@@ -512,13 +512,16 @@ def visualize_dist_map(
         dist_map, # (N, N)
         save_path,
         title,
-        cdr_residues=None, # 1-dim List
+        cdr_residues=None, # list of tuples, e.g., [(start1, end1), (start2, end2)]
         mark_cdr=False,
         cmap='viridis'
         ):
 
     plt.figure(figsize=(6, 5))
-    plt.imshow(dist_map, cmap=cmap)
+    
+    # vmin과 vmax를 추가하여 colorbar 범위 고정
+    plt.imshow(dist_map, cmap=cmap, vmin=0, vmax=20) 
+    
     plt.colorbar(label='Expected Distance (Å)')
     plt.title(title)
     plt.xlabel('Residue Index')
@@ -528,16 +531,27 @@ def visualize_dist_map(
         ax = plt.gca()
         N = dist_map.shape[0]
         for (start, end) in cdr_residues:
-            width = end - start + 1
+            # matplotlib의 Rectangle은 (x, y)에서 시작하여 width, height를 가짐
+            # 인덱스가 0부터 시작하고, 칸의 경계를 기준으로 그려야 하므로 -0.5를 해주는 것이 정확함
+            start_coord = start - 0.5
+            end_coord = end + 0.5
+            width = end_coord - start_coord
 
-            # 행 강조: 전체 x축에 대해 특정 y 범위에 박스
+            # 가로 줄 (Row Highlight)
             rect_row = patches.Rectangle(
-                (0, start), N, width,
-                linewidth=1.0, edgecolor='red', facecolor='none', linestyle='-', alpha=0.8
+                (-0.5, start_coord), N, width,
+                linewidth=1.2, edgecolor='red', facecolor='none', linestyle='--', alpha=0.9
+            )
+            # 세로 줄 (Column Highlight)
+            rect_col = patches.Rectangle(
+                (start_coord, -0.5), width, N,
+                linewidth=1.2, edgecolor='red', facecolor='none', linestyle='--', alpha=0.9
             )
             ax.add_patch(rect_row)
+            ax.add_patch(rect_col)
 
     plt.tight_layout()
 
     # 이미지 저장
-    plt.savefig(save_path, dpi=300)  # dpi는 해상도. 필요에 따라 조정 가능
+    plt.savefig(save_path, dpi=300)
+    plt.close() # 메모리 누수 방지를 위해 figure를 닫아주는 것이 좋음
