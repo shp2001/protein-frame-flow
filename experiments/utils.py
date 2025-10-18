@@ -514,13 +514,14 @@ def visualize_dist_map(
         title,
         cdr_residues=None, # list of tuples, e.g., [(start1, end1), (start2, end2)]
         mark_cdr=False,
-        cmap='viridis'
+        cmap='viridis',
+        vmax=64
         ):
 
     plt.figure(figsize=(6, 5))
     
     # vmin과 vmax를 추가하여 colorbar 범위 고정
-    plt.imshow(dist_map, cmap=cmap, vmin=0, vmax=20) 
+    plt.imshow(dist_map, cmap=cmap, vmin=0, vmax=vmax) 
     
     plt.colorbar(label='Expected Distance (Å)')
     plt.title(title)

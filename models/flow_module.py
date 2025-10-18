@@ -737,7 +737,8 @@ class FlowModule(LightningModule):
                 title=f"{pdb_id.upper()} |True - Pairformer|",
                 cdr_residues=cdr_residues,
                 mark_cdr=True,
-                cmap='hot'
+                cmap='hot',
+                vmax=22
                 )
 
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(

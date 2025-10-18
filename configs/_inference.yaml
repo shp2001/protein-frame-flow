@@ -84,7 +84,7 @@ inference:
     csv_path: /home/psh/benchmark_after210930/meta_modif/metadata_duplicated.csv
 
     # Number of scaffolds to sample per target.
-    samples_per_target: 20
+    samples_per_target: 10
 
     # Batch size when sampling from the model
     batch_size: 10

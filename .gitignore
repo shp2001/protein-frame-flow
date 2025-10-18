@@ -21,6 +21,7 @@ weights/
 .history/
 **/*.cif
 **/*.cif.gz
+**/*.pse
 **/*.err
 
 # Byte-compiled / optimized / DLL files
