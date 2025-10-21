@@ -25,6 +25,10 @@ parser.add_argument(
     help='Path to directory with PDB files.',
     type=str)
 parser.add_argument(
+    '--chothia_dir',
+    help='Path to directory with Chothia numbered PDB files.',
+    )
+parser.add_argument(
     '--num_processes',
     help='Number of processes.',
     type=int,
@@ -49,7 +53,7 @@ parser.add_argument(
     default='/home/psh/protein-frame-flow/configs/datasets.yaml'
 )
 
-def process_file(file_path: str, write_dir: str, cfg: str):
+def process_file(file_path: str, write_dir: str, cfg: str, chothia_file_path=None):
     """Processes protein file into usable, smaller pickles.
 
     Args:
@@ -72,24 +76,24 @@ def process_file(file_path: str, write_dir: str, cfg: str):
 
     if mode == 'ab':
         cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
-        for cdr_type in cdr_types:
-            start, end = mi.cdr_indices(file_path, cdr_type)
-            metadata[f'{cdr_type}_start'] = start
-            metadata[f'{cdr_type}_end'] = end
+        if chothia_file_path != None:
+            for cdr_type in cdr_types:
+                start, end = mi.cdr_indices(chothia_file_path, cdr_type)
+                metadata[f'{cdr_type}_start'] = start
+                metadata[f'{cdr_type}_end'] = end
 
     if mode == 'nanobody':
         cdr_types = ['h1', 'h2', 'h3']
-        for cdr_type in cdr_types:
-            start, end = mi.cdr_indices(file_path, cdr_type)
-            metadata[f'{cdr_type}_start'] = start
-            metadata[f'{cdr_type}_end'] = end
-    
+        if chothia_file_path != None:
+            for cdr_type in cdr_types:
+                start, end = mi.cdr_indices(chothia_file_path, cdr_type)
+                metadata[f'{cdr_type}_start'] = start
+                metadata[f'{cdr_type}_end'] = end
 
     if mode == 'general':
         loop_json_dir = cfg['shared']['loop_dir']
         json_filename = os.path.basename(file_path).replace('.pdb', '.json')
         loop_info_file = os.path.join(loop_json_dir, json_filename)
-
         metadata['loop_info_dir'] = loop_info_file
 
     pdb_name = os.path.basename(file_path).replace('.pdb', '')
@@ -161,15 +165,19 @@ def process_file(file_path: str, write_dir: str, cfg: str):
     return metadata
 
 
-def process_serially(all_paths, write_dir, cfg):
+def process_serially(all_paths, write_dir, cfg, chothia_file_paths=None):
     all_metadata = []
+    assert not (chothia_file_paths==None and cfg['mode'] in ['ab', 'nanobody'])
+
     for i, file_path in enumerate(all_paths):
         try:
             start_time = time.time()
             metadata = process_file(
                 file_path,
                 write_dir,
-                cfg)
+                cfg,
+                chothia_file_paths[i]
+                )
             elapsed_time = time.time() - start_time
             print(f'Finished {file_path} in {elapsed_time:2.2f}s')
             all_metadata.append(metadata)
@@ -182,13 +190,15 @@ def process_fn(
         file_path,
         verbose=None,
         write_dir=None,
-        cfg=None):
+        cfg=None,
+        chothia_file_path=None):
     try:
         start_time = time.time()
         metadata = process_file(
             file_path,
             write_dir,
-            cfg)
+            cfg,
+            chothia_file_path)
         elapsed_time = time.time() - start_time
         if verbose:
             print(f'Finished {file_path} in {elapsed_time:2.2f}s')
@@ -200,10 +210,19 @@ def process_fn(
 
 def main(args):
     pdb_dir = args.pdb_dir
+    chothia_dir = args.chothia_dir
     cfg = args.config
     all_file_paths = [
         os.path.join(pdb_dir, x)
         for x in os.listdir(args.pdb_dir) if '.pdb' in x]
+    
+    chothia_file_paths = None 
+    if cfg['mode'] in ['ab', 'nanobody']:
+        chothia_file_paths = [
+            os.path.join(chothia_dir, x)
+            for x in os.listdir(args.chothia_dir) if '.pdb' in x
+        ] 
+
     total_num_paths = len(all_file_paths)
     write_dir = args.write_dir
     if not os.path.exists(write_dir):
@@ -220,15 +239,20 @@ def main(args):
         all_metadata = process_serially(
             all_file_paths,
             write_dir,
-            cfg)
+            cfg,
+            chothia_file_paths)
     else:
         _process_fn = fn.partial(
             process_fn,
             verbose=args.verbose,
             write_dir=write_dir,
-            cfg=cfg)
+            cfg=cfg,
+            )
         with mp.Pool(processes=args.num_processes) as pool:
-            all_metadata = pool.map(_process_fn, all_file_paths)
+            if cfg['mode'] in ['ab', 'nanobody']:
+                all_metadata = pool.starmap(_process_fn, all_file_paths, chothia_file_paths)
+            else:
+                all_metadata = pool.map(_process_fn, all_file_paths)
         all_metadata = [x for x in all_metadata if x is not None]
     metadata_df = pd.DataFrame(all_metadata)
     metadata_df.to_csv(metadata_path, index=False)
