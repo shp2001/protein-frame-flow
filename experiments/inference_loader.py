@@ -20,9 +20,7 @@ from itertools import accumulate
 import bisect
 
 from data import featurizer
-
 from torch.utils.data import SequentialSampler
-
 
 def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.read_pkl(processed_file_path)
@@ -280,7 +278,7 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=450,
+                                                    max_len=1000,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=False
                                                     )

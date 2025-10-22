@@ -81,7 +81,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/benchmark_after210930/meta_modif/metadata_duplicated.csv
+    csv_path: /home/psh/BioBetter/5ggs/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
     samples_per_target: 10
