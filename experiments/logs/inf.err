@@ -3,3 +3,4 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+slurmstepd-gpu02: error: *** JOB 832396 ON gpu02 CANCELLED AT 2025-10-25T12:36:30 ***

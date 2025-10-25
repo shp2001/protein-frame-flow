@@ -2,7 +2,7 @@ model:
   c_s: 384
   c_token: 768
   c_z: 128
-  train_confidence: False
+  train_confidence: True
   symmetric: False
   
   node_features:
@@ -100,12 +100,20 @@ model:
     max_bin: 64
     num_bins: 128
 
-    
   confidence_head:
-    use_confidence: False
-    c_s: ${model.c_s}
-    c_z: ${model.c_z}
-    num_bins: 32
+    n_blocks: 3
+    c_s: 384
+    c_z: 128
+    c_s_inputs: 384
+    b_pae: 64
+    b_plddt: 50
+    max_atoms_per_token: 14
+    pairformer_dropout: 0.0
+    blocks_per_ckpt: 1
+    distance_bin_start: 3.25
+    distance_bin_end: 52.0
+    distance_bin_step: 1.25
+    stop_gradient: True
 
   initialization:
     zero_init_condition_transition: False

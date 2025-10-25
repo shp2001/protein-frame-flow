@@ -4,7 +4,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 # Pytorch lightning imports
-from pytorch_lightning import LightningDataModule, LightningModule, Trainer, Callback
+from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
@@ -81,18 +81,16 @@ class Experiment:
             # The optimizer and scheduler will be re-initialized from scratch.
             self._module = FlowModule.load_from_checkpoint(
                 checkpoint_path=self._exp_cfg.warm_start,
-                
-                # Pass any arguments needed by your FlowModule's __init__ method
-                # In your case, it seems to be the config `cfg`.
                 cfg=self._cfg,
-
-                # (Optional) Use strict=False if the checkpoint and model
-                # architectures have some differences (e.g., a new final layer).
-                # strict=False 
+                strict=False 
             )
         else:
             log.info("No warm start checkpoint found. Training from scratch.")
 
+        if hasattr(self._module, 'confidence_model'):
+            strategy = 'ddp_find_unused_parameters_true'
+        else:
+            strategy = 'ddp'
         trainer = Trainer(
             **self._exp_cfg.trainer,
             callbacks=callbacks,
@@ -100,7 +98,7 @@ class Experiment:
             use_distributed_sampler=False,
             enable_progress_bar=True,
             enable_model_summary=True,
-            strategy='ddp',
+            strategy=strategy,
             devices=self._exp_cfg.num_devices,
             gradient_clip_val=1.0
         )

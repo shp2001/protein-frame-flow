@@ -34,12 +34,10 @@ interpolant:
   max_shift: 0
   twisting:
     use: False
-
   rots:
     corrupt: True
     sample_schedule: exp
     exp_rate: 10
-
   trans:
     corrupt: True
     batch_ot: True
@@ -52,27 +50,20 @@ interpolant:
     rog:
       weight: 10.0
       cutoff: 5.0
-
   inference_time_scaling:
     use: False
-
   sampling:
     num_timesteps: 30
     do_sde: False
 
-  save_traj: False 
-
-mini_rollout:
+rollout:
   min_t: 1e-2
-
   twisting:
     use: False
-
   rots:
     corrupt: True
     sample_schedule: exp
     exp_rate: 10
-
   trans:
     corrupt: True
     batch_ot: True
@@ -85,15 +76,11 @@ mini_rollout:
     rog:
       weight: 10.0
       cutoff: 5.0
-
   inference_time_scaling:
     use: False
   sampling:
     num_timesteps: 15
     do_sde: False
-
-  use_prmsd: ${model.confidence_head.use_confidence}
-  save_traj: False 
   
 experiment:
   add_modules: False
@@ -140,14 +127,31 @@ experiment:
     bb_viol_loss_t_pass: 0.5
     sc_viol_loss_t_pass: 0.75
     
+    # confidence loss 
+    plddt:
+      min_bin: 0
+      max_bin: 1
+      no_bins: 50
+      threshold: 15
+      eps: 1e-6
+      normalize: True
+      reduction: mean
+
+    pae:
+      min_bin: 0
+      max_bin: 32
+      no_bins: 64
+      eps: 1e-6
+      reduction: mean
+      
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2
-    project: v2.3.2
+    name: CDRFlow_v2.3.2.1_stage_2_wt_confidence
+    project: v2.3.2_confidence
   optimizer:
     warmup_steps: 0
-    decay_steps: 270_000
+    decay_steps: 120_000
     min_lr: 1e-4
-    max_lr: 1e-4
+    max_lr: 1e-3
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -161,7 +165,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/h3_trans_loss
+    monitor: valid/plddt_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null
