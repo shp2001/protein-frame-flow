@@ -87,7 +87,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_general/2025-10-10_11-07-07/epoch=68-step=233979.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2/2025-10-14_00-20-37/epoch=63-step=91712_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -145,13 +145,13 @@ experiment:
       reduction: mean
       
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2_wt_confidence
+    name: CDRFlow_v2.3.2.1_stage_2_wt_confidence_lr_1e-4
     project: v2.3.2_confidence
   optimizer:
     warmup_steps: 0
     decay_steps: 120_000
     min_lr: 1e-4
-    max_lr: 1e-3
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
