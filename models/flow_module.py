@@ -859,13 +859,17 @@ class FlowModule(LightningModule):
         print("Pairformer cache has been initialized.")
 
     def predict_step(self, batch, batch_idx):
-        del batch_idx # Unused
-        device = f'cuda:{torch.cuda.current_device()}'
-        interpolant = Interpolant(self._infer_cfg.interpolant) 
-        interpolant.set_device(device)
-
-        num_batch = batch['sample_id'].shape[0]
+        res_mask = batch['res_mask']
+        b = res_mask.shape[0]
+        self.interpolant.set_device(res_mask.device)
+        num_batch, num_res = res_mask.shape
+        num_batch, num_atom, _ = batch['r_1'].shape
+        edge_mask = batch['edge_mask']
+        loop_mask = batch['loop_mask']
+        diffuse_mask = batch['diffuse_mask']
+        raw_path = batch['raw_path']
         pdb_id = batch['processed_path'].split('/')[-1].replace('.pdb', '')
+
 
         sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):
@@ -880,11 +884,11 @@ class FlowModule(LightningModule):
             s_init, s, z = self.pairformer_cache[pdb_id]
         else:
             print(f"new pdb {pdb_id}: make pairformer output")
-            s_init_embed, z_init = self.model.embed_input(batch)
+            s_init, z_init = self.model.embed_input(batch)
             s_init, s, z, pair_outputs = self.model.do_pairformer(
-                s_init_embed,
+                s_init,
                 z_init,
-                batch['edge_mask'][0][None, ...],
+                edge_mask[0][None, ...],
                 self._model_cfg.pairformer.n_cycles,
                 num_batch
             )
@@ -893,57 +897,57 @@ class FlowModule(LightningModule):
             
             # save distogram 
             # find cdr_residues to mark cdr on the distogram 
-            cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
-            cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
+            # cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
+            # cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
 
             # pairformer distogram 시각화
-            dist_map_pairformer = eu.dist_map_from_distogram(
-                pair_outputs[0][None, ...],
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                do_softmax=False
-                ) # (1, N, N)
-            eu.visualize_dist_map(
-                dist_map_pairformer[0], 
-                os.path.join(sample_root_dir, "pairformer_dist_ca.png"), 
-                title=f"{pdb_id.upper()} Pairformer Cα Distogram",
-                cdr_residues=cdr_residues,
-                mark_cdr=True
-                )
+            # dist_map_pairformer = eu.dist_map_from_distogram(
+            #     pair_outputs[0][None, ...],
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     do_softmax=False
+            #     ) # (1, N, N)
+            # eu.visualize_dist_map(
+            #     dist_map_pairformer[0], 
+            #     os.path.join(sample_root_dir, "pairformer_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} Pairformer Cα Distogram",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True
+            #     )
 
-            # gt distogram 시각화 
-            gt_ca_distogram = calc_distogram(  
-                batch['trans_1'][0][None, ...],
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                num_bins=self._model_cfg.distogram_head.num_bins,
-            ) # (1, L, L, num_bins)
-            gt_ca_dist = eu.dist_map_from_distogram(
-                gt_ca_distogram, 
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                do_softmax=False)
-            eu.visualize_dist_map(
-                gt_ca_dist[0], 
-                os.path.join(sample_root_dir, "gt_dist_ca.png"), 
-                title=f"{pdb_id.upper()} True Cα Distogram",
-                cdr_residues=cdr_residues,
-                mark_cdr=True
-                )
-            # gt distogram과 pairformer distogram 차이 
-            diff_distance_map = np.abs(gt_ca_dist - dist_map_pairformer)
+            # # gt distogram 시각화 
+            # gt_ca_distogram = calc_distogram(  
+            #     batch['trans_1'][0][None, ...],
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     num_bins=self._model_cfg.distogram_head.num_bins,
+            # ) # (1, L, L, num_bins)
+            # gt_ca_dist = eu.dist_map_from_distogram(
+            #     gt_ca_distogram, 
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     do_softmax=False)
+            # eu.visualize_dist_map(
+            #     gt_ca_dist[0], 
+            #     os.path.join(sample_root_dir, "gt_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} True Cα Distogram",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True
+            #     )
+            # # gt distogram과 pairformer distogram 차이 
+            # diff_distance_map = np.abs(gt_ca_dist - dist_map_pairformer)
 
-            eu.visualize_dist_map(
-                diff_distance_map[0], 
-                os.path.join(sample_root_dir, "diff_dist_ca.png"), 
-                title=f"{pdb_id.upper()} |True - Pairformer|",
-                cdr_residues=cdr_residues,
-                mark_cdr=True,
-                cmap='hot',
-                vmax=22
-                )
+            # eu.visualize_dist_map(
+            #     diff_distance_map[0], 
+            #     os.path.join(sample_root_dir, "diff_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} |True - Pairformer|",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True,
+            #     cmap='hot',
+            #     vmax=22
+            #     )
 
-        atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
+        atom37_traj, model_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
             self.model,
             batch,
             s_init,
@@ -951,13 +955,40 @@ class FlowModule(LightningModule):
             z
         )
 
+        # get b_factors 
+        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
+        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
+
+        if hasattr(self, "confidence_model"):
+            plddt_pred, pae_pred = self.confidence_model(
+                batch['ref_feature_dict'],
+                s_init[0],
+                s[0],
+                z[0],
+                batch['edge_mask'][0],
+                pred_trans_1,
+            )       
+            plddt_bins = plddt_pred.shape[-1]
+            plddt_probs = nn.functional.softmax(plddt_pred, dim=-1)  # [B, N_atom, plddt_bins]
+            bin_values = torch.linspace(0, 1, plddt_bins, device=plddt_pred.device)  # [plddt_bins]
+            plddt_score = torch.sum(plddt_probs * bin_values, dim=-1)  # [B, N_atom]
+            b_factors_14 = du.atom_unflatten(plddt_score, batch['atom14_gt_exists']) # [B, N_token, 14]
+            b_factors_14 = du.to_numpy(b_factors_14) * 100
+
+            b_factors = []
+            for i in range(b):
+                b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch)
+                b_factors.append(np.squeeze(b_factors_37, axis=-1))
+            b_factors = np.stack(b_factors) # (B, L, 37)
+        else:
+            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
+
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1)) # (B, N_steps, L, 37, 3)
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []
 
-        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
-        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
-        for i in range(pred_positions.shape[0]):
+        for i in range(b):
             pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
             pred_positions_37.append(pred_position_37)
         pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
@@ -965,6 +996,7 @@ class FlowModule(LightningModule):
         samples = os.listdir(sample_root_dir)
         sample_nums = samples 
         next_sample_num = -1
+
         # protein의 n번째 (n>1) 배치를 생성할 때 
         if any('sample' in filename for filename in samples):
             sample_nums = sorted([int(sample.replace("sample_", "")) for sample in samples if 'sample' in sample])
@@ -981,16 +1013,16 @@ class FlowModule(LightningModule):
             aatype = du.to_numpy(batch['aatype'][i].int())
             chain_idx = du.to_numpy(batch['chain_idx'][i].int())
             diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
-
+            b_factor = b_factors[i]
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
                 bb_prot_traj=bb_traj, 
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                b_factors=None,  # 위의 prmsd 집어넣기 
+                b_factors=b_factor,  # 위의 prmsd 집어넣기 
                 diffuse_mask=diffuse_mask,
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
-                save_traj_bool=self._interpolant_cfg.save_traj
+                save_traj_bool=False
             )
             

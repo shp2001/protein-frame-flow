@@ -206,7 +206,7 @@ def save_traj(
         output_dir: str,
         b_factors: np.ndarray,
         diffuse_mask: np.ndarray,
-        save_traj_bool,
+        save_traj_bool = False,
         aatype = None,
         chain_index = None
     ):
@@ -241,9 +241,6 @@ def save_traj(
     if b_factors is None:
         b_factor_alt = diffuse_mask
         b_factors = np.tile((b_factor_alt * 100)[:, None], (1, 37))
-    
-    else:
-        b_factors = np.tile((b_factors)[:, None], (1, 37))
     
     sample_path = au.write_prot_to_pdb(
         sample,

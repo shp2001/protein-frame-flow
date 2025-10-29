@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH -J CDRFlow_2.0.0_inf
+#SBATCH -J v2.3.2.1_no_aff
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=90g
-#SBATCH -c 12
+#SBATCH --mem=45g
+#SBATCH -c 6
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/inf.err
 

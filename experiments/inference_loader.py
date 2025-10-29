@@ -278,9 +278,9 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=1000,
+                                                    max_len=400,
                                                     seq_list=feat['chain_seq_list'],
-                                                    crop_ab=False
+                                                    crop_ab=True
                                                     )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
