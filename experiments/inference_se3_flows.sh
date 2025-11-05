@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.1_no_aff
+#SBATCH -J v2.3.2.1
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1

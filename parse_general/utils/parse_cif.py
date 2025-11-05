@@ -29,10 +29,10 @@ import copy
 parser = argparse.ArgumentParser(
     description='PDB processing script.')
 parser.add_argument(
-    '--pdb_ids_path',
+    '--input_path',
     help='Path to directory with PDB files.',
     type=str,
-    default='/home/psh/protein-frame-flow/parse_general/meta/only_protein_filtered.txt')
+    default='/home/psh/BioBetter/SEZ6/process_file.txt')
 parser.add_argument(
     '--num_processes',
     help='Number of processes.',
@@ -42,7 +42,7 @@ parser.add_argument(
     '--write_dir',
     help='Path to write results to.',
     type=str,
-    default='/home/psh/data/general/meta')
+    default='/home/psh/BioBetter/SEZ6/meta')
 parser.add_argument(
     '--debug',
     help='Turn on for debugging.',
@@ -91,8 +91,12 @@ def get_cif_path(cif_ID):
     return cif_path
 
 def mmcif_to_cif_text(gz_path: str) -> io.StringIO:
-    with gzip.open(gz_path, 'rt') as f_in:
-        cif_content = f_in.read()
+    if gz_path.endswith('.gz'):
+        with gzip.open(gz_path, 'rt') as f_in:
+            cif_content = f_in.read()
+    else:
+        with open(gz_path, 'r') as f_in:
+            cif_content = f_in.read()
 
     mmcif_dict = MMCIF2Dict(io.StringIO(cif_content))
 
@@ -297,8 +301,6 @@ def process_cif_file(file_path: str, write_dir: str, cfg: str):
 def process_serially(all_paths, write_dir, cfg):
     all_metadata = []
     for i, file_path in enumerate(all_paths):
-        if '1ejg' not in file_path:
-            continue
         try:
             start_time = time.time()
             metadata = process_cif_file(
@@ -334,13 +336,17 @@ def process_fn(
             print(f'Failed {file_path}: {e}')
 
 def main(args):
-    pdb_ids_path = args.pdb_ids_path
+    input_path = args.input_path
     cfg = args.config
 
-    with open(pdb_ids_path, 'r') as f:
-        pdb_ids = [line.strip() for line in f if line.strip()]
+    with open(input_path, 'r') as f:
+        cif_path_or_id = [line.strip() for line in f if line.strip()]
 
-    all_file_paths = [get_cif_path(pdb_id) for pdb_id in pdb_ids]
+    all_file_paths = [
+        pdb_id if pdb_id.endswith('.cif') else get_cif_path(pdb_id)
+        for pdb_id in cif_path_or_id
+]
+
     total_num_paths = len(all_file_paths)
     write_dir = args.write_dir
     if not os.path.exists(write_dir):
