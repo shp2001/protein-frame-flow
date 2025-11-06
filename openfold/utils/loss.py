@@ -883,8 +883,8 @@ def between_residue_clash_loss(
     atom14_atom_radius: torch.Tensor,
     residue_index: torch.Tensor,
     interface_mask: torch.Tensor,
-    overlap_tolerance_soft=1.5,
-    overlap_tolerance_hard=1.5,
+    overlap_tolerance_soft=0,
+    overlap_tolerance_hard=0,
     eps=1e-10,
 ) -> Dict[str, torch.Tensor]:
     """Loss to penalize steric clashes between residues.

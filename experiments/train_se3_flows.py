@@ -81,14 +81,7 @@ class Experiment:
             # The optimizer and scheduler will be re-initialized from scratch.
             self._module = FlowModule.load_from_checkpoint(
                 checkpoint_path=self._exp_cfg.warm_start,
-                
-                # Pass any arguments needed by your FlowModule's __init__ method
-                # In your case, it seems to be the config `cfg`.
                 cfg=self._cfg,
-
-                # (Optional) Use strict=False if the checkpoint and model
-                # architectures have some differences (e.g., a new final layer).
-                # strict=False 
             )
         else:
             log.info("No warm start checkpoint found. Training from scratch.")

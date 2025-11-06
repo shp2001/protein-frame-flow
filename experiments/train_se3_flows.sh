@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.1_stage2
+#SBATCH -J v2.3.2.1_stage2_aa_clash
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:2
-#SBATCH --mem=200g
-#SBATCH -c 64
-#SBATCH -w gpu04
+#SBATCH --mem=150g
+#SBATCH -c 32
+#SBATCH -w gpu05
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
 

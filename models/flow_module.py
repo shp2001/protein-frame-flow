@@ -274,7 +274,7 @@ class FlowModule(LightningModule):
                 noisy_batch['atom14_gt_exists'],
                 noisy_batch['residue_index'],
                 noisy_batch['residx_atom14_to_atom37'],
-                interface_mask=None,
+                interface_mask=noisy_batch['loop_mask'],
             )
 
 
