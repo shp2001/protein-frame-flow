@@ -862,91 +862,40 @@ class FlowModule(LightningModule):
         res_mask = batch['res_mask']
         b = res_mask.shape[0]
         self.interpolant.set_device(res_mask.device)
-        num_batch, num_res = res_mask.shape
-        num_batch, num_atom, _ = batch['r_1'].shape
         edge_mask = batch['edge_mask']
-        loop_mask = batch['loop_mask']
         diffuse_mask = batch['diffuse_mask']
-        raw_path = batch['raw_path']
-        pdb_id = batch['processed_path'].split('/')[-1].replace('.pdb', '')
 
+        num_batch = batch['sample_id'].shape[0]
+        if 'sample' in batch['raw_path'].split('/')[-1]:
+            pdb_id = batch['raw_path'].split('/')[-2]
+            sample_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
+            sample_root_dir = os.path.join(self.inference_dir, pdb_id, sample_id)
+        else:
+            pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
+            sample_root_dir = os.path.join(self.inference_dir, pdb_id)
 
-        sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
 
-        if pdb_id != self.current_pdb_id:
+        if batch['raw_path'] != self.current_pdb_id:
             self.pairformer_cache.clear()
-            self.current_pdb_id = pdb_id
+            self.current_pdb_id = batch['raw_path']
 
-        if pdb_id in self.pairformer_cache:
-            print(f"{pdb_id} pairformer cache will be used")
-            s_init, s, z = self.pairformer_cache[pdb_id]
+        if batch['raw_path'] in self.pairformer_cache:
+            s_init, s, z = self.pairformer_cache[batch['raw_path']]
         else:
-            print(f"new pdb {pdb_id}: make pairformer output")
-            s_init, z_init = self.model.embed_input(batch)
+            s_init_embed, z_init = self.model.embed_input(batch)
             s_init, s, z, pair_outputs = self.model.do_pairformer(
-                s_init,
+                s_init_embed,
                 z_init,
-                edge_mask[0][None, ...],
+                batch['edge_mask'][0][None, ...],
                 self._model_cfg.pairformer.n_cycles,
                 num_batch
             )
             # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[pdb_id] = (s_init, s, z)
+            self.pairformer_cache[batch['raw_path']] = (s_init, s, z)
             
-            # save distogram 
-            # find cdr_residues to mark cdr on the distogram 
-            # cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
-            # cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
-
-            # pairformer distogram 시각화
-            # dist_map_pairformer = eu.dist_map_from_distogram(
-            #     pair_outputs[0][None, ...],
-            #     min_bin=self._model_cfg.distogram_head.min_bin,
-            #     max_bin=self._model_cfg.distogram_head.max_bin,
-            #     do_softmax=False
-            #     ) # (1, N, N)
-            # eu.visualize_dist_map(
-            #     dist_map_pairformer[0], 
-            #     os.path.join(sample_root_dir, "pairformer_dist_ca.png"), 
-            #     title=f"{pdb_id.upper()} Pairformer Cα Distogram",
-            #     cdr_residues=cdr_residues,
-            #     mark_cdr=True
-            #     )
-
-            # # gt distogram 시각화 
-            # gt_ca_distogram = calc_distogram(  
-            #     batch['trans_1'][0][None, ...],
-            #     min_bin=self._model_cfg.distogram_head.min_bin,
-            #     max_bin=self._model_cfg.distogram_head.max_bin,
-            #     num_bins=self._model_cfg.distogram_head.num_bins,
-            # ) # (1, L, L, num_bins)
-            # gt_ca_dist = eu.dist_map_from_distogram(
-            #     gt_ca_distogram, 
-            #     min_bin=self._model_cfg.distogram_head.min_bin,
-            #     max_bin=self._model_cfg.distogram_head.max_bin,
-            #     do_softmax=False)
-            # eu.visualize_dist_map(
-            #     gt_ca_dist[0], 
-            #     os.path.join(sample_root_dir, "gt_dist_ca.png"), 
-            #     title=f"{pdb_id.upper()} True Cα Distogram",
-            #     cdr_residues=cdr_residues,
-            #     mark_cdr=True
-            #     )
-            # # gt distogram과 pairformer distogram 차이 
-            # diff_distance_map = np.abs(gt_ca_dist - dist_map_pairformer)
-
-            # eu.visualize_dist_map(
-            #     diff_distance_map[0], 
-            #     os.path.join(sample_root_dir, "diff_dist_ca.png"), 
-            #     title=f"{pdb_id.upper()} |True - Pairformer|",
-            #     cdr_residues=cdr_residues,
-            #     mark_cdr=True,
-            #     cmap='hot',
-            #     vmax=22
-            #     )
-
+            
         atom37_traj, model_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
             self.model,
             batch,
@@ -1013,6 +962,7 @@ class FlowModule(LightningModule):
             aatype = du.to_numpy(batch['aatype'][i].int())
             chain_idx = du.to_numpy(batch['chain_idx'][i].int())
             diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
+            residue_idx = du.to_numpy(batch['residue_index'][i].int())
             b_factor = b_factors[i]
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
@@ -1023,6 +973,7 @@ class FlowModule(LightningModule):
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
+                residue_index=residue_idx,
                 save_traj_bool=False
             )
             

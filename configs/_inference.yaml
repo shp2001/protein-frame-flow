@@ -81,12 +81,12 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/BioBetter/SEZ6/meta/metadata_2.csv
+    csv_path: /home/psh/BioBetter/kkh_output/meta/metadata_acc_med_high.csv 
     # Number of scaffolds to sample per target.
-    samples_per_target: 100
+    samples_per_target: 15
 
     # Batch size when sampling from the model
-    batch_size: 10
+    batch_size: 5
     num_workers: 8
     prefetch_factor: 4
 

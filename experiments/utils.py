@@ -206,9 +206,10 @@ def save_traj(
         output_dir: str,
         b_factors: np.ndarray,
         diffuse_mask: np.ndarray,
-        save_traj_bool = False,
+        save_traj_bool,
         aatype = None,
-        chain_index = None
+        chain_index = None,
+        residue_index = None,
     ):
     """Writes final sample and reverse diffusion trajectory.
 
@@ -236,8 +237,6 @@ def save_traj(
     sample_path = os.path.join(output_dir, 'sample.pdb')
     prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
     x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
-
-    # Use b-factors to specify which residues are diffused.
     if b_factors is None:
         b_factor_alt = diffuse_mask
         b_factors = np.tile((b_factor_alt * 100)[:, None], (1, 37))
@@ -248,7 +247,8 @@ def save_traj(
         b_factors=b_factors,
         no_indexing=False,
         aatype=aatype,
-        chain_index=chain_index
+        chain_index=chain_index,
+        residue_index=residue_index
     )
     if not save_traj_bool:
         return {
@@ -262,7 +262,8 @@ def save_traj(
             b_factors=b_factors,
             no_indexing=False,
             aatype=aatype,
-            chain_index=chain_index
+            chain_index=chain_index,
+            residue_index=residue_index
         )
         # x0_traj_path = au.write_prot_to_pdb(
         #     x0_traj,
@@ -277,7 +278,6 @@ def save_traj(
             'traj_path': prot_traj_path,
             # 'x0_traj_path': x0_traj_path,
         }
-
 
 
 def get_pylogger(name=__name__) -> logging.Logger:
