@@ -186,8 +186,13 @@ def get_ab_metrics(pdb_file_1, pdb_file_2, output_file):
     # pdb_file_2: label
 
     # PyRosetta 초기화
-    pyrosetta.init("-ignore_zero_occupancy false -check_cdr_chainbreaks false")
-
+    pyrosetta.init(
+        "-ignore_unrecognized_res "
+        "-ignore_waters "
+        "-ignore_zero_occupancy true "
+        "-mute all"
+        "-check_cdr_chainbreaks false"
+    )
     # PDB 파일로부터 pose 객체 생성
     pose_1 = pyrosetta.pose_from_file(pdb_file_1)
     pose_2 = pyrosetta.pose_from_file(pdb_file_2)

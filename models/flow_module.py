@@ -882,6 +882,7 @@ class FlowModule(LightningModule):
             self.current_pdb_id = batch['raw_path']
 
         if batch['raw_path'] in self.pairformer_cache:
+            print(f"{batch['raw_path']} pairformer 사용")
             s_init, s, z = self.pairformer_cache[batch['raw_path']]
         else:
             s_init_embed, z_init = self.model.embed_input(batch)
@@ -894,7 +895,7 @@ class FlowModule(LightningModule):
             )
             # 결과를 캐시에 저장합니다.
             self.pairformer_cache[batch['raw_path']] = (s_init, s, z)
-            
+            print(f"{batch['raw_path']} pairformer 생성")
             
         atom37_traj, model_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
             self.model,

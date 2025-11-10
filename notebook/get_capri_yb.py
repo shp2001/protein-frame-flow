@@ -477,6 +477,7 @@ if __name__ == '__main__':
             agchain = ''
             pdbname = i.split('/')[-4] # real one
             data_name = i.split('/')[-3]
+            sample_id = i.split('/')[-2]
             print(f"pdb name: {pdbname}")
             if pdbname.split('_')[3] == '#': continue
             change_chain(i, pdbname)
@@ -505,6 +506,7 @@ if __name__ == '__main__':
 
             info_dict['pdb_id'].append(pdbname)
             info_dict['data_name'].append(data_name)
+            info_dict['sample_id'].append(sample_id)
             info_dict['capri'].append(capri_criteria)
             info_dict['dockq'].append(dockq)
             info_dict['lrmsd'].append(l_rmsd)

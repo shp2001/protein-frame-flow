@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.1_kkh
+#SBATCH -J v2.3.2.1_inc
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=90g
+#SBATCH --mem=60g
 #SBATCH -c 12
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/inf.err
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/CDRFlow_1.2.4_aug_2.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > /home/psh/protein-frame-flow/experiments/logs/CDRFlow_1.2.4_aug_4.log

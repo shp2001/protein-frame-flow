@@ -1,0 +1,1 @@
+/var/spool/slurmd/job839582/slurm_script: line 12: 1462229 Segmentation fault      (core dumped) python -u -W ignore /home/psh/BioBetter/measure_cdr_rmsd_kkh.py --pred_dir /home/psh/BioBetter/kkh_output/chothia --label_dir /home/psh/benchmark_after210930/pdb_only_ab/ > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
