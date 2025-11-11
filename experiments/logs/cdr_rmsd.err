@@ -1,1 +1,27 @@
-/var/spool/slurmd/job839582/slurm_script: line 12: 1462229 Segmentation fault      (core dumped) python -u -W ignore /home/psh/BioBetter/measure_cdr_rmsd_kkh.py --pred_dir /home/psh/BioBetter/kkh_output/chothia --label_dir /home/psh/benchmark_after210930/pdb_only_ab/ > /home/psh/protein-frame-flow/experiments/logs/cdr_rmsd2.log
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: *** JOB 845059 STEPD TERMINATED ON gpu02 AT 2025-11-11T10:39:45 DUE TO JOB NOT ENDING WITH SIGNALS ***
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"

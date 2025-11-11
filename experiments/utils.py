@@ -15,6 +15,7 @@ from openfold.utils import rigid_utils as ru
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import pickle 
+from Bio.PDB import PDBParser
 
 class LengthDataset(torch.utils.data.Dataset):
     def __init__(self, samples_cfg):
@@ -553,3 +554,42 @@ def visualize_dist_map(
     # 이미지 저장
     plt.savefig(save_path, dpi=300)
     plt.close() # 메모리 누수 방지를 위해 figure를 닫아주는 것이 좋음
+
+cdr_chothia = {
+    "h1": (26, 32),
+    "h2": (52, 56),
+    "h3": (95, 102),
+    "l1": (24, 34),
+    "l2": (50, 56),
+    "l3": (89, 97)
+}
+
+cdr_chothia = {
+    "h1": (26, 32),
+    "h2": (52, 56),
+    "h3": (95, 102),
+    "l1": (24, 34),
+    "l2": (50, 56),
+    "l3": (89, 97)
+}
+def calculate_b_factor_mean(pdb_file, cdr_type):
+    parser = PDBParser(QUIET=True)
+
+    start_residue = cdr_chothia[cdr_type][0]
+    end_residue = cdr_chothia[cdr_type][1]
+
+    structure = parser.get_structure("structure", pdb_file)
+    
+    # 첫 번째 체인 추출
+    first_chain = next(iter(structure[0].get_chains()))
+    b_factors = []
+    for residue in first_chain:
+        residue_id = residue.get_id()
+        if residue_id[0] == " ":  # 표준 아미노산만 고려
+            residue_number = residue_id[1]
+            if start_residue <= residue_number <= end_residue:
+                # 각 원자의 B-factor 가져오기
+                for atom in residue:
+                    b_factors.append(atom.get_bfactor())
+
+    return np.mean(b_factors)

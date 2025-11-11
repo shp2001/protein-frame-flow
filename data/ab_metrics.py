@@ -102,7 +102,6 @@ def renumber_pdb_wt_constant(
             print(f"오류: Chain {chain.id} 슬라이싱 후에도 길이가 불일치합니다. 로직 확인 필요.")
             continue
 
-        print(f"Chain {chain.id}: V-domain {len(vd_residues_pdb)}개 잔기를 renumbering합니다...")
         # 6. V-domain 부분만 PDB ID (번호) 변경
         for pdb_r, (pos, aa) in zip(vd_residues_pdb, numbering_list):
             pos = str(pos)[1:]
@@ -118,7 +117,6 @@ def renumber_pdb_wt_constant(
     io = PDBIO()
     io.set_structure(structure)
     io.save(out_pdb_file)
-    print(f"Renumbering 완료. 파일 저장: {out_pdb_file}")
 
     return True
 

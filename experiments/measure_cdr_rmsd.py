@@ -110,6 +110,9 @@ def main(args):
                     continue
                 a = renumber_pdb(predicted_filepath)
                 extract_first_two_chains(predicted_filepath, only_ab_filepath)
+
+                if '.pkl' in filename:
+                    filename = filename.replace('.pkl', '')
                 label_filepath = os.path.join(label_dir, filename + '.pdb')
             
                 # PDB 파일 재체인 및 리넘버링
