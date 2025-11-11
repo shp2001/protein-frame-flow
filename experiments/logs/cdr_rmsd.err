@@ -25,3 +25,5 @@ slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Nam
 slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
 slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
 slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
+slurmstepd-gpu02: error: xgetaddrinfo: getaddrinfo(cssb-master:6817) failed: Name or service not known
+slurmstepd-gpu02: error: slurm_set_addr: Unable to resolve "cssb-master"
