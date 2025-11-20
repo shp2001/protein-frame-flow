@@ -425,63 +425,90 @@ def calculate_rmsd_info(gt_trans, pred_trans, loop_mask, diffuse_mask):
 
     return rmsd_info
 
-def modify_residues_in_cdr(src_pkl, target_dir, cdr_sequence, mutations):
+
+def modify_residues_by_id(src_pkl, target_dir, mutations):
     """
-    특정 CDR 서브시퀀스 내에서 여러 residue를 바꾸고
-    aatype, atom_mask를 업데이트한 뒤 새로운 pkl 파일로 저장하는 함수.
-
-    Args:
-        src_pkl (str): 원본 pkl 파일 경로
-        target_dir (str): 수정된 pkl 저장 디렉토리
-        cdr_sequence (str): CDR 서브시퀀스 (1-letter 코드)
-        mutations (list of tuple): [(rel_pos, new_resname), ...]
-            - rel_pos (int): target 내 상대 위치 (0-based)
-            - new_resname (str): 교체할 residue (3-letter 코드)
+    [NumPy 버전]
+    Chain ID와 Residue ID(PDB Number)를 기준으로 특정 residue를 찾아서 바꾸고
+    aatype, atom_mask를 업데이트한 뒤 저장하는 함수.
     """
-    # 원본 pkl 읽기
-    data = du.read_pkl(src_pkl, use_torch=True)
+    # 1. 원본 pkl 읽기
+    # use_torch=False로 설정하여 NumPy/List 형태로 로드한다고 가정
+    data = du.read_pkl(src_pkl, use_torch=False)
 
-    aatype = data["aatype"].copy()
-    atom_mask = data["atom_mask"].copy()   # (L, 37)
+    # ---------------------------------------------------------
+    # [수정] 데이터를 NumPy 배열로 변환 및 복사
+    # 원본이 리스트일 수도 있으므로 np.array()로 감싸줍니다.
+    # ---------------------------------------------------------
+    aatype = np.array(data["aatype"]).copy()
+    atom_mask = np.array(data["atom_mask"]).copy()
+    
+    chain_index = np.array(data["chain_index"])      # shape: (L,)
+    residue_index = np.array(data["residue_index"])  # shape: (L,)
 
-    # idx → 1-letter 매핑 준비
-    idx_to_resname = {i: r for r, i in rc.resname_to_idx.items()}
-    idx_to_aa = {i: rc.restype_3to1.get(res, "X") for i, res in idx_to_resname.items()}
+    print(f"Input File: {src_pkl}")
 
-    # 전체 시퀀스 (1-letter)
-    seq_full = "".join([idx_to_aa[int(i)] for i in aatype])
+    # 2. Mutation 적용
+    mutation_names = []
 
-    # target 시퀀스 찾기
-    start_idx = seq_full.find(cdr_sequence)
-    if start_idx == -1:
-        raise ValueError("target 시퀀스를 찾을 수 없습니다.")
+    for target_chain, target_res_id, new_resname in mutations:
+        # ---------------------------------------------------------
+        # [수정] NumPy 비교 연산 및 인덱스 추출
+        # torch.nonzero -> np.where
+        # ---------------------------------------------------------
+        mask = (chain_index == target_chain) & (residue_index == target_res_id)
+        found_indices = np.where(mask)[0]
 
-    # 여러 residue 교체
-    for rel_pos, new_resname in mutations:
-        replace_idx = start_idx + rel_pos
-        # aatype 업데이트
-        aatype[replace_idx] = rc.resname_to_idx[new_resname]
-        # atom_mask 업데이트
-        new_mask = rc.restype_atom37_mask[aatype[replace_idx]]
-        atom_mask[replace_idx] = new_mask
-        print(f"변경: global_idx={replace_idx}, new_resname={new_resname}")
+        if len(found_indices) == 0:
+            print(f"[Warning] Target not found: Chain={target_chain}, ResID={target_res_id}. Skipping.")
+            continue
+        
+        for idx in found_indices:
+            # idx는 numpy int64 타입이므로 그대로 인덱싱 가능
+            
+            old_idx = aatype[idx]  # 스칼라 값
+            old_resname = rc.restypes_with_x[old_idx] if old_idx < len(rc.restypes_with_x) else "X"
+            
+            # 새로운 residue index 가져오기
+            if new_resname not in rc.resname_to_idx:
+                raise ValueError(f"Unknown residue name: {new_resname}")
+            
+            new_aa_idx = rc.resname_to_idx[new_resname]
 
-    # data 업데이트
+            # aatype 업데이트
+            aatype[idx] = new_aa_idx
+
+            # ---------------------------------------------------------
+            # [수정] atom_mask 업데이트
+            # rc.restype_atom37_mask는 이미 NumPy array이므로 바로 대입
+            # ---------------------------------------------------------
+            new_mask_np = rc.restype_atom37_mask[new_aa_idx]
+            atom_mask[idx] = new_mask_np
+
+            print(f"✅ 변경 완료 (idx={idx}): Chain {target_chain} / Res {target_res_id} | {old_resname} -> {new_resname}")
+            
+            mutation_names.append(f"{old_resname}{target_res_id}{rc.restype_3to1[new_resname]}")
+
+    # 3. Data 업데이트 (NumPy 배열을 다시 할당)
     data["aatype"] = aatype
     data["atom_mask"] = atom_mask
+    
+    # 만약 원본 데이터가 리스트 형태여야 한다면 tolist()를 사용하세요.
+    # data["aatype"] = aatype.tolist()
+    # data["atom_mask"] = atom_mask.tolist()
 
-    # 저장 경로 만들기
+    # 4. 저장
     os.makedirs(target_dir, exist_ok=True)
     base_name = os.path.basename(src_pkl)
-
-    # 파일 이름에 모든 변이 표시
-    mut_str = "_".join([f"{pos}{name}" for pos, name in mutations])
+    
+    mut_str = "_".join(mutation_names)
+    if not mut_str:
+        mut_str = "WT"
+        
     save_path = os.path.join(target_dir, base_name.replace(".pkl", f"_{mut_str}.pkl"))
-
-    with open(save_path, "wb") as f:
-        pickle.dump(data, f)
-
-    print(f"✅ 저장 완료: {save_path}")
+    
+    du.write_pkl(save_path, data)
+    print(f"💾 저장 완료: {save_path}\n")
     return save_path
 
 def dist_map_from_distogram(

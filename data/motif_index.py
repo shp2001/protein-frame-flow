@@ -63,7 +63,6 @@ def cdr_indices(chothia_pdb_file, cdr, offset_heavy=True):
 
     residue_id_nums = [res.get_id()[1] for res in chain]
 
-    # Binary search to find the start and end of the CDR loop (pdb 상에서 cdr index. anchor residue가 아니라 cdr 양 끝점의 computing index다.)
     cdr_start = bisect_left(
         residue_id_nums,
         chothia_range[0],
@@ -338,7 +337,7 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, mode='
         distance_vector, _ = torch.min(distance_vectors, dim=0)
         
         distance_ag = distance_vector[ab_len:]
-        values, indices = torch.topk(distance_ag, max_len-len(ab_idx), largest=False)
+        values, indices = torch.topk(distance_ag, max(max_len-len(ab_idx), 0), largest=False)
         indices = sorted([i + ab_len for i in indices if nan_mask[i]==1])
         residue_indices = ab_idx + indices
         

@@ -32,7 +32,7 @@ parser.add_argument(
     '--input_path',
     help='Path to directory with PDB files.',
     type=str,
-    default='/home/psh/BioBetter/SEZ6/process_file.txt')
+    default='/home/psh/data/affinity/pdb_ids.txt')
 parser.add_argument(
     '--num_processes',
     help='Number of processes.',
@@ -42,7 +42,7 @@ parser.add_argument(
     '--write_dir',
     help='Path to write results to.',
     type=str,
-    default='/home/psh/BioBetter/SEZ6/meta')
+    default='/home/psh/data/affinity/meta')
 parser.add_argument(
     '--debug',
     help='Turn on for debugging.',
@@ -82,7 +82,7 @@ def generate_chain_id_map(chain_ids):
  
 def get_cif_path(cif_ID):
     cif_path = (
-        "/public_data/BioMolDB_2024Oct21/cif/"
+        "/public_data/BioMolDB_2024Oct21/cif/cif_raw/"
         + cif_ID[1:3]
         + "/"
         + cif_ID

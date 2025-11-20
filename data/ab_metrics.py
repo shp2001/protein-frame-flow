@@ -53,67 +53,101 @@ def renumber_pdb_wt_constant(
     scheme="chothia",
 ):
     """
-    PDB 파일의 항체 가변 영역(V-domain)을 renumbering하고
+    PDB 파일의 항체 가변 영역(V-domain, VHH 포함)을 renumbering하고
     불변 영역(C-domain)은 기존 번호를 유지합니다.
+    Antigen 등 비-항체 체인은 건너뜁니다.
     """
     if out_pdb_file is None:
         out_pdb_file = in_pdb_file
 
-    # clean_pdb(in_pdb_file) # 해당 함수가 정의되어 있지 않아 주석 처리
-    
-    parser = PDBParser()
-    with warnings.catch_warnings(record=True):
-        structure = parser.get_structure(
-            "_",
-            in_pdb_file,
-        )
+    parser = PDBParser(QUIET=True) # 경고 메시지 최소화
+    structure = parser.get_structure("_", in_pdb_file)
 
-    for i, chain in enumerate(structure.get_chains()):
-        if i == 2:  # Heavy/Light chain (최대 2개)만 처리
-            break
-
+    # 모든 체인에 대해 순회 (기존의 i==2 break 제거)
+    for chain in structure.get_chains():
+        
         # 1. 비표준 잔기(HOH, 리간드 등)를 제외한 표준 아미노산 잔기 리스트와 서열 생성
         std_residues = []
         std_resnames = []
-        for r in chain.get_residues():
-            try:
-                # seq1 변환이 가능한 표준 아미노산인지 확인
-                aa = seq1(r.get_resname())
-                std_residues.append(r)
-                std_resnames.append(r.get_resname())
-            except KeyError:
-                continue  # HOH, 리간드 등 비표준 잔기 건너뛰기
         
-            
+        for r in chain.get_residues():
+            # PDB 표준 아미노산인지 확인 (Bio.PDB.Polypeptide.is_aa 등을 쓸 수도 있으나 seq1 활용)
+            resname = r.get_resname()
+            # seq1은 표준 아미노산이 아니면 '' 혹은 에러가 날 수 있음, 보통 3글자->1글자 변환
+            # 안전하게 처리하기 위해 try-except 혹은 dict check 사용 권장되나,
+            # 기존 로직을 존중하여 KeyError/ValueError 처리
+            try:
+                # 리간드나 물(HOH) 등은 seq1 변환 시 예외가 발생하거나 비표준 문자가 될 수 있음
+                if r.id[0] != ' ': # HETATM 제외 (물, 리간드 등)
+                    continue
+                
+                aa = seq1(resname)
+                # seq1('UNK') 등은 'X'를 반환할 수 있음. 필요한 경우 필터링
+                std_residues.append(r)
+                std_resnames.append(resname)
+            except (KeyError, ValueError):
+                continue
+        
+        # 서열이 너무 짧으면 항체가 아닐 확률 높음
+        if not std_resnames:
+            continue
+
         seq = seq1(''.join(std_resnames))
 
         # 2. abnumber를 사용해 V-domain 서열 번호 매기기
-        abnum_chain = Chain(seq, scheme=scheme)
-
-        # 3. V-domain 번호 리스트와 V-domain 시작 인덱스 가져오기
-        numbering_list = list(abnum_chain.positions.items())  # 순서가 보장된 리스트
-        vd_len = len(numbering_list)
-
-        # 4. PDB 잔기 리스트(std_residues)에서 V-domain에 해당하는 부분만 슬라이싱
-        vd_residues_pdb = std_residues[:vd_len]
-
-        # 5. 길이 재확인 (이제 길이가 같아야 함)
-        if len(vd_residues_pdb) != len(numbering_list):
-            print(f"오류: Chain {chain.id} 슬라이싱 후에도 길이가 불일치합니다. 로직 확인 필요.")
+        # Nanobody(VHH)도 Heavy chain으로 인식되어 처리됨
+        # Antigen이나 비-항체 서열은 ChainParseError 발생하므로 예외 처리
+        try:
+            abnum_chain = AbChain(seq, scheme=scheme)
+        except Exception:
+            # abnumber가 항체 서열로 인식하지 못함 -> renumbering 건너뛰기 (Antigen 등)
+            # print(f"Info: Chain {chain.id} is not an antibody variable domain. Skipping.")
             continue
 
-        # 6. V-domain 부분만 PDB ID (번호) 변경
+        # 3. V-domain 번호 리스트 가져오기
+        # abnumber는 가변 영역만 인식하므로, 전체 서열 중 앞부분(V-domain)에 해당하는 번호만 반환
+        numbering_list = list(abnum_chain.positions.items())
+        vd_len = len(numbering_list)
+
+        if vd_len == 0:
+            continue
+
+        # 4. PDB 잔기 리스트에서 V-domain에 해당하는 부분 매핑
+        # 주의: abnumber는 입력 서열의 '앞부분'에서 V-domain을 찾았다고 가정합니다.
+        # (일반적인 항체 PDB 구조상 V-domain이 N-term에 위치함)
+        vd_residues_pdb = std_residues[:vd_len]
+
+        # 길이 검증
+        if len(vd_residues_pdb) != len(numbering_list):
+            print(f"[Warning] Chain {chain.id}: Length mismatch between PDB residues ({len(vd_residues_pdb)}) and abnumber result ({len(numbering_list)}). Skipping.")
+            continue
+
+        # 5. V-domain 부분만 PDB ID (Residue Number) 변경
         for pdb_r, (pos, aa) in zip(vd_residues_pdb, numbering_list):
-            pos = str(pos)[1:]
-            if not pos[-1].isnumeric():
-                ins = pos[-1]
-                pos = int(pos[:-1])
+            # pos 예시: 'H100A', 'L24' 등 (Chain type 포함될 수 있음 -> abnumber 버전에 따라 다름)
+            # abnumber의 positions 키값은 보통 string이거나 별도 객체임. 
+            # 문자열로 변환 후 파싱
+            
+            pos_str = str(pos) # 예: "100", "100A", "H100A" (설정에 따라 다름)
+            
+            # abnumber Chain 객체의 positions 키는 보통 숫자+삽입코드 형태지만,
+            # Chain type(H/L)이 붙어있을 수 있으니 제거 (맨 앞 글자가 알파벳이고 뒤가 숫자면)
+            if pos_str[0].isalpha() and len(pos_str) > 1 and pos_str[1].isdigit():
+                 pos_str = pos_str[1:] # H100 -> 100
+            
+            # 숫자와 삽입코드(Insertion Code) 분리
+            if not pos_str[-1].isnumeric():
+                ins = pos_str[-1]       # 삽입 코드 (예: 'A')
+                res_num = int(pos_str[:-1]) # 잔기 번호 (예: 100)
             else:
-                pos = int(pos)
-                ins = ' '
+                ins = ' '               # 삽입 코드 없음
+                res_num = int(pos_str)
+            
+            # PDB 잔기 ID 업데이트: (Hetero flag, Sequence identifier, Insertion code)
+            # Hetero flag는 표준 아미노산이므로 ' '
+            pdb_r.id = (' ', res_num, ins)
 
-            pdb_r._id = (' ', pos, ins)
-
+    # 저장
     io = PDBIO()
     io.set_structure(structure)
     io.save(out_pdb_file)

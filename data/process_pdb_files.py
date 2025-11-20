@@ -217,7 +217,11 @@ def main(args):
         for x in os.listdir(args.pdb_dir) if '.pdb' in x]
     
     chothia_file_paths = None 
-    if cfg['mode'] in ['ab', 'nanobody']:
+
+    with open(cfg, 'r') as f:
+        loaded_cfg = yaml.safe_load(f)
+    
+    if loaded_cfg['shared']['mode'] in ['ab', 'nanobody']:
         chothia_file_paths = [
             os.path.join(chothia_dir, x)
             for x in os.listdir(args.chothia_dir) if '.pdb' in x
@@ -249,7 +253,7 @@ def main(args):
             cfg=cfg,
             )
         with mp.Pool(processes=args.num_processes) as pool:
-            if cfg['mode'] in ['ab', 'nanobody']:
+            if loaded_cfg['shared']['mode'] in ['ab', 'nanobody']:
                 all_metadata = pool.starmap(_process_fn, all_file_paths, chothia_file_paths)
             else:
                 all_metadata = pool.map(_process_fn, all_file_paths)

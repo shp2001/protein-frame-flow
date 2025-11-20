@@ -26,6 +26,8 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
+
+
     # make chain sequence list (for the multimer relpos embedding)
     int_to_aa = {i: restype for restype, i in rc.restype_order_with_x.items()}
     aatypes = processed_feats["aatype"]             # [L]
@@ -60,6 +62,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     rigids_1 = rigid_utils.Rigid.from_tensor_4x4(chain_feats['rigidgroups_gt_frames'])[:, 0]
     rotmats_1 = rigids_1.get_rots().get_rot_mats()
     trans_1 = rigids_1.get_trans()
+
     res_plddt = processed_feats['b_factors'][:, 1]
     res_mask = torch.tensor(processed_feats['bb_mask']).int()
 
@@ -278,7 +281,7 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=450,
+                                                    max_len=3000,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=False
                                                     )

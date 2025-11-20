@@ -2,6 +2,7 @@ from typing import Any
 import torch
 import time
 import math 
+import json 
 
 import os
 import random
@@ -866,24 +867,24 @@ class FlowModule(LightningModule):
         diffuse_mask = batch['diffuse_mask']
 
         num_batch = batch['sample_id'].shape[0]
-        if 'sample' in batch['raw_path'].split('/')[-1]:
-            pdb_id = batch['raw_path'].split('/')[-2]
-            sample_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
+        if 'sample' in batch['processed_path'].split('/')[-1]:
+            pdb_id = batch['processed_path'].split('/')[-2]
+            sample_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
             sample_root_dir = os.path.join(self.inference_dir, pdb_id, sample_id)
         else:
-            pdb_id = batch['raw_path'].split('/')[-1].replace('.pdb', '')
+            pdb_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
             sample_root_dir = os.path.join(self.inference_dir, pdb_id)
 
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
 
-        if batch['raw_path'] != self.current_pdb_id:
+        if batch['processed_path'] != self.current_pdb_id:
             self.pairformer_cache.clear()
-            self.current_pdb_id = batch['raw_path']
+            self.current_pdb_id = batch['processed_path']
 
-        if batch['raw_path'] in self.pairformer_cache:
-            print(f"{batch['raw_path']} pairformer 사용")
-            s_init, s, z = self.pairformer_cache[batch['raw_path']]
+        if batch['processed_path'] in self.pairformer_cache:
+            print(f"{batch['processed_path']} pairformer 사용")
+            s_init, s, z = self.pairformer_cache[batch['processed_path']]
         else:
             s_init_embed, z_init = self.model.embed_input(batch)
             s_init, s, z, pair_outputs = self.model.do_pairformer(
@@ -894,8 +895,8 @@ class FlowModule(LightningModule):
                 num_batch
             )
             # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[batch['raw_path']] = (s_init, s, z)
-            print(f"{batch['raw_path']} pairformer 생성")
+            self.pairformer_cache[batch['processed_path']] = (s_init, s, z)
+            print(f"{batch['processed_path']} pairformer 생성")
             
         atom37_traj, model_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
             self.model,
@@ -925,11 +926,36 @@ class FlowModule(LightningModule):
             b_factors_14 = du.atom_unflatten(plddt_score, batch['atom14_gt_exists']) # [B, N_token, 14]
             b_factors_14 = du.to_numpy(b_factors_14) * 100
 
+
+            # cdr 별 plddt 저장 
+            anchors = find_anchor(batch['loop_mask'][0], only_h3=False)
+            plddts_by_cdr_all_atom = []
+            plddts_by_cdr_backbone = []
+            for i in range(len(anchors)//2):
+                start = anchors[2*i]
+                end = anchors[2*i+1]
+
+                # all atom plddt 
+                cdr_b_factors = b_factors_14[:, start+1:end, :] # (B, L_cdr, 14)
+                cdr_atom14_mask = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :]) # (B, L_cdr, 14)
+                plddts_by_cdr_all_atom.append(np.sum(cdr_b_factors, axis=(-1, -2)) / np.sum(cdr_atom14_mask, axis=(-1, -2))) # (B)
+
+                # all atom plddt 
+                cdr_b_factors_bb = b_factors_14[:, start+1:end, :3] # (B, L_cdr, 3)
+                cdr_atom14_mask_bb = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :3]) # (B, L_cdr, 3)
+                plddts_by_cdr_backbone.append(np.sum(cdr_b_factors_bb, axis=(-1, -2)) / np.sum(cdr_atom14_mask_bb, axis=(-1, -2))) # (B)
+                
+            plddts_by_cdr_all_atom = np.stack(plddts_by_cdr_all_atom, axis=1) # (B, 6)
+            plddts_by_cdr_backbone = np.stack(plddts_by_cdr_backbone, axis=1) # (B, 6)
+
+            # b_factor 차원 (14 -> 37)
             b_factors = []
             for i in range(b):
                 b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch)
                 b_factors.append(np.squeeze(b_factors_37, axis=-1))
             b_factors = np.stack(b_factors) # (B, L, 37)
+
+
         else:
             b_factor_alt = diffuse_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
@@ -977,4 +1003,28 @@ class FlowModule(LightningModule):
                 residue_index=residue_idx,
                 save_traj_bool=False
             )
+
+            # save plddt 
+            plddt_by_cdr_all_atom = plddts_by_cdr_all_atom[i].tolist()
+            plddt_by_cdr_backbone = plddts_by_cdr_backbone[i].tolist()
+            plddt_by_cdr_dict = {
+                'h1_aa': plddt_by_cdr_all_atom[0],
+                'h2_aa': plddt_by_cdr_all_atom[1],
+                'h3_aa': plddt_by_cdr_all_atom[2],
+                'l1_aa': plddt_by_cdr_all_atom[3],
+                'l2_aa': plddt_by_cdr_all_atom[4],
+                'l3_aa': plddt_by_cdr_all_atom[5],       
+                'h1_bb': plddt_by_cdr_backbone[0],
+                'h2_bb': plddt_by_cdr_backbone[1],
+                'h3_bb': plddt_by_cdr_backbone[2],
+                'l1_bb': plddt_by_cdr_backbone[3],
+                'l2_bb': plddt_by_cdr_backbone[4],
+                'l3_bb': plddt_by_cdr_backbone[5],          
+            }
             
+            # 저장할 파일 경로
+            json_path = os.path.join(sample_dir, 'plddts.json')
+
+            # JSON으로 저장
+            with open(json_path, 'w') as f:
+                json.dump(plddt_by_cdr_dict, f, indent=4)
