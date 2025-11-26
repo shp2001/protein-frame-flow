@@ -50,30 +50,33 @@ def extract_first_two_chains(input_pdb, output_pdb):
 
     chains = list(structure.get_chains())
     
-    if len(chains) < 2:
-        raise ValueError("PDB 파일에 두 개 이상의 체인이 없습니다.")
+    if len(chains) == 1:
+        # Nanobody
+        chains[0].id = 'H'
+    elif len(chains) >= 2:
+        # 첫 두 체인만 선택
+        first_chain, second_chain = chains[:2]
 
-    # 첫 번째와 두 번째 체인 선택
-    first_chain, second_chain = chains[:2]
+        # 이미 H/L이면 그대로
+        if first_chain.id != 'H':
+            first_chain.id = 'H'
+        if second_chain.id != 'L':
+            second_chain.id = 'L'
 
-    # 체인 ID를 H와 L로 변경
-    first_chain.id = 'H'
-    second_chain.id = 'L'
+        # 기존 모델에서 chain 제거 후 다시 추가
+        for model in structure:
+            existing_chains = list(model)
+            for c in existing_chains:
+                model.detach_child(c.id)
+            model.add(first_chain)
+            model.add(second_chain)
+    else:
+        raise ValueError(f"PDB 파일에 적절한 체인이 없습니다: {input_pdb}")
 
-    # 새로운 구조를 저장
     io = PDB.PDBIO()
     io.set_structure(structure)
-
-    # 기존 체인 제거 후 H, L 체인만 추가
-    for model in structure:
-        for chain in list(model):
-            model.detach_child(chain.id)
-
-        model.add(first_chain)
-        model.add(second_chain)
-
     io.save(output_pdb)
-    
+
 
 def count_chains_in_pdb(pdb_file):
     parser = PDBParser(QUIET=True)
@@ -113,6 +116,8 @@ def main(args):
 
                 if '.pkl' in filename:
                     filename = filename.replace('.pkl', '')
+                if '#' in filename:
+                    filename = filename.replace('#', "NA")
                 label_filepath = os.path.join(label_dir, filename + '.pdb')
             
                 # PDB 파일 재체인 및 리넘버링

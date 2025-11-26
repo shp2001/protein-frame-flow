@@ -253,6 +253,8 @@ class BaseDataset(Dataset):
         chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
         if len(chain_len_list) == 1:
             diffuse_mask = feats['loop_mask']
+        elif len(chain_len_list) == 2 and feats['mode'] == 'ab': # unbound paired antibody 
+            diffuse_mask = feats['loop_mask']
         else:
             asym_id = []
             for i, chain_len in enumerate(chain_len_list):
@@ -281,7 +283,7 @@ def collate_fn(batch):
             cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
                                                     cdr_mask=feat['loop_mask'],
                                                     nan_mask=feat['res_mask'],
-                                                    max_len=3000,
+                                                    max_len=1000,
                                                     seq_list=feat['chain_seq_list'],
                                                     crop_ab=False
                                                     )
