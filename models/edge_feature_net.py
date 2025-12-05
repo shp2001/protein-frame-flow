@@ -3,6 +3,7 @@ from torch import nn
 
 from models.utils import calc_distogram, calc_unit_vector
 from data.utils import create_rigid
+from data.interpolant import apply_global_rigid_transform
 
 from Protenix.protenix.model.modules.primitives import LinearNoBias
 
@@ -150,17 +151,18 @@ class EdgeFeatureNet(nn.Module):
             nn.LayerNorm(self.c_z),
         )
 
-    def forward(self, 
-                s_init,
-                trans_template, 
-                rotmats_template,   
-                diffuse_mask,
-                loop_mask, 
-                asym_id: torch.Tensor,
-                residue_index: torch.Tensor,
-                entity_id: torch.Tensor,
-                sym_id: torch.Tensor,
-                ):
+    def forward(
+            self, 
+            s_init,
+            trans_template, 
+            rotmats_template,   
+            diffuse_mask,
+            loop_mask, 
+            asym_id: torch.Tensor,
+            residue_index: torch.Tensor,
+            entity_id: torch.Tensor,
+            sym_id: torch.Tensor,
+            ):
         """
         trans_sc, rotmats_sc : if there was self-condition value, it is sc-value.
                                 If not, it is cdr_masked (cdr masked to the closeast residues) value 
@@ -194,6 +196,15 @@ class EdgeFeatureNet(nn.Module):
             all_edge_feats.append(distogram_diag)
 
         if self._cfg.embed_contact_map_off_diag:
+
+            if self._cfg.contact_map_off_diag.perturb:
+                trans_template = apply_global_rigid_transform(
+                    trans_template,
+                    diffuse_mask,
+                    translation_scale=self._cfg.contact_map_off_diag.trans_scale,
+                    rotation_scale=self._cfg.contact_map_off_diag.rot_scale
+                )
+
             dists_2d = torch.linalg.norm(
                 trans_template[:, :, None, :] - trans_template[:, None, :, :], axis=-1)[..., None] # (b, L, L, 1)
             contact_map_off_diag = (dists_2d < self._cfg.contact_map_off_diag.threshold).int()
@@ -216,4 +227,5 @@ class EdgeFeatureNet(nn.Module):
             sym_id
         )
         edge_feats = edge_feats + relpos_feats  
+
         return edge_feats

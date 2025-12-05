@@ -52,6 +52,9 @@ class EvalRunner:
             OmegaConf.save(config=self._cfg, f=f)
         log.info(f'Saving inference config to {config_path}')
 
+        # predict w/o perturbed pair distogram 
+        self._cfg.model.edge_features.contact_map_off_diag.perturb = False 
+
         # Read checkpoint and initialize module.
         if not self.use_prmsd:
             # turn off the gradient checkpoint

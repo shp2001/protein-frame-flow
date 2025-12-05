@@ -205,7 +205,7 @@ class FlowModule(LightningModule):
                 num_bins=self._model_cfg.distogram_head.num_bins
             )
 
-        # distance map loss
+        # distance map loss (antibody backbone)
         dist_mat_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.use_dist_mat_loss:
             gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])
@@ -226,6 +226,19 @@ class FlowModule(LightningModule):
             dist_mat_loss = torch.sum(torch.abs(gt_pair_dists - pred_pair_dists) * pair_dist_mask, dim=(1,2))
             dist_mat_loss /= (torch.sum(pair_dist_mask, dim=(1,2)) + 1)
 
+        if training_cfg.use_orientation_loss:
+            gt_flat_atoms = gt_bb_atoms.reshape([num_batch, num_res*3, 3])    # (B, L*3, 3)
+            pred_flat_atoms = pred_bb_atoms.reshape([num_batch, num_res*3, 3]) # (B, L*3, 3)
+            
+            flat_diffuse_mask = loss_diffuse_mask[:, :, None].repeat(1, 1, 3) 
+            flat_diffuse_mask = flat_diffuse_mask.reshape(num_batch, num_res*3).unsqueeze(-1)  # (B, L*3, 1)
+
+            loss_term = ((gt_flat_atoms - pred_flat_atoms) ** 2) * flat_diffuse_mask
+            orientation_loss = torch.sum(loss_term, dim=(-1, -2))
+            denom = torch.sum(flat_diffuse_mask, dim=(-1, -2)) + 1e-6 # 0 나누기 방지
+            
+            orientation_loss = orientation_loss / denom
+            
         # Loop Backbone RMSD loss
         bb_loop_loss = torch.zeros(gt_atom14_pos.shape[0], device=device)
         if training_cfg.use_loop_bb_loss:
@@ -308,6 +321,7 @@ class FlowModule(LightningModule):
         bb_auxiliary_loss = (
             dist_mat_loss * training_cfg.dist_mat_loss_weight
             + bb_loop_loss * training_cfg.loop_bb_loss_weight
+            + orientation_loss * training_cfg.orientation_loss_weight
         )
         sc_auxiliary_loss = (
             sc_loop_loss * training_cfg.loop_sc_loss_weight
@@ -353,6 +367,7 @@ class FlowModule(LightningModule):
             "distogram_loss": distogram_loss,
             "auxiliary_loss": auxiliary_loss,
             'dist_mat_loss': dist_mat_loss,
+            "orientaion_loss": orientation_loss,
             "bb_loop_loss": bb_loop_loss,
             'sc_loop_loss': sc_loop_loss,
             'local_dist_mat_loss': local_dist_mat_loss,
@@ -670,6 +685,9 @@ class FlowModule(LightningModule):
         sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
+            
+        torch.save(batch['loop_mask'], os.path.join(sample_root_dir, "loop_mask.pt"))
+
 
         if pdb_id != self.current_pdb_id:
             self.pairformer_cache.clear()
@@ -689,57 +707,57 @@ class FlowModule(LightningModule):
             # 결과를 캐시에 저장합니다.
             self.pairformer_cache[pdb_id] = (s_init, s, z)
             
-            # save distogram 
-            # find cdr_residues to mark cdr on the distogram 
-            cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
-            cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
+            # # save distogram 
+            # # find cdr_residues to mark cdr on the distogram 
+            # cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
+            # cdr_residues = [(cdr_residues[2*i], cdr_residues[2*i+1]) for i in range(6)]
 
-            # pairformer distogram 시각화
-            dist_map_pairformer = eu.dist_map_from_distogram(
-                pair_outputs[0][None, ...],
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                do_softmax=False
-                ) # (1, N, N)
-            eu.visualize_dist_map(
-                dist_map_pairformer[0], 
-                os.path.join(sample_root_dir, "pairformer_dist_ca.png"), 
-                title=f"{pdb_id.upper()} Pairformer Cα Distogram",
-                cdr_residues=cdr_residues,
-                mark_cdr=True
-                )
+            # # pairformer distogram 시각화
+            # dist_map_pairformer = eu.dist_map_from_distogram(
+            #     pair_outputs[0][None, ...],
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     do_softmax=False
+            #     ) # (1, N, N)
+            # eu.visualize_dist_map(
+            #     dist_map_pairformer[0], 
+            #     os.path.join(sample_root_dir, "pairformer_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} Pairformer Cα Distogram",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True
+            #     )
 
-            # gt distogram 시각화 
-            gt_ca_distogram = calc_distogram(  
-                batch['trans_1'][0][None, ...],
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                num_bins=self._model_cfg.distogram_head.num_bins,
-            ) # (1, L, L, num_bins)
-            gt_ca_dist = eu.dist_map_from_distogram(
-                gt_ca_distogram, 
-                min_bin=self._model_cfg.distogram_head.min_bin,
-                max_bin=self._model_cfg.distogram_head.max_bin,
-                do_softmax=False)
-            eu.visualize_dist_map(
-                gt_ca_dist[0], 
-                os.path.join(sample_root_dir, "gt_dist_ca.png"), 
-                title=f"{pdb_id.upper()} True Cα Distogram",
-                cdr_residues=cdr_residues,
-                mark_cdr=True
-                )
-            # gt distogram과 pairformer distogram 차이 
-            diff_distance_map = np.abs(gt_ca_dist - dist_map_pairformer)
+            # # gt distogram 시각화 
+            # gt_ca_distogram = calc_distogram(  
+            #     batch['trans_1'][0][None, ...],
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     num_bins=self._model_cfg.distogram_head.num_bins,
+            # ) # (1, L, L, num_bins)
+            # gt_ca_dist = eu.dist_map_from_distogram(
+            #     gt_ca_distogram, 
+            #     min_bin=self._model_cfg.distogram_head.min_bin,
+            #     max_bin=self._model_cfg.distogram_head.max_bin,
+            #     do_softmax=False)
+            # eu.visualize_dist_map(
+            #     gt_ca_dist[0], 
+            #     os.path.join(sample_root_dir, "gt_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} True Cα Distogram",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True
+            #     )
+            # # gt distogram과 pairformer distogram 차이 
+            # diff_distance_map = np.abs(gt_ca_dist - dist_map_pairformer)
 
-            eu.visualize_dist_map(
-                diff_distance_map[0], 
-                os.path.join(sample_root_dir, "diff_dist_ca.png"), 
-                title=f"{pdb_id.upper()} |True - Pairformer|",
-                cdr_residues=cdr_residues,
-                mark_cdr=True,
-                cmap='hot',
-                vmax=22
-                )
+            # eu.visualize_dist_map(
+            #     diff_distance_map[0], 
+            #     os.path.join(sample_root_dir, "diff_dist_ca.png"), 
+            #     title=f"{pdb_id.upper()} |True - Pairformer|",
+            #     cdr_residues=cdr_residues,
+            #     mark_cdr=True,
+            #     cmap='hot',
+            #     vmax=22
+            #     )
 
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,

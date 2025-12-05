@@ -10,6 +10,107 @@ def _centered_gaussian(num_batch, num_res, device):
 def _r_diffuse_mask(r_t, r_1, atom_diffuse_mask):
     return r_t * atom_diffuse_mask[..., None] + r_1 * (1 - atom_diffuse_mask[..., None])
 
+import torch
+
+def axis_angle_to_matrix_batched(axis, angle):
+    """
+    Rodrigues' rotation formula (Batched)
+    axis: (B, 3)
+    angle: (B, 1)
+    return: (B, 3, 3)
+    """
+    B = axis.shape[0]
+    device = axis.device
+    dtype = axis.dtype
+    
+    x, y, z = axis[:, 0], axis[:, 1], axis[:, 2]
+    zeros = torch.zeros_like(x)
+    
+    # Skew-symmetric matrix K
+    K = torch.stack([
+        torch.stack([zeros, -z, y], dim=-1),
+        torch.stack([z, zeros, -x], dim=-1),
+        torch.stack([-y, x, zeros], dim=-1)
+    ], dim=1) # (B, 3, 3)
+    
+    I = torch.eye(3, device=device, dtype=dtype).unsqueeze(0).expand(B, 3, 3)
+    
+    sin_a = torch.sin(angle).view(B, 1, 1)
+    cos_a = torch.cos(angle).view(B, 1, 1)
+    
+    # R = I + sin(theta)K + (1-cos(theta))K^2
+    R = I + sin_a * K + (1 - cos_a) * torch.matmul(K, K)
+    return R
+
+def apply_global_rigid_transform(trans, diffuse_mask, translation_scale=2.0, rotation_scale=0.3):
+    """
+    trans: shape (B, L, 3)
+    diffuse_mask: shape (B, L) or (L,)
+    """
+    coords = trans # (B, L, 3)
+    B, L, _ = coords.shape
+    device = coords.device
+    dtype = coords.dtype
+
+    # ---------------------------
+    # 1) Mask Preparation (Broadcasting)
+    # ---------------------------
+    if diffuse_mask.dim() == 1:
+        mask_bool = diffuse_mask.view(1, L, 1).expand(B, L, 1).bool()
+    else:
+        mask_bool = diffuse_mask.view(B, L, 1).bool()
+
+    mask_float = mask_bool.float()
+
+    # ---------------------------
+    # 2) Center of Mass (Batch-wise)
+    # ---------------------------
+    # (B, L, 3) * (B, L, 1) -> sum -> (B, 3)
+    masked_sum = (coords * mask_float).sum(dim=1)
+    mask_count = mask_float.sum(dim=1) # (B, 1)
+    mask_count = torch.clamp(mask_count, min=1.0) # 0 나누기 방지
+    
+    center = masked_sum / mask_count
+    center = center.view(B, 1, 3) # (B, 1, 3)
+
+    # ---------------------------
+    # 3) Batch Random Rotation & Translation
+    # ---------------------------
+    if rotation_scale > 1e-6:
+        # Axis: (B, 3)
+        rand_axis = torch.randn(B, 3, device=device, dtype=dtype)
+        rand_axis = rand_axis / (torch.norm(rand_axis, dim=1, keepdim=True) + 1e-6)
+        
+        # Angle: (B, 1)
+        rand_angle = (torch.rand(B, 1, device=device, dtype=dtype) * 2 - 1) * rotation_scale
+        
+        R = axis_angle_to_matrix_batched(rand_axis, rand_angle) # (B, 3, 3)
+    else:
+        R = torch.eye(3, device=device, dtype=dtype).unsqueeze(0).expand(B, 3, 3)
+
+    t = torch.randn(B, 3, device=device, dtype=dtype) * translation_scale
+    t = t.view(B, 1, 3)
+
+    # ---------------------------
+    # 4) Apply Transform
+    # ---------------------------
+    # R^T (Transpose for multiplying on the right)
+    R_T = R.transpose(1, 2) # (B, 3, 3)
+    
+    # Effective Translation: t_eff = C - C@R^T + t
+    # center: (B, 1, 3)
+    center_rotated = torch.matmul(center, R_T)
+    t_effective = center - center_rotated + t # (B, 1, 3)
+    
+    # 전체 좌표 변환: (B, L, 3) @ (B, 3, 3) + (B, 1, 3)
+    rotated_all = torch.matmul(coords, R_T)
+    transformed_all = rotated_all + t_effective
+
+    # mask_bool: (B, L, 1) -> 자동으로 (B, L, 3)으로 브로드캐스팅되어 조건 적용
+    new_coords = torch.where(mask_bool, transformed_all, coords)
+
+    return new_coords
+            
 class Interpolant:
 
     def __init__(self, cfg):

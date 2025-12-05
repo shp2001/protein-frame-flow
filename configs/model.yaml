@@ -35,7 +35,10 @@ model:
       max_bin: 22
     contact_map_off_diag:
       threshold: 20
-
+      perturb: True
+      trans_scale: 2.0
+      rot_scale: 0.3
+      
     embed_ref_pos: True
     embed_loop_mask: True
     embed_diag_mask: True

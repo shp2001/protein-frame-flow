@@ -118,10 +118,13 @@ experiment:
     use_dist_mat_loss: True
     dist_mat_loss_weight: 1.0
     use_loop_bb_loss: True
-    loop_bb_loss_weight: 1.0 
+    loop_bb_loss_weight: 0.5 
+    use_orientation_loss: True
+    orientation_loss_weight: 2.0
+
     # side chain
     use_loop_sc_loss: True
-    loop_sc_loss_weight: 0.5
+    loop_sc_loss_weight: 0.25
     use_local_dist_mat_loss: True
     local_dist_mat_loss_weight: 0.5
     # violation_backbone 
@@ -130,7 +133,7 @@ experiment:
     c_n_ca_loss_weight: 1.0 
     ca_c_n_loss_weight: 1.0 
     # violation_side chain
-    use_all_atom_clash_loss: True
+    use_all_atom_clash_loss: False
     all_atom_clash_loss_weight: 0.1
     use_within_clash_loss: True
     within_clash_loss_weight: 0.1
@@ -141,7 +144,7 @@ experiment:
     sc_viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2_aa_clash
+    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb
     project: v2.3.2
   optimizer:
     warmup_steps: 0
