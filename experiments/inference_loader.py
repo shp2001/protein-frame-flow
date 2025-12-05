@@ -269,26 +269,34 @@ class BaseDataset(Dataset):
 
 def collate_fn(batch):
     cropped_batch = []
+    include_ag = False
+
     for feat in batch:
         mode = feat['mode']
         # crop the feats
         cropped_feat = {}
 
+        if not include_ag:
+            feat['diffuse_mask'] = feat['loop_mask']
+
         if mode =='ab':
-            cropped_feat['crop_idx'] = crop_antigen(feat['trans_1'],
-                                                    cdr_mask=feat['loop_mask'],
-                                                    nan_mask=feat['res_mask'],
-                                                    max_len=1000,
-                                                    seq_list=feat['chain_seq_list'],
-                                                    crop_ab=False
-                                                    )
+            cropped_feat['crop_idx'] = crop_antigen(
+                feat['trans_1'],
+                cdr_mask=feat['loop_mask'],
+                nan_mask=feat['res_mask'],
+                max_len=450,
+                seq_list=feat['chain_seq_list'],
+                crop_ab=True,
+                include_ag=include_ag
+                )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
-            cropped_feat['crop_idx'] = crop_general_protein(feat['trans_1'],
-                            loop_mask=feat['loop_mask'],
-                            nan_mask=feat['res_mask'],
-                            max_len=256,
-                            seq_list=feat['chain_seq_list']
-                            )
+            cropped_feat['crop_idx'] = crop_general_protein(
+                feat['trans_1'],
+                loop_mask=feat['loop_mask'],
+                nan_mask=feat['res_mask'],
+                max_len=256,
+                seq_list=feat['chain_seq_list']
+                )
 
         not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'processed_path', 'sample_id', 'mode']
 
