@@ -863,7 +863,6 @@ class FlowModule(LightningModule):
         res_mask = batch['res_mask']
         b = res_mask.shape[0]
         self.interpolant.set_device(res_mask.device)
-        edge_mask = batch['edge_mask']
         diffuse_mask = batch['diffuse_mask']
 
         num_batch = batch['sample_id'].shape[0]
@@ -877,6 +876,8 @@ class FlowModule(LightningModule):
 
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
+
+        torch.save(batch['loop_mask'], os.path.join(sample_root_dir, "loop_mask.pt"))
 
         if batch['processed_path'] != self.current_pdb_id:
             self.pairformer_cache.clear()
