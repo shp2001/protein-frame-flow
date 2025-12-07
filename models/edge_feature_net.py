@@ -195,6 +195,7 @@ class EdgeFeatureNet(nn.Module):
             distogram_diag = distogram_diag * diag_mask[..., None]
             all_edge_feats.append(distogram_diag)
 
+        trans_perturbed = None 
         if self._cfg.embed_contact_map_off_diag:
 
             if self._cfg.contact_map_off_diag.perturb:
@@ -204,6 +205,8 @@ class EdgeFeatureNet(nn.Module):
                     translation_scale=self._cfg.contact_map_off_diag.trans_scale,
                     rotation_scale=self._cfg.contact_map_off_diag.rot_scale
                 )
+
+                trans_perturbed = trans_template.clone()
 
             dists_2d = torch.linalg.norm(
                 trans_template[:, :, None, :] - trans_template[:, None, :, :], axis=-1)[..., None] # (b, L, L, 1)
@@ -228,4 +231,4 @@ class EdgeFeatureNet(nn.Module):
         )
         edge_feats = edge_feats + relpos_feats  
 
-        return edge_feats
+        return edge_feats, trans_perturbed

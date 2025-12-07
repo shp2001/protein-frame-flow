@@ -100,7 +100,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2/2025-10-14_00-20-37/epoch=63-step=91712_copy.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage2/2025-12-05_16-29-09/epoch=45-step=65918_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -144,7 +144,7 @@ experiment:
     sc_viol_loss_t_pass: 0.75
     
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb
+    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage3
     project: v2.3.2
   optimizer:
     warmup_steps: 0

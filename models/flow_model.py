@@ -118,7 +118,7 @@ class FlowModel(nn.Module):
             squeezed_ref_feature_dict
         )
 
-        z_init = self.edge_feature_net(
+        z_init, trans_perturbed = self.edge_feature_net(
             s_init,
             trans_1,
             rotmats_1,
@@ -130,7 +130,7 @@ class FlowModel(nn.Module):
             sym_id
             )
     
-        return s_init, z_init
+        return s_init, z_init, trans_perturbed
     
     def do_pairformer(
         self, 
@@ -225,7 +225,7 @@ class FlowModel(nn.Module):
         }
     
     def forward(self, input_feats, N_cycle):
-        s_init, z_init = self.embed_input(input_feats)
+        s_init, z_init, trans_perturbed = self.embed_input(input_feats)
 
         edge_mask = input_feats['edge_mask'][0].unsqueeze(0)
         s_init, s_trunk, z_trunk, distogram_logit_pairformer = self.do_pairformer(
@@ -237,6 +237,7 @@ class FlowModel(nn.Module):
             )
         structure_output = self.get_structure(input_feats, s_init, s_trunk, z_trunk)
         structure_output['pair_outputs'] = distogram_logit_pairformer
+        structure_output['trans_perturbed'] = trans_perturbed
         return structure_output
     
 

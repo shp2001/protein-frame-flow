@@ -391,7 +391,7 @@ class FlowModule(LightningModule):
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
-        s_init, z_init = self.model.embed_input(batch)
+        s_init, z_init, trans_perturbed = self.model.embed_input(batch)
         s_init, s, z, pair_outputs = self.model.do_pairformer(s_init, z_init, edge_mask[0][None, ...], self._model_cfg.pairformer.n_cycles, b)
         atom37_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
             self.model,
@@ -416,6 +416,7 @@ class FlowModule(LightningModule):
         )
         os.makedirs(sample_dir, exist_ok=True)
 
+            
         for i in range(num_batch):
             # Write out sample to PDB file (wo b-factors)
             final_pos = pred_positions[i]
@@ -433,14 +434,17 @@ class FlowModule(LightningModule):
 
             saved_path = au.write_prot_to_pdb(
                 final_pos,
-                file_path=os.path.join(sample_dir, pdb_id+'.pbd'),
+                file_path=os.path.join(sample_dir, pdb_id+'.pdb'),
                 aatype=batch['aatype'].cpu(),
                 chain_index=batch['chain_idx'].cpu(),
                 no_indexing=False,
                 overwrite=True,
                 b_factors=b_factors
             )
-            
+
+            if trans_perturbed != None:
+                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], sample_dir)
+
         # calculate trans diffuse loss (rmsd)
         gt_trans_1 = batch['trans_1']
         trans_error = (gt_trans_1 - pred_trans_1) 
@@ -680,33 +684,61 @@ class FlowModule(LightningModule):
         interpolant.set_device(device)
 
         num_batch = batch['sample_id'].shape[0]
-        pdb_id = batch['processed_path'].split('/')[-1].replace('.pdb', '')
+        pdb_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
 
+        if 'sample' in pdb_id:
+            parts = batch['processed_path'].split('/')
+            pdb_id = parts[-2] + "_" + parts[-1].replace('.pkl', '')
         sample_root_dir = os.path.join(self.inference_dir, pdb_id)
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
             
-        torch.save(batch['loop_mask'], os.path.join(sample_root_dir, "loop_mask.pt"))
+        
 
+# ############################################################################################################
+#         if pdb_id != self.current_pdb_id:
+#             self.pairformer_cache.clear()
+#             self.current_pdb_id = pdb_id
 
-        if pdb_id != self.current_pdb_id:
-            self.pairformer_cache.clear()
-            self.current_pdb_id = pdb_id
+#         if pdb_id in self.pairformer_cache:
+#             s_init, s, z = self.pairformer_cache[pdb_id]
+#         else:
+#             s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
+#             s_init, s, z, pair_outputs = self.model.do_pairformer(
+#                 s_init_embed,
+#                 z_init,
+#                 batch['edge_mask'][0][None, ...],
+#                 self._model_cfg.pairformer.n_cycles,
+#                 num_batch
+#             )
 
-        if pdb_id in self.pairformer_cache:
-            s_init, s, z = self.pairformer_cache[pdb_id]
-        else:
-            s_init_embed, z_init = self.model.embed_input(batch)
-            s_init, s, z, pair_outputs = self.model.do_pairformer(
-                s_init_embed,
-                z_init,
-                batch['edge_mask'][0][None, ...],
-                self._model_cfg.pairformer.n_cycles,
-                num_batch
-            )
-            # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[pdb_id] = (s_init, s, z)
-            
+#             # 결과를 캐시에 저장합니다.
+#             self.pairformer_cache[pdb_id] = (s_init, s, z)
+# ############################################################################################################
+############################################################################################################
+        s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
+        s_init, s, z, pair_outputs = self.model.do_pairformer(
+            s_init_embed,
+            z_init,
+            batch['edge_mask'][0][None, ...],
+            self._model_cfg.pairformer.n_cycles,
+            num_batch
+        )
+
+        # row-wise
+        loop_mask = batch['loop_mask'][0]
+        rows_selected = z[0][loop_mask, :, :]          # [L_selected, L, C]
+        # col-wise
+        cols_selected = z[0][:, loop_mask, :]          # [L, L_selected, C]
+        cols_selected = cols_selected.permute(1, 0, 2)     # [L_selected, L, C]
+        # concat
+        z_cdr = torch.cat([rows_selected, cols_selected], dim=0)  # [L_selected*2, L, C]
+
+        # flatten to [feature_dim]
+        z_cdr = z_cdr.mean(dim=1).mean(dim=0)  # [C]
+        torch.save({"z": z_cdr, "loop_mask": loop_mask, 'affinity': batch['affinity']}, os.path.join(sample_root_dir, "pair.pt"))
+
+############################################################################################################
             # # save distogram 
             # # find cdr_residues to mark cdr on the distogram 
             # cdr_residues = find_anchor(batch["loop_mask"][0], only_h3=False)
@@ -809,4 +841,6 @@ class FlowModule(LightningModule):
                 chain_index=chain_idx,
                 save_traj_bool=self._interpolant_cfg.save_traj
             )
-            
+            # save perturbed trans 
+            if trans_perturbed != None:
+                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], sample_dir)

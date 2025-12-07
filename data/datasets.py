@@ -240,6 +240,7 @@ class BaseDataset(Dataset):
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
         processed_row['mode'] = csv_row['mode']
+
         return processed_row
     
     def _sample_scaffold_mask(self, batch, rng):

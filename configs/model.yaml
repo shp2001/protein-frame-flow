@@ -36,8 +36,8 @@ model:
     contact_map_off_diag:
       threshold: 20
       perturb: True
-      trans_scale: 2.0
-      rot_scale: 0.3
+      trans_scale: 4.0
+      rot_scale: 0.5
       
     embed_ref_pos: True
     embed_loop_mask: True

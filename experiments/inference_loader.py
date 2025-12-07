@@ -269,7 +269,7 @@ class BaseDataset(Dataset):
 
 def collate_fn(batch):
     cropped_batch = []
-    include_ag = False
+    include_ag = True
 
     for feat in batch:
         mode = feat['mode']
@@ -286,7 +286,7 @@ def collate_fn(batch):
                 nan_mask=feat['res_mask'],
                 max_len=450,
                 seq_list=feat['chain_seq_list'],
-                crop_ab=True,
+                crop_ab=False,
                 include_ag=include_ag
                 )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':

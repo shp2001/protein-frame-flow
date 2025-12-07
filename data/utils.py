@@ -527,3 +527,60 @@ def atom_unflatten(flatten, mask):
     coords_recon[mask.bool()] = flatten_3d.reshape(B*L_atom, F)
 
     return coords_recon.view(B, L, A) if flatten.dim() == 2 else coords_recon
+
+def tensor_to_pdb_block_ca(tensor, chain_index, model_num=1):
+    """
+    (L, 3) 좌표 텐서 + (L,) chain index 텐서를 받아
+    residue별로 다른 체인 ID를 가지는 PDB block 생성
+    """
+
+    coords = tensor.detach().cpu().numpy()            # shape (L, 3)
+    chain_index = chain_index.detach().cpu().numpy()  # shape (L,)
+    L = coords.shape[0]
+
+    pdb_lines = []
+    pdb_lines.append(f"MODEL     {model_num}")
+
+    atom_serial = 1
+
+    for i in range(L):
+        pos = coords[i]
+        cidx = int(chain_index[i])
+
+        # (0,0,0)은 패딩 residue → skip
+        if np.sum(np.abs(pos)) < 1e-6:
+            continue
+
+        # 체인 인덱스를 PDB 체인 문자로 매핑 (0=A, 1=B, 2=C ...)
+        chain_id = chr(ord('A') + cidx)
+
+        res_seq = i + 1
+        res_name = "ALA"
+        atom_name = " CA "
+
+        line = (
+            f"ATOM  {atom_serial:>5d} {atom_name:^4s} {res_name:>3s} "
+            f"{chain_id:>1s}{res_seq:>4d}    "
+            f"{pos[0]:>8.3f}{pos[1]:>8.3f}{pos[2]:>8.3f}"
+            f"  1.00  0.00           C"
+        )
+
+        pdb_lines.append(line)
+        atom_serial += 1
+
+    pdb_lines.append("ENDMDL")
+    return "\n".join(pdb_lines)
+
+def save_perturbed_trans(tensor_list, chain_index, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    for i, tensor in enumerate(tensor_list):
+        # [수정됨] CA 전용 함수 호출
+        pdb_content = tensor_to_pdb_block_ca(tensor, chain_index[i], model_num=1)
+        
+        # 파일명: 0.pdb, 1.pdb ...
+        save_path = os.path.join(output_dir, f"perturbed_trans_{i}.pdb")
+        
+        with open(save_path, 'w') as f:
+            f.write(pdb_content)
+            

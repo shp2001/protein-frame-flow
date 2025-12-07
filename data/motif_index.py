@@ -297,7 +297,7 @@ def get_distance_map(trans_1):
 
     return distance_map
 
-def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, include_ag, mode='ab'): 
+def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, include_ag=True, mode='ab'): 
     chain_len_list = [len(seq) for seq in seq_list]
 
     if mode == 'ab':
