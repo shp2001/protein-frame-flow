@@ -696,47 +696,48 @@ class FlowModule(LightningModule):
         
 
 # ############################################################################################################
-#         if pdb_id != self.current_pdb_id:
-#             self.pairformer_cache.clear()
-#             self.current_pdb_id = pdb_id
+        if pdb_id != self.current_pdb_id:
+            self.pairformer_cache.clear()
+            self.current_pdb_id = pdb_id
 
-#         if pdb_id in self.pairformer_cache:
-#             s_init, s, z = self.pairformer_cache[pdb_id]
-#         else:
-#             s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
-#             s_init, s, z, pair_outputs = self.model.do_pairformer(
-#                 s_init_embed,
-#                 z_init,
-#                 batch['edge_mask'][0][None, ...],
-#                 self._model_cfg.pairformer.n_cycles,
-#                 num_batch
-#             )
+        if pdb_id in self.pairformer_cache:
+            s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_id]
+            
+        else:
+            s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
+            s_init, s, z, pair_outputs = self.model.do_pairformer(
+                s_init_embed,
+                z_init,
+                batch['edge_mask'][0][None, ...],
+                self._model_cfg.pairformer.n_cycles,
+                num_batch
+            )
 
-#             # 결과를 캐시에 저장합니다.
-#             self.pairformer_cache[pdb_id] = (s_init, s, z)
-# ############################################################################################################
+            # 결과를 캐시에 저장합니다.
+            self.pairformer_cache[pdb_id] = (s_init, s, z, trans_perturbed)
 ############################################################################################################
-        s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
-        s_init, s, z, pair_outputs = self.model.do_pairformer(
-            s_init_embed,
-            z_init,
-            batch['edge_mask'][0][None, ...],
-            self._model_cfg.pairformer.n_cycles,
-            num_batch
-        )
+############################################################################################################
+        # s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
+        # s_init, s, z, pair_outputs = self.model.do_pairformer(
+        #     s_init_embed,
+        #     z_init,
+        #     batch['edge_mask'][0][None, ...],
+        #     self._model_cfg.pairformer.n_cycles,
+        #     num_batch
+        # )
 
-        # row-wise
-        loop_mask = batch['loop_mask'][0]
-        rows_selected = z[0][loop_mask, :, :]          # [L_selected, L, C]
-        # col-wise
-        cols_selected = z[0][:, loop_mask, :]          # [L, L_selected, C]
-        cols_selected = cols_selected.permute(1, 0, 2)     # [L_selected, L, C]
-        # concat
-        z_cdr = torch.cat([rows_selected, cols_selected], dim=0)  # [L_selected*2, L, C]
+        # # row-wise
+        # loop_mask = batch['loop_mask'][0]
+        # rows_selected = z[0][loop_mask, :, :]          # [L_selected, L, C]
+        # # col-wise
+        # cols_selected = z[0][:, loop_mask, :]          # [L, L_selected, C]
+        # cols_selected = cols_selected.permute(1, 0, 2)     # [L_selected, L, C]
+        # # concat
+        # z_cdr = torch.cat([rows_selected, cols_selected], dim=0)  # [L_selected*2, L, C]
 
-        # flatten to [feature_dim]
-        z_cdr = z_cdr.mean(dim=1).mean(dim=0)  # [C]
-        torch.save({"z": z_cdr, "loop_mask": loop_mask, 'affinity': batch['affinity']}, os.path.join(sample_root_dir, "pair.pt"))
+        # # flatten to [feature_dim]
+        # z_cdr = z_cdr.mean(dim=1).mean(dim=0)  # [C]
+        # torch.save({"z": z[0], "loop_mask": loop_mask}, os.path.join(sample_root_dir, "pair.pt"))
 
 ############################################################################################################
             # # save distogram 

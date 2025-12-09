@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.2_unbound
+#SBATCH -J v2.3.2.2_stage3
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1
-#SBATCH --mem=49g
+#SBATCH --mem=48g
 #SBATCH -c 12
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/inf.err
