@@ -1,4 +1,4 @@
-name: fm
+name: cdrflow-rank
 channels:
   - pytorch
   - nvidia

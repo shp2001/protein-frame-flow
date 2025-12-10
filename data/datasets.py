@@ -344,6 +344,7 @@ class BaseDataset(Dataset):
                     max_len=self.dataset_cfg.ab_max_num_res,
                     seq_list=feats['chain_seq_list'],
                     crop_ab=self.dataset_cfg.crop_ab,
+                    include_ag=True,
                     mode=mode,
                     )
             if mode == 'nanobody':
@@ -354,6 +355,7 @@ class BaseDataset(Dataset):
                     max_len=self.dataset_cfg.ab_max_num_res,
                     seq_list=feats['chain_seq_list'],
                     crop_ab=self.dataset_cfg.crop_ab,
+                    include_ag=True,
                     mode=mode,
                     )   
             if mode == 'general' or mode == 'polymer' or mode == 'monomer':
