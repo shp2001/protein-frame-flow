@@ -829,6 +829,7 @@ class FlowModule(LightningModule):
             # save structure data 
             aatype = du.to_numpy(batch['aatype'][i].int())
             chain_idx = du.to_numpy(batch['chain_idx'][i].int())
+            residue_idx = du.to_numpy(batch['residue_index'][i].int())
             diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
 
             _ = eu.save_traj(
@@ -840,6 +841,7 @@ class FlowModule(LightningModule):
                 output_dir=sample_dir,
                 aatype=aatype,
                 chain_index=chain_idx,
+                residue_index=residue_idx,
                 save_traj_bool=self._interpolant_cfg.save_traj
             )
             # save perturbed trans 

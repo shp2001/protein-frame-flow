@@ -21,12 +21,14 @@ def create_full_prot(
         chain_index=None,
         aatype=None,
         b_factors=None,
+        residue_index=None
     ):
     assert atom37.ndim == 3
     assert atom37.shape[-1] == 3
     assert atom37.shape[-2] == 37
     n = atom37.shape[0]
-    residue_index = np.arange(n)
+    if residue_index is None:
+        residue_index = np.arange(n)
     if chain_index is None:
         chain_index = np.zeros(n)
     if b_factors is None:
@@ -50,6 +52,7 @@ def write_prot_to_pdb(
         overwrite=False,
         no_indexing=False,
         b_factors=None,
+        residue_index=None,  # 추가
     ):
     if overwrite:
         max_existing_idx = 0
@@ -59,23 +62,29 @@ def write_prot_to_pdb(
         existing_files = [x for x in os.listdir(file_dir) if file_name in x]
         max_existing_idx = max([
             int(re.findall(r'_(\d+).pdb', x)[0]) for x in existing_files if re.findall(r'_(\d+).pdb', x)
-            if re.findall(r'_(\d+).pdb', x)] + [0])
+        ] + [0])
+        
     if not no_indexing:
         save_path = file_path.replace('.pdb', '') + f'_{max_existing_idx+1}.pdb'
     else:
         save_path = file_path
+
     with open(save_path, 'w') as f:
         if prot_pos.ndim == 4:
             for t, pos37 in enumerate(prot_pos):
                 atom37_mask = np.sum(np.abs(pos37), axis=-1) > 1e-7
                 prot = create_full_prot(
-                    pos37, atom37_mask, chain_index=chain_index, aatype=aatype, b_factors=b_factors)
+                    pos37, atom37_mask, chain_index=chain_index, aatype=aatype, b_factors=b_factors,
+                    residue_index=residue_index  # 전달
+                )
                 pdb_prot = protein.to_pdb(prot, model=t + 1, add_end=False)
                 f.write(pdb_prot)
         elif prot_pos.ndim == 3:
             atom37_mask = np.sum(np.abs(prot_pos), axis=-1) > 1e-7
             prot = create_full_prot(
-                prot_pos, atom37_mask, chain_index=chain_index, aatype=aatype, b_factors=b_factors)
+                prot_pos, atom37_mask, chain_index=chain_index, aatype=aatype, b_factors=b_factors,
+                residue_index=residue_index  # 전달
+            )
             pdb_prot = protein.to_pdb(prot, model=1, add_end=False)
             f.write(pdb_prot)
         else:
