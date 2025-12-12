@@ -54,20 +54,7 @@ def write_prot_to_pdb(
         b_factors=None,
         residue_index=None,  # 추가
     ):
-    if overwrite:
-        max_existing_idx = 0
-    else:
-        file_dir = os.path.dirname(file_path)
-        file_name = os.path.basename(file_path).strip('.pdb')
-        existing_files = [x for x in os.listdir(file_dir) if file_name in x]
-        max_existing_idx = max([
-            int(re.findall(r'_(\d+).pdb', x)[0]) for x in existing_files if re.findall(r'_(\d+).pdb', x)
-        ] + [0])
-        
-    if not no_indexing:
-        save_path = file_path.replace('.pdb', '') + f'_{max_existing_idx+1}.pdb'
-    else:
-        save_path = file_path
+    save_path = file_path
 
     with open(save_path, 'w') as f:
         if prot_pos.ndim == 4:
