@@ -821,10 +821,9 @@ class FlowModule(LightningModule):
 
         for i in range(num_batch):
             next_sample_num += 1
-            sample_dir = os.path.join(sample_root_dir, f"sample_{next_sample_num}")
+            sample_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}.pdb")
             pred_position = pred_positions[i]
             bb_traj = bb_trajs[i]
-            os.makedirs(sample_dir, exist_ok=True)
 
             # save structure data 
             aatype = du.to_numpy(batch['aatype'][i].int())
@@ -838,7 +837,7 @@ class FlowModule(LightningModule):
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
                 b_factors=None,  # 위의 prmsd 집어넣기 
                 diffuse_mask=diffuse_mask,
-                output_dir=sample_dir,
+                output_path=sample_path,
                 aatype=aatype,
                 chain_index=chain_idx,
                 residue_index=residue_idx,
@@ -846,4 +845,5 @@ class FlowModule(LightningModule):
             )
             # save perturbed trans 
             if trans_perturbed != None:
-                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], sample_dir)
+                perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
+                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], perturbed_trans_path)

@@ -203,7 +203,7 @@ def save_traj(
         sample: np.ndarray,
         bb_prot_traj: np.ndarray,
         x0_traj: np.ndarray,
-        output_dir: str,
+        output_path: str,
         b_factors: np.ndarray,
         diffuse_mask: np.ndarray,
         save_traj_bool,
@@ -234,9 +234,7 @@ def save_traj(
     """
 
     # Write sample.
-    sample_path = os.path.join(output_dir, 'sample.pdb')
-    prot_traj_path = os.path.join(output_dir, 'bb_traj.pdb')
-    x0_traj_path = os.path.join(output_dir, 'x0_traj.pdb')
+    sample_path = output_path
 
     # Use b-factors to specify which residues are diffused.
     if b_factors == None:
@@ -259,29 +257,29 @@ def save_traj(
             'sample_path': sample_path,
         }
     
-    else:
-        prot_traj_path = au.write_prot_to_pdb(
-            bb_prot_traj,
-            prot_traj_path,
-            b_factors=b_factors,
-            no_indexing=False,
-            aatype=aatype,
-            chain_index=chain_index,
-            residue_index=residue_index
-        )
-        # x0_traj_path = au.write_prot_to_pdb(
-        #     x0_traj,
-        #     x0_traj_path,
-        #     b_factors=b_factors,
-        #     no_indexing=False,
-        #     aatype=aatype,
-        #     chain_index=chain_index
-        # )
-        return {
-            'sample_path': sample_path,
-            'traj_path': prot_traj_path,
-            # 'x0_traj_path': x0_traj_path,
-        }
+    # else:
+    #     prot_traj_path = au.write_prot_to_pdb(
+    #         bb_prot_traj,
+    #         prot_traj_path,
+    #         b_factors=b_factors,
+    #         no_indexing=False,
+    #         aatype=aatype,
+    #         chain_index=chain_index,
+    #         residue_index=residue_index
+    #     )
+    #     # x0_traj_path = au.write_prot_to_pdb(
+    #     #     x0_traj,
+    #     #     x0_traj_path,
+    #     #     b_factors=b_factors,
+    #     #     no_indexing=False,
+    #     #     aatype=aatype,
+    #     #     chain_index=chain_index
+    #     # )
+    #     return {
+    #         'sample_path': sample_path,
+    #         'traj_path': prot_traj_path,
+    #         # 'x0_traj_path': x0_traj_path,
+    #     }
 
 
 

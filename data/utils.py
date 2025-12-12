@@ -571,16 +571,13 @@ def tensor_to_pdb_block_ca(tensor, chain_index, model_num=1):
     pdb_lines.append("ENDMDL")
     return "\n".join(pdb_lines)
 
-def save_perturbed_trans(tensor_list, chain_index, output_dir):
-    os.makedirs(output_dir, exist_ok=True)
+def save_perturbed_trans(tensor_list, chain_index, output_path):
     
     for i, tensor in enumerate(tensor_list):
         # [수정됨] CA 전용 함수 호출
         pdb_content = tensor_to_pdb_block_ca(tensor, chain_index[i], model_num=1)
+
         
-        # 파일명: 0.pdb, 1.pdb ...
-        save_path = os.path.join(output_dir, f"perturbed_trans_{i}.pdb")
-        
-        with open(save_path, 'w') as f:
+        with open(output_path, 'w') as f:
             f.write(pdb_content)
             
