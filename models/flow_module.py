@@ -443,7 +443,13 @@ class FlowModule(LightningModule):
             )
 
             if trans_perturbed != None:
-                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], sample_dir)
+                perturbed_trans_path = os.path.join(sample_dir, f"{pdb_id}_perturbed_trans.pdb")
+                du.save_perturbed_trans(
+                    trans_perturbed[i][None, ...], 
+                    batch['chain_index'][i][None, ...], 
+                    batch['residue_index'][i][None, ...],
+                    perturbed_trans_path
+                    )
 
         # calculate trans diffuse loss (rmsd)
         gt_trans_1 = batch['trans_1']
@@ -816,7 +822,7 @@ class FlowModule(LightningModule):
         next_sample_num = -1
         # protein의 n번째 (n>1) 배치를 생성할 때 
         if any('sample' in filename for filename in samples):
-            sample_nums = sorted([int(sample.replace("sample_", "")) for sample in samples if 'sample' in sample])
+            sample_nums = sorted([int(sample.replace("sample_", "").replace(".pdb", "")) for sample in samples if 'sample' in sample])
             next_sample_num = sample_nums[-1]
 
         for i in range(num_batch):
@@ -846,4 +852,10 @@ class FlowModule(LightningModule):
             # save perturbed trans 
             if trans_perturbed != None:
                 perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
-                du.save_perturbed_trans(trans_perturbed[i][None, ...], batch['chain_index'][i][None, ...], perturbed_trans_path)
+                du.save_perturbed_trans(
+                    trans_perturbed[i][None, ...], 
+                    batch['chain_index'][i][None, ...], 
+                    batch['residue_index'][i][None, ...],
+                    perturbed_trans_path
+                    )
+                

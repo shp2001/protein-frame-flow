@@ -528,15 +528,39 @@ def atom_unflatten(flatten, mask):
 
     return coords_recon.view(B, L, A) if flatten.dim() == 2 else coords_recon
 
-def tensor_to_pdb_block_ca(tensor, chain_index, model_num=1):
-    """
-    (L, 3) 좌표 텐서 + (L,) chain index 텐서를 받아
-    residue별로 다른 체인 ID를 가지는 PDB block 생성
-    """
+import numpy as np
 
+import numpy as np
+import torch # torch가 사용되는 것으로 가정하고 import를 명시적으로 추가합니다.
+
+def tensor_to_pdb_block_ca(tensor, chain_index, residue_index, model_num=1):
+    """
+    (L, 3) 좌표 텐서 + (L,) chain index 텐서 + (L,) residue index 텐서를 받아
+    residue별로 다른 체인 ID 및 실제 잔기 번호를 가지는 PDB block 생성 (C-alpha만)
+    """
+    
+    # 텐서에서 NumPy 배열로 변환
     coords = tensor.detach().cpu().numpy()            # shape (L, 3)
     chain_index = chain_index.detach().cpu().numpy()  # shape (L,)
+    residue_index = residue_index.detach().cpu().numpy() # shape (L,)
     L = coords.shape[0]
+
+    # ----------------------------------------------------
+    # [수정된 부분: chain_index의 고유 값을 배열에 처음 나타나는 순서대로 A, B, C, ...에 매핑]
+    
+    # 1. chain_index의 고유한 값들을 배열에 나타난 순서대로 얻습니다.
+    #    (dict.fromkeys를 사용하여 순서를 보존하며 고유 값을 추출)
+    unique_chain_indices_in_order = list(dict.fromkeys(chain_index))
+    
+    # 2. 고유한 값들을 PDB 체인 ID(A, B, C, ...)에 매핑하는 딕셔너리를 만듭니다.
+    chain_map = {}
+    for i, cidx_val in enumerate(unique_chain_indices_in_order):
+        # i번째 고유 값에 i번째 PDB 문자 할당 (0=A, 1=B, 2=C, ...)
+        # chain_index의 값이 숫자(float/int)일 수 있으므로 이를 키로 사용
+        chain_id = chr(ord('A') + i)
+        chain_map[cidx_val] = chain_id
+        
+    # ----------------------------------------------------
 
     pdb_lines = []
     pdb_lines.append(f"MODEL     {model_num}")
@@ -545,17 +569,19 @@ def tensor_to_pdb_block_ca(tensor, chain_index, model_num=1):
 
     for i in range(L):
         pos = coords[i]
-        cidx = int(chain_index[i])
+        cidx_val = chain_index[i] # 현재 잔기의 chain index 값
+        
+        # 주어진 잔기 인덱스를 잔기 번호로 사용
+        res_seq = int(residue_index[i])
 
-        # (0,0,0)은 패딩 residue → skip
+        # (0,0,0)은 패딩 residue → skip.
         if np.sum(np.abs(pos)) < 1e-6:
             continue
+        
+        # 매핑 딕셔너리에서 PDB 체인 문자를 가져옵니다.
+        chain_id = chain_map[cidx_val]
 
-        # 체인 인덱스를 PDB 체인 문자로 매핑 (0=A, 1=B, 2=C ...)
-        chain_id = chr(ord('A') + cidx)
-
-        res_seq = i + 1
-        res_name = "ALA"
+        res_name = "ALA" 
         atom_name = " CA "
 
         line = (
@@ -571,13 +597,12 @@ def tensor_to_pdb_block_ca(tensor, chain_index, model_num=1):
     pdb_lines.append("ENDMDL")
     return "\n".join(pdb_lines)
 
-def save_perturbed_trans(tensor_list, chain_index, output_path):
+def save_perturbed_trans(tensor_list, chain_index, residued_index, output_path):
     
     for i, tensor in enumerate(tensor_list):
         # [수정됨] CA 전용 함수 호출
-        pdb_content = tensor_to_pdb_block_ca(tensor, chain_index[i], model_num=1)
+        pdb_content = tensor_to_pdb_block_ca(tensor, chain_index[i], residued_index[i], model_num=1)
 
-        
         with open(output_path, 'w') as f:
             f.write(pdb_content)
             

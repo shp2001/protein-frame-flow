@@ -182,7 +182,7 @@ def to_pdb(prot: Protein, model=1, add_end=True) -> str:
     if i >= PDB_MAX_CHAINS:
       raise ValueError(
           f'The PDB format supports at most {PDB_MAX_CHAINS} chains.')
-    chain_ids[i] = PDB_CHAIN_IDS[i]
+    chain_ids[i] = PDB_CHAIN_IDS[i].upper()
 
   pdb_lines.append(f'MODEL     {model}')
   atom_index = 1
