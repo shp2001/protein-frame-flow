@@ -142,7 +142,24 @@ experiment:
     sc_aux_loss_t_pass: 0.5
     bb_viol_loss_t_pass: 0.5
     sc_viol_loss_t_pass: 0.75
-    
+  
+    # confidence loss 
+    plddt:
+      min_bin: 0
+      max_bin: 1
+      no_bins: 50
+      threshold: 15
+      eps: 1e-6
+      normalize: True
+      reduction: mean
+
+    pae:
+      min_bin: 0
+      max_bin: 32
+      no_bins: 64
+      eps: 1e-6
+      reduction: mean
+
   wandb:
     name: CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage3
     project: v2.3.2

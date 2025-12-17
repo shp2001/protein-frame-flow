@@ -1268,3 +1268,399 @@ def clash_potential(translations: torch.Tensor, rotmats: torch.Tensor, local_ato
         interface_mask=batch['interface_mask'].clone()
     )
     return within + inter
+
+class PLDDTLoss(nn.Module):
+    """
+    Implements PLDDT Loss in AF3, different from the paper description.
+    Main changes:
+    1. use difference of distance instead of predicted distance when calculating plddt
+    2. normalize each plddt score within 0-1
+    """
+
+    def __init__(
+        self,
+        min_bin: float = 0,
+        max_bin: float = 1,
+        no_bins: int = 50,
+        is_nucleotide_threshold: float = 30.0,
+        is_not_nucleotide_threshold: float = 15.0,
+        eps: float = 1e-6,
+        normalize: bool = True,
+        reduction: str = "mean",
+    ) -> None:
+        """PLDDT loss
+        This loss are between atoms l and m (has some filters) in the mini-rollout prediction
+
+        Args:
+            min_bin (float, optional): min boundary of bins. Defaults to 0.
+            max_bin (float, optional): max boundary of bins. Defaults to 1.
+            no_bins (int, optional): number of bins. Defaults to 50.
+            is_nucleotide_threshold (float, optional): threshold for nucleotide atoms. Defaults 30.0.
+            is_not_nucleotide_threshold (float, optional): threshold for non-nucleotide atoms. Defaults 15.0
+            eps (float, optional): small number added to denominator. Defaults to 1e-6.
+            reduction (str, optional): reduction method for the batch dims. Defaults to mean.
+        """
+        super(PLDDTLoss, self).__init__()
+        self.normalize = normalize
+        self.min_bin = min_bin
+        self.max_bin = max_bin
+        self.no_bins = no_bins
+        self.eps = eps
+        self.reduction = reduction
+        self.is_nucleotide_threshold = is_nucleotide_threshold
+        self.is_not_nucleotide_threshold = is_not_nucleotide_threshold
+
+    def bins_from_lddt(
+        self,
+        per_atom_lddt: torch.Tensor,
+        per_atom_weight: torch.Tensor,
+    ):
+        if self.normalize:
+            per_atom_lddt = per_atom_lddt / (per_atom_weight + self.eps)
+        # Distribute into bins
+        boundaries = torch.linspace(
+            start=self.min_bin,
+            end=self.max_bin,
+            steps=self.no_bins + 1,
+            device=per_atom_lddt.device,
+        )  # [N_bins]
+
+        true_bins = torch.sum(
+            per_atom_lddt > boundaries, dim=-1
+        )  # [...,  N_sample, N_atom], range in [1, no_bins]
+        true_bins = torch.clamp(
+            true_bins, min=1, max=self.no_bins
+        )  # just in case bin=0/no_bins+1 occurs
+        true_bins = nn.functional.one_hot(
+            true_bins - 1, self.no_bins
+        )  # [...,  N_sample, N_atom, N_bins]
+
+        return true_bins
+
+    def forward_given_atom_lddt(
+        self,
+        logits: torch.Tensor,
+        per_atom_lddt: torch.Tensor,
+        per_atom_weight: torch.Tensor,
+        atom_diffuse_mask: torch.Tensor
+    ):
+        """
+        Args:
+        per_atom_lddt
+            [..., N_sample, N_atom, 1]
+        per_atom_weight
+            [..., N_sample, N_atom, 1]
+        atom_diffuse_mask
+            [..., N_sample, N_atom]
+        Returns:
+            torch.Tensor: per-atom lddt bins
+                [..., N_sample, N_atom, N_bins]
+        """
+        with torch.no_grad():
+            true_bins = self.bins_from_lddt(per_atom_lddt, per_atom_weight).detach()
+        plddt_loss = softmax_cross_entropy(
+            logits=logits,
+            labels=true_bins,
+        )  # [..., N_sample, N_atom_with_coords]
+        plddt_loss = plddt_loss * atom_diffuse_mask # [..., N_sample, N_atom_with_coords]
+        # Average over atoms
+        plddt_loss = plddt_loss.sum(dim=-1) / (atom_diffuse_mask.sum(dim=-1) + 1e-6)  # [..., N_sample]
+        return plddt_loss
+
+    def forward(
+        self,
+        logits: torch.Tensor,
+        pred_coordinate: torch.Tensor,
+        true_coordinate: torch.Tensor,
+        coordinate_mask: torch.Tensor,
+        is_nucleotide: torch.Tensor,
+        is_polymer: torch.Tensor,
+        rep_atom_mask: torch.Tensor,
+        atom_diffuse_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """PLDDT loss
+
+        Args:
+            logits (torch.Tensor): logits
+                [..., N_sample, N_atom, no_bins:=50]
+            pred_coordinate (torch.Tensor): predicted coordinates
+                [..., N_sample, N_atom, 3]
+            true_coordinate (torch.Tensor): true coordinates
+                [..., N_atom, 3]
+            coordinate_mask (torch.Tensor): whether true coordinates exist
+                [N_atom]
+            is_nucleotide (torch.Tensor): "is_rna" or "is_dna"
+                [N_atom]
+            is_polymer (torch.Tensor): not "is_ligand"
+                [N_atom]
+            rep_atom_mask (torch.Tensor): representative atom of each token
+                [N_atom]
+            atom_diffuse_mask (torch.Tensor): saffold atom mask 
+                [N_sample, N_atom]
+        Returns:
+            torch.Tensor: the return loss
+                [...] if self.reduction is None else []
+        """
+        assert (
+            is_nucleotide.shape
+            == is_polymer.shape
+            == rep_atom_mask.shape
+            == coordinate_mask.shape
+            == coordinate_mask.view(-1).shape
+        )
+
+        coordinate_mask = coordinate_mask.bool()
+        rep_atom_mask = rep_atom_mask.bool()
+        is_nucleotide = is_nucleotide.bool()
+        is_polymer = is_polymer.bool()
+
+        with torch.no_grad():
+            per_atom_lddt, per_atom_weight = calculate_atom_bespoke_lddt(
+                pred_coordinate=pred_coordinate[..., coordinate_mask, :],
+                true_coordinate=true_coordinate[..., coordinate_mask, :],
+                is_nucleotide=is_nucleotide[coordinate_mask],
+                is_polymer=is_polymer[coordinate_mask],
+                rep_atom_mask=rep_atom_mask[coordinate_mask],
+                is_nucleotide_threshold=self.is_nucleotide_threshold,
+                is_not_nucleotide_threshold=self.is_not_nucleotide_threshold,
+            )
+
+        loss = self.forward_given_atom_lddt(
+            logits=logits[..., coordinate_mask, :],
+            per_atom_lddt=per_atom_lddt,
+            per_atom_weight=per_atom_weight,
+            atom_diffuse_mask=atom_diffuse_mask
+        )
+        return loss
+
+def compute_alignment_error_squared(
+    pred_coordinate: torch.Tensor,
+    true_coordinate: torch.Tensor,
+    pred_frames: torch.Tensor,
+    true_frames: torch.Tensor,
+) -> torch.Tensor:
+    """Implements Algorithm 30 Compute alignment error, but do not take the square root
+
+    Args:
+        pred_coordinate (torch.Tensor): the predict coords [frame center]
+            [..., N_sample, N_token, 3]
+        true_coordinate (torch.Tensor): the ground truth coords [frame center]
+            [..., N_token, 3]
+        pred_frames (torch.Tensor): the predict frame
+            [..., N_sample, N_frame, 3, 3]
+        true_frames (torch.Tensor): the ground truth frame
+            [..., N_frame, 3, 3]
+
+    Returns:
+        torch.Tensor: the computed alignment error
+            [..., N_sample, N_frame, N_token]
+    """
+    x_transformed_pred = expressCoordinatesInFrame(
+        coordinate=pred_coordinate, frames=pred_frames
+    )  # [..., N_sample, N_frame, N_token, 3]
+    x_transformed_true = expressCoordinatesInFrame(
+        coordinate=true_coordinate, frames=true_frames
+    )  # [..., N_frame, N_token, 3]
+    squared_pae = torch.sum(
+        (x_transformed_pred - x_transformed_true.unsqueeze(dim=-4)) ** 2, dim=-1
+    )  # [..., N_sample, N_frame, N_token]
+    return squared_pae
+
+class PAELoss(nn.Module):
+    """
+    Implements Predicted Aligned distance loss in AF3
+    """
+
+    def __init__(
+        self,
+        min_bin: float = 0,
+        max_bin: float = 32,
+        no_bins: int = 64,
+        eps: float = 1e-6,
+        reduction: str = "mean",
+    ) -> None:
+        """PAELoss
+        This loss are between representative token atoms i and j in the mini-rollout prediction
+
+        Args:
+            min_bin (float, optional): min boundary of bins. Defaults to 0.
+            max_bin (float, optional): max boundary of bins. Defaults to 32.
+            no_bins (int, optional): number of bins. Defaults to 64.
+            eps (float, optional): small number added to denominator. Defaults to 1e-6.
+            reduce (bool, optional): reduce dim. Defaults to True.
+        """
+        super(PAELoss, self).__init__()
+        self.min_bin = min_bin
+        self.max_bin = max_bin
+        self.no_bins = no_bins
+        self.eps = eps
+        self.reduction = reduction
+
+    def calculate_label(
+        self,
+        pred_coordinate: torch.Tensor,
+        true_coordinate: torch.Tensor,
+        coordinate_mask: torch.Tensor,
+        rep_atom_mask: torch.Tensor,
+        frame_atom_index: torch.Tensor,
+        has_frame: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """calculate true PAE (squared) and true bins
+
+        Args:
+            pred_coordinate: (torch.Tensor): predict coordinates.
+                [..., N_sample, N_atom, 3]
+            true_coordinate (torch.Tensor): true coordinates.
+                [..., N_atom, 3]
+            coordinate_mask (torch.Tensor): whether true coordinates exist
+                [N_atom]
+            rep_atom_mask (torch.Tensor): masks of the representative atom for each token.
+                [N_atom]
+            frame_atom_index (torch.Tensor): indices of frame atoms (three atoms per token(=per frame)).
+                [N_token, 3[three atom]]
+            has_frame (torch.Tensor): indicates whether token_i has a valid frame.
+                [N_token]
+        Returns:
+            squared_pae (torch.Tensor): pairwise alignment error squared
+                [..., N_sample, N_frame, N_token] where N_token = rep_atom_mask.sum()
+            true_bins (torch.Tensor): the true bins
+                [..., N_sample, N_frame, N_token, no_bins]
+            frame_token_pair_mask (torch.Tensor): whether frame_i token_j both have true coordinates.
+                [N_frame, N_token]
+        """
+
+        coordinate_mask = coordinate_mask.bool()
+        rep_atom_mask = rep_atom_mask.bool()
+        has_frame = has_frame.bool()
+
+        # NOTE: to support frame_atom_index with batch_dims, need to expand its dims before constructing frames.
+        assert len(frame_atom_index.shape) == 2
+
+        # Take valid frames: N_token -> N_frame
+        frame_atom_index = frame_atom_index[has_frame, :]  # [N_frame, 3[three atom]]
+
+        # Get predicted frames and true frames
+        pred_frames = gather_frame_atom_by_indices(
+            coordinate=pred_coordinate, frame_atom_index=frame_atom_index, dim=-2
+        )  # [..., N_sample, N_frame, 3[three atom], 3[coordinates]]
+        true_frames = gather_frame_atom_by_indices(
+            coordinate=true_coordinate, frame_atom_index=frame_atom_index, dim=-2
+        )  # [..., N_frame, 3[three atom], 3[coordinates]]
+
+        # Get pair_mask for computing the loss
+        true_frame_coord_mask = gather_frame_atom_by_indices(
+            coordinate=coordinate_mask, frame_atom_index=frame_atom_index, dim=-1
+        )  # [N_frame, 3[three atom]]
+        true_frame_coord_mask = (
+            true_frame_coord_mask.sum(dim=-1) >= 3
+        )  # [N_frame] whether all atoms in the frame has coordinates
+        token_mask = coordinate_mask[rep_atom_mask]  # [N_token]
+        frame_token_pair_mask = (
+            true_frame_coord_mask[..., None] * token_mask[..., None, :]
+        )  # [N_frame, N_token]
+
+        squared_pae = (
+            compute_alignment_error_squared(
+                pred_coordinate=pred_coordinate[..., rep_atom_mask, :],
+                true_coordinate=true_coordinate[..., rep_atom_mask, :],
+                pred_frames=pred_frames,
+                true_frames=true_frames,
+            )
+            * frame_token_pair_mask
+        )  # [..., N_sample, N_frame, N_token]
+
+        # Compute true bins
+        boundaries = torch.linspace(
+            start=self.min_bin,
+            end=self.max_bin,
+            steps=self.no_bins + 1,
+            device=pred_coordinate.device,
+        )
+        boundaries = boundaries**2
+
+        true_bins = torch.sum(
+            squared_pae.unsqueeze(dim=-1) > boundaries, dim=-1
+        )  # range [1, no_bins + 1]
+        true_bins = torch.where(
+            frame_token_pair_mask,
+            true_bins,
+            torch.ones_like(true_bins) * self.no_bins,
+        )
+        true_bins = torch.clamp(
+            true_bins, min=1, max=self.no_bins
+        )  # just in case bin=0 occurs
+
+        return (
+            squared_pae.detach(),
+            nn.functional.one_hot(true_bins - 1, self.no_bins).detach(),
+            frame_token_pair_mask.detach(),
+        )
+
+    def forward(
+        self,
+        logits: torch.Tensor,
+        pred_coordinate: torch.Tensor,
+        true_coordinate: torch.Tensor,
+        coordinate_mask: torch.Tensor,
+        frame_atom_index: torch.Tensor,
+        rep_atom_mask: torch.Tensor,
+        has_frame: torch.Tensor,
+        inter_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """PAELoss
+
+        Args:
+            logits (torch.Tensor): logits
+                [..., N_sample, N_token, N_token, no_bins]
+            pred_coordinate: (torch.Tensor): predict coordinates
+                [..., N_sample, N_atom, 3]
+            true_coordinate (torch.Tensor): true coordinates
+                [..., N_atom, 3]
+            coordinate_mask (torch.Tensor): whether true coordinates exist
+                [N_atom]
+            rep_atom_mask (torch.Tensor): masks of the representative atom for each token.
+                [N_atom]
+            frame_atom_index (torch.Tensor): indices of frame atoms (three atoms per token(=per frame)).
+                [N_token, 3[three atom]]
+            has_frame (torch.Tensor): indicates whether token_i has a valid frame.
+                [N_token]
+            inter_mask (torch.Tensor): indicates whether token_i and token_j belong to different chains (Ab vs Ag)
+                [..., N_sample, N_token, N_token]
+        Returns:pae_loss = self.pae_loss_module(
+            torch.Tensor: the return loss
+                [] if reduce
+                [..., n] else
+        """
+
+        has_frame = has_frame.bool()
+        rep_atom_mask = rep_atom_mask.bool()
+        assert len(has_frame.shape) == 1
+        assert len(frame_atom_index.shape) == 2
+
+        with torch.no_grad():
+            # true_bins: [..., N_sample, N_frame, N_token, no_bins]
+            # pair_mask: [N_frame, N_token]
+            _, true_bins, pair_mask = self.calculate_label(
+                pred_coordinate=pred_coordinate,
+                true_coordinate=true_coordinate,
+                frame_atom_index=frame_atom_index,
+                rep_atom_mask=rep_atom_mask,
+                coordinate_mask=coordinate_mask,
+                has_frame=has_frame,
+            )
+
+        loss = softmax_cross_entropy(
+            logits=logits[
+                ..., has_frame, :, :
+            ],  # [..., N_sample, N_frame, N_token, no_bins]
+            labels=true_bins,
+        )  # [..., N_sample, N_frame, N_token]
+
+        frame_idx = torch.nonzero(has_frame).squeeze(-1)  
+        inter_mask = inter_mask[..., frame_idx, :] # [..., N_sample, N_frame, N_token]
+        denom = self.eps + torch.sum(inter_mask, dim=(-1, -2))  # [..., N_sample]
+        loss = loss * inter_mask  # [..., N_sample, N_token, N_token]
+        loss = torch.sum(loss, dim=(-1, -2))  # [..., N_sample]
+        loss = loss / denom  # [..., N_sample]
+
+        return loss
