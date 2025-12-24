@@ -82,7 +82,7 @@ def generate_chain_id_map(chain_ids):
  
 def get_cif_path(cif_ID):
     cif_path = (
-        "/public_data/BioMolDB_2024Oct21/cif/"
+        "/public_data/BioMolDB_2024Oct21/cif/cif_raw/"
         + cif_ID[1:3]
         + "/"
         + cif_ID

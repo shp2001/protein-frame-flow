@@ -236,13 +236,10 @@ def save_traj(
     # Write sample.
     sample_path = output_path
 
-    # Use b-factors to specify which residues are diffused.
-    if b_factors == None:
-        b_factors = np.tile((diffuse_mask * 100)[:, None], (1, 37))
-    
-    else:
-        b_factors = np.tile((b_factors)[:, None], (1, 37))
-    
+    if b_factors is None:
+        b_factor_alt = diffuse_mask
+        b_factors = np.tile((b_factor_alt * 100)[:, None], (1, 37))
+
     sample_path = au.write_prot_to_pdb(
         sample,
         sample_path,

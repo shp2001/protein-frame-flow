@@ -2,7 +2,7 @@ model:
   c_s: 384
   c_token: 768
   c_z: 128
-  train_confidence: False
+  train_confidence: True
   symmetric: False
   
   node_features:
@@ -104,6 +104,7 @@ model:
     num_bins: 128
     
   confidence_head:
+    use_confidence: ${model.train_confidence}
     n_blocks: 3
     c_s: 384
     c_z: 128

@@ -47,6 +47,11 @@ def rechain_pdb(pdb_file):
     io.save(pdb_file)
 
 
+from Bio.PDB import PDBParser, PDBIO, Chain as PDBChain
+from Bio.SeqUtils import seq1
+from abnumber import Chain, ChainParseError  # 에러 처리를 위해 import
+import warnings
+
 def renumber_pdb_wt_constant(
     in_pdb_file,
     out_pdb_file=None,
@@ -59,20 +64,15 @@ def renumber_pdb_wt_constant(
     if out_pdb_file is None:
         out_pdb_file = in_pdb_file
 
-    # clean_pdb(in_pdb_file) # 해당 함수가 정의되어 있지 않아 주석 처리
-    
     parser = PDBParser()
     with warnings.catch_warnings(record=True):
-        structure = parser.get_structure(
-            "_",
-            in_pdb_file,
-        )
+        structure = parser.get_structure("_", in_pdb_file)
 
     for i, chain in enumerate(structure.get_chains()):
         if i == 2:  # Heavy/Light chain (최대 2개)만 처리
             break
 
-        # 1. 비표준 잔기(HOH, 리간드 등)를 제외한 표준 아미노산 잔기 리스트와 서열 생성
+        # 1. 표준 아미노산 잔기 리스트와 서열 생성
         std_residues = []
         std_resnames = []
         for r in chain.get_residues():
@@ -82,38 +82,54 @@ def renumber_pdb_wt_constant(
                 std_residues.append(r)
                 std_resnames.append(r.get_resname())
             except KeyError:
-                continue  # HOH, 리간드 등 비표준 잔기 건너뛰기
+                continue
         
-            
-        seq = seq1(''.join(std_resnames))
+        full_seq = seq1(''.join(std_resnames))
 
-        # 2. abnumber를 사용해 V-domain 서열 번호 매기기
-        abnum_chain = Chain(seq, scheme=scheme)
+        # [수정 1] 가변 영역 인식을 위해 서열 앞부분(150aa)만 잘라서 사용
+        # C-domain이 너무 길게 붙어있으면 abnumber가 인식을 실패함
+        seq_for_numbering = full_seq[:150] if len(full_seq) > 150 else full_seq
 
-        # 3. V-domain 번호 리스트와 V-domain 시작 인덱스 가져오기
-        numbering_list = list(abnum_chain.positions.items())  # 순서가 보장된 리스트
+        try:
+            # 2. abnumber를 사용해 V-domain 서열 번호 매기기
+            abnum_chain = Chain(seq_for_numbering, scheme=scheme)
+        except ChainParseError:
+            print(f"Warning: Chain {chain.id}에서 V-domain을 인식하지 못했습니다. (Skip)")
+            continue
+
+        # 3. V-domain 번호 리스트 가져오기
+        numbering_list = list(abnum_chain.positions.items())
         vd_len = len(numbering_list)
 
-        # 4. PDB 잔기 리스트(std_residues)에서 V-domain에 해당하는 부분만 슬라이싱
+        # 4. PDB 잔기 리스트에서 V-domain 부분 슬라이싱
         vd_residues_pdb = std_residues[:vd_len]
 
-        # 5. 길이 재확인 (이제 길이가 같아야 함)
         if len(vd_residues_pdb) != len(numbering_list):
-            print(f"오류: Chain {chain.id} 슬라이싱 후에도 길이가 불일치합니다. 로직 확인 필요.")
+            print(f"오류: Chain {chain.id} 길이 불일치.")
             continue
 
         print(f"Chain {chain.id}: V-domain {len(vd_residues_pdb)}개 잔기를 renumbering합니다...")
-        # 6. V-domain 부분만 PDB ID (번호) 변경
-        for pdb_r, (pos, aa) in zip(vd_residues_pdb, numbering_list):
-            pos = str(pos)[1:]
-            if not pos[-1].isnumeric():
-                ins = pos[-1]
-                pos = int(pos[:-1])
+        
+        # 5. Renumbering 수행
+        for pdb_r, (pos, aa_abnum) in zip(vd_residues_pdb, numbering_list):
+            # [수정 2] 안전 장치: PDB의 아미노산과 abnumber가 인식한 아미노산이 같은지 확인
+            pdb_aa = seq1(pdb_r.get_resname())
+            if pdb_aa != aa_abnum:
+                print(f"Warning: 서열 불일치 감지 (PDB: {pdb_aa} vs AbNum: {aa_abnum}). 정렬 확인이 필요합니다.")
+                # 필요시 여기서 break 하거나 continue 할 수 있음
+
+            pos_str = str(pos)[1:] # H100 -> 100
+            
+            # Insertion code 처리 (예: 100A)
+            if not pos_str[-1].isnumeric():
+                ins = pos_str[-1]
+                res_num = int(pos_str[:-1])
             else:
-                pos = int(pos)
+                res_num = int(pos_str)
                 ins = ' '
 
-            pdb_r._id = (' ', pos, ins)
+            # PDB ID 변경 (Hetero flag, Sequence identifier, Insertion code)
+            pdb_r._id = (' ', res_num, ins)
 
     io = PDBIO()
     io.set_structure(structure)

@@ -71,11 +71,12 @@ class ProteinData(LightningDataModule):
         cropped_batch['mode'] = feat['mode']
         cropped_batch['raw_path'] = feat['raw_path']
 
-        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos = \
+        ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, atom_to_tokatom_idx, ref_pos = \
             featurizer.get_ref_basic_feature(cropped_batch['aatype'], cropped_batch['atom14_gt_exists'], cropped_batch['residue_index'])
         cropped_batch['ref_feature_dict'] = {
             'ref_space_uid': ref_space_uid,
             'atom_to_token_idx': atom_to_token_idx,
+            'atom_to_tokatom_idx': atom_to_tokatom_idx,
             'ref_pos': ref_pos,
             'ref_element': ref_element,
             'ref_charge': ref_charge,

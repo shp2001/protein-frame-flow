@@ -77,6 +77,7 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
     ref_element = []
     ref_charge = []
     atom_to_token_idx = [] # residue number를 고려하지 않고 res idx 상에서 몇 번째인지 
+    atom_to_tokatom_idx = []  # residue 내 atom index
     ref_pos = []
 
     aatype = aatype_batch[0]
@@ -96,10 +97,10 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
 
         res_idx = res_indices[i]
         res_coords = []
+        local_idx = 0
         for j, atom_name in enumerate(atom_names):
             if atom_name != '' and atom14_mask[i, j] == 1:
                 ref_space_uid.append(res_idx)
-                
                 atom_list.append(atom_name)
                 element = residue_constants.atom_type_to_element[atom_name]
                 element_one_hot = residue_constants.element_onehot[element] # numpy array
@@ -113,6 +114,10 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
 
                 # atom_to_token_idx
                 atom_to_token_idx.append(i)
+
+                # atom_to_tokatom_idx
+                atom_to_tokatom_idx.append(local_idx)
+                local_idx += 1 
 
                 # ref_pos & ref_rigid_frame
                 coord = None
@@ -137,5 +142,5 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         ).unsqueeze(0).repeat(B,1,1,1) 
     ref_pos = torch.tensor(ref_pos).unsqueeze(0).repeat(B,1,1)
     atom_to_token_idx = torch.tensor(atom_to_token_idx)
-    
-    return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, ref_pos
+    atom_to_tokatom_idx = torch.tensor(atom_to_tokatom_idx)
+    return ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, atom_to_tokatom_idx, ref_pos
