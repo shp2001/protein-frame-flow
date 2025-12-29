@@ -1,0 +1,121 @@
+"""Script for running inference and evaluation."""
+
+import os
+import time
+import numpy as np
+import hydra
+import torch
+import GPUtil
+import pytorch_lightning as pl
+from pytorch_lightning import Trainer
+from omegaconf import DictConfig, OmegaConf
+from experiments import utils as eu
+from experiments.inference_loader import BaseDataset, predict_dataloader
+
+from models.flow_module import FlowModule
+
+
+torch.set_float32_matmul_precision('high')
+log = eu.get_pylogger(__name__)
+
+
+class EvalRunner:
+
+    def __init__(self, cfg: DictConfig):
+        """Initialize sampler.
+
+        Args:
+            cfg: inference config.
+        """
+        ckpt_path = cfg.inference.ckpt_path
+        ckpt_dir = os.path.dirname(ckpt_path)
+        ckpt_cfg = OmegaConf.load(os.path.join(ckpt_dir, 'config.yaml'))
+
+        # Set-up config.
+        OmegaConf.set_struct(cfg, False)
+        OmegaConf.set_struct(ckpt_cfg, False)
+        cfg = OmegaConf.merge(cfg, ckpt_cfg)
+        cfg.experiment.checkpointer.dirpath = './'
+        self._cfg = cfg
+        self._exp_cfg = cfg.experiment
+        self._infer_cfg = cfg.inference
+        self._samples_cfg = self._infer_cfg.samples
+        self._rng = np.random.default_rng(self._infer_cfg.seed)
+        self.use_prmsd = self._infer_cfg.interpolant.use_prmsd
+        self.batch_size = self._infer_cfg.samples.batch_size
+
+        # Set-up output directory only on rank 0
+        inference_dir = self.setup_inference_dir(ckpt_path)
+        self._exp_cfg.inference_dir = inference_dir
+        config_path = os.path.join(inference_dir, 'config.yaml')
+        with open(config_path, 'w') as f:
+            OmegaConf.save(config=self._cfg, f=f)
+        log.info(f'Saving inference config to {config_path}')
+
+        # predict w/o perturbed pair distogram 
+        self._cfg.model.edge_features.contact_map_off_diag.perturb = cfg.inference.perturbation 
+
+        # Read checkpoint and initialize module.
+        if not self.use_prmsd:
+            # turn off the gradient checkpoint
+            self._cfg.model.pairformer.blocks_per_ckpt = None
+            self._flow_module = FlowModule.load_from_checkpoint(
+                checkpoint_path=ckpt_path,
+                cfg=self._cfg,
+            )
+
+        log.info(pl.utilities.model_summary.ModelSummary(self._flow_module))
+        self._flow_module.eval()
+        self._flow_module._infer_cfg = self._infer_cfg
+        self._flow_module._samples_cfg = self._samples_cfg
+
+    @property
+    def inference_dir(self):
+        return self._flow_module.inference_dir
+
+    def setup_inference_dir(self, ckpt_path):
+        self._ckpt_name = '/'.join(ckpt_path.replace('.ckpt', '').split('/')[-3:])
+        output_dir = os.path.join(
+            self._infer_cfg.predict_dir,
+            self._ckpt_name,
+            self._infer_cfg.inference_subdir,
+        )
+        os.makedirs(output_dir, exist_ok=True)
+        log.info(f'Saving results to {output_dir}')
+        return output_dir
+
+    def run_sampling(self, save_file=True):
+        devices = GPUtil.getAvailable(
+            order='memory', limit = 8)[:self._infer_cfg.num_gpus]
+        log.info(f"Using devices: {devices}")
+        log.info(f'Evaluating {self._infer_cfg.task}')
+        eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
+            
+        dataloader = predict_dataloader(
+            dataset=eval_dataset,
+            loader_cfg=self._samples_cfg,
+            )
+        
+        trainer = Trainer(
+            accelerator="gpu",
+            # strategy="single",
+            devices=devices,
+        )
+
+        self._flow_module.save_file = save_file
+        trainer.predict(self._flow_module, dataloaders=dataloader)
+
+
+@hydra.main(version_base=None, config_path="../configs", config_name="inference_scaffolding")
+def run(cfg: DictConfig) -> None:
+
+    # Read model checkpoint.
+    log.info(f'Starting inference with {cfg.inference.num_gpus} GPUs')
+    start_time = time.time()
+    sampler = EvalRunner(cfg)
+    sampler.run_sampling()
+    elapsed_time = time.time() - start_time
+    log.info(f'Finished in {elapsed_time:.2f}s')
+
+if __name__ == '__main__':
+    run()

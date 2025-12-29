@@ -15,31 +15,6 @@ import json
 
 from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein, provide_anchor
 
-# def _rog_filter(df, quantile):
-#     y_quant = pd.pivot_table(
-#         df,
-#         values='radius_gyration', 
-#         index='modeled_seq_len',
-#         aggfunc=lambda x: np.quantile(x, quantile)
-#     )
-#     x_quant = y_quant.index.to_numpy()
-#     y_quant = y_quant.radius_gyration.to_numpy()
-
-#     # Fit polynomial regressor
-#     poly = PolynomialFeatures(degree=4, include_bias=True)
-#     poly_features = poly.fit_transform(x_quant[:, None])
-#     poly_reg_model = LinearRegression()
-#     poly_reg_model.fit(poly_features, y_quant)
-
-#     # Calculate cutoff for all sequence lengths
-#     max_len = df.modeled_seq_len.max()
-#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
-#     # Add a little more.
-#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
-
-#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
-#     return df[df.radius_gyration < row_rog_cutoffs]
-
 
 def _length_filter(data_csv, min_res, max_res):
     return data_csv[
