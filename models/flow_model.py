@@ -11,9 +11,6 @@ from models import ipa_pytorch
 
 from data import utils as du
 from openfold.utils.rigid_utils import Rigid
-
-from Proteus.model.ipa_pytorch import LocalTriangleAttentionNew
-
 from Protenix.protenix.model.modules import transformer, pairformer
 from Protenix.protenix.openfold_local.model.primitives import LayerNorm
 from Protenix.protenix.model.modules.primitives import LinearNoBias
@@ -239,58 +236,3 @@ class FlowModel(nn.Module):
         structure_output['pair_outputs'] = distogram_logit_pairformer
         structure_output['trans_perturbed'] = trans_perturbed
         return structure_output
-    
-
-class ConfidenceModel(nn.Module):
-    def __init__(self, model_conf):
-        super(ConfidenceModel, self).__init__()
-        self._model_conf = model_conf
-        self._aa_enc_conf = model_conf.aa_enc
-        self._local_triangle_attention_new_conf = model_conf.local_triangle_attention_new
-        self._distogram_conf = model_conf.distogram_head
-        self._confidence_head = model_conf.confidence_head
-
-        self.s_transform = ipa_pytorch.Linear(self._confidence_head.c_s, self._confidence_head.c_s)
-        self.str_2_pair = ipa_pytorch.Linear(self._distogram_conf.num_bins + 3, self._confidence_head.c_z)
-
-        self.edge_transition = LocalTriangleAttentionNew(**self._local_triangle_attention_new_conf)
-        self.distogram_error_head = DistogramHead(
-            self._confidence_head.c_z,
-            self._confidence_head.num_bins
-            )
-
-
-    def forward(self, input_feats, node_mask):
-        edge_mask = input_feats['edge_mask']
-
-        # Initialize node and edge embeddings
-        node_embed = input_feats['node_embed']
-        edge_embed = input_feats['edge_embed']
-        curr_rigids = input_feats['curr_rigids']
-
-        # transform single feature 
-        node_embed = self.s_transform(node_embed)
-        
-        # transform pair feature
-        pred_trans = curr_rigids.get_trans()
-        pred_distogram = calc_distogram(
-            pos=pred_trans, 
-            min_bin=self._distogram_conf.min_bin,
-            max_bin=self._distogram_conf.max_bin,
-            num_bins=self._distogram_conf.num_bins
-            )
-        pred_unit_vector = calc_unit_vector(
-            rigids=curr_rigids
-        )
-        edge_embed = edge_embed + self.str_2_pair(torch.concat([pred_distogram, pred_unit_vector], dim=-1))
-
-        # apply local triangle 
-        edge_embed = self.edge_transition(
-            node_embed, edge_embed, curr_rigids, edge_mask
-        )
-        
-        pde = self.distogram_error_head(edge_embed) # softmax 적용
-
-        plddt_logit = None
-
-        return plddt_logit, pde

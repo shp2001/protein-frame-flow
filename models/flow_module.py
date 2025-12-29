@@ -1029,7 +1029,7 @@ class FlowModule(LightningModule):
 
         for i in range(num_batch):
             next_sample_num += 1
-            sample_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}.pdb")
+            sample_path = os.path.join(sample_root_dir, f"{pdb_id}_sample_{next_sample_num}.pdb")
             pred_position = pred_positions[i]
             bb_traj = bb_trajs[i]
 
@@ -1053,7 +1053,7 @@ class FlowModule(LightningModule):
             )
             # save perturbed trans 
             if trans_perturbed != None:
-                perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
+                perturbed_trans_path = os.path.join(sample_root_dir, f"{pdb_id}_sample_{next_sample_num}_perturbed_trans.pdb")
                 du.save_perturbed_trans(
                     trans_perturbed[i][None, ...], 
                     batch['chain_index'][i][None, ...], 
@@ -1081,7 +1081,10 @@ class FlowModule(LightningModule):
                 }
                 
                 # 저장할 파일 경로
-                json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_plddts.json')
+                plddt_dir = os.path.join(sample_root_dir, "plddt")
+                if not os.path.exists(plddt_dir):
+                    os.makedirs(plddt_dir, exist_ok=True)
+                json_path = os.path.join(plddt_dir, f'{pdb_id}_sample_{next_sample_num}_plddts.json')
 
                 # JSON으로 저장
                 with open(json_path, 'w') as f:
