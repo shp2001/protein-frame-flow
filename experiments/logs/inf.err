@@ -3,5 +3,3 @@ TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
 LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
-slurmstepd-gpu02: error: *** JOB 872840 ON gpu02 CANCELLED AT 2025-12-29T13:55:01 ***
-slurmstepd-gpu02: error: *** JOB 872788 ON gpu02 CANCELLED AT 2025-12-29T13:55:01 ***
