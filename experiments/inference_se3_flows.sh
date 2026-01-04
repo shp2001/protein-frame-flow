@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.2_abflow_refinement
+#SBATCH -J v2.3.2.2_SBE_ins
 #SBATCH -p gpu
 #SBATCH -w gpu02
 #SBATCH --gres=gpu:A5000:1

@@ -30,7 +30,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     int_to_aa = {i: restype for restype, i in rc.restype_order_with_x.items()}
     aatypes = processed_feats["aatype"]             # [L]
     chain_indices = processed_feats["chain_index"]  # [L]
-
     chain_seqs = defaultdict(list)
     chain_order = []
 
@@ -39,9 +38,7 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         chain_seqs[chain_id].append(aa_letter)
         if chain_id not in chain_order:
             chain_order.append(chain_id)
-
     chain_seq_list = ["".join(chain_seqs[chain_id]) for chain_id in chain_order]
-
     # Run through OpenFold data transforms.
     chain_feats = {
         'aatype': torch.tensor(processed_feats['aatype']).long(),
@@ -150,13 +147,6 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
-
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=None)
-            scaffold_idx[f'loop_start'] = loop_start
-            scaffold_idx[f'loop_end'] = loop_end
-
-        if csv_row['mode'] == 'general':
-            loop_info_file = csv_row['loop_info_dir']
             loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=123)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
@@ -246,7 +236,7 @@ class BaseDataset(Dataset):
         # make diffuse_mask
         # if sample is monomer -> diffuse_mask = loop_mask
         # if sample is polymer -> diffuse_mask is whole chains which have masked loops
-            
+        
         chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
         if len(chain_len_list) == 1:
             diffuse_mask = feats['loop_mask']
@@ -284,7 +274,7 @@ def collate_fn(batch):
                 feat['trans_1'],
                 cdr_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=450,
+                max_len=2000,
                 seq_list=feat['chain_seq_list'],
                 crop_ab=False,
                 include_ag=include_ag
