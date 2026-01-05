@@ -3,7 +3,7 @@ import numpy as np
 import random
 from collections import defaultdict
 
-import os
+
 import itertools 
 import re
 import copy 
@@ -16,9 +16,10 @@ from data import residue_constants as rc
 
 from openfold.data import data_transforms
 from openfold.utils import rigid_utils
-import json 
 
-from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein, provide_anchor
+from data.motif_index import crop_antigen
+
+import logging
 
 def _process_mutations(processed_file_path, mut, scaffold_idx):
     processed_feats = du.read_pkl(processed_file_path)
@@ -433,6 +434,18 @@ class AffinityDataset(Dataset):
 
         return processed_row
 
+    def _create_split(self, data_csv):
+        # Training or validation specific logic.
+        self.csv = data_csv
+        if self.is_training:
+            self._log.info(
+                f'Training: {len(self.csv)} examples')
+        else:
+            self._log.info(
+                f'Validation: {len(self.csv)} examples')
+            
+        self.csv['index'] = list(range(len(self.csv)))
+
     def _sample_scaffold_mask(self, batch):
         aatype = batch['aatype']
         mode = batch['mode']
@@ -508,7 +521,54 @@ class AffinityDataset(Dataset):
                 mode=feats['mode'],
                 )
             feats['loop_mask'] = feats['loop_mask'].int()
-            feats_paired[i] = feats
+            feats_paired[f"batch_{i}"] = feats
         feats_paired['label'] = label
         
         return feats_paired
+
+
+def _length_filter(data_csv, min_res, max_res):
+    return data_csv[
+        (data_csv.seq_len >= min_res)
+        & (data_csv.seq_len <= max_res)
+    ]
+
+
+
+
+class PdbDataset(AffinityDataset):
+
+    def __init__(
+            self,
+            *,
+            dataset_cfg,
+            is_training,
+            task,
+        ):
+        self._log = logging.getLogger(__name__)
+        self._is_training = is_training
+        self._dataset_cfg = dataset_cfg
+        self.task = task
+        self._rng = np.random.default_rng(seed=self._dataset_cfg.seed)
+        self.current_epoch = 0
+        # Process clusters
+        metadata_csv = self._filter_metadata(self.raw_csv)
+        metadata_csv = metadata_csv.sort_values(
+            'seq_len', ascending=False)
+
+        self._missing_pdbs = 0
+        self._create_split(metadata_csv)
+
+    def set_current_epoch(self, epoch):
+        self.current_epoch = epoch
+
+    def _filter_metadata(self, raw_csv):
+        """Filter metadata."""
+        filter_cfg = self.dataset_cfg.filter
+        data_csv = raw_csv
+
+        # if self._is_training:
+        data_csv = _length_filter(
+            data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
+
+        return data_csv

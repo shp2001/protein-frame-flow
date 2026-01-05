@@ -111,7 +111,7 @@ class FlowModel(nn.Module):
             loop_mask,
             aatype,
             ag_hotspot,
-            squeezed_ref_feature_dict
+            squeezed_ref_feature_dict,
         )
 
         z_init, trans_perturbed = self.edge_feature_net(
@@ -157,10 +157,10 @@ class FlowModel(nn.Module):
                     use_lma=False
                 )
 
-        distogram_logit = self.distogram_head_pairformer(z) # (1, N_res, N_res, num_bins)
-        s_init = s.repeat(B, 1, 1) # (B, N_res, c_s)
-        s = s.repeat(B, 1, 1) # (B, N_res, c_s)
-        z = z.repeat(B, 1, 1, 1) # (B, N_res, N_res, c_z)
+        distogram_logit = self.distogram_head_pairformer(z) # (B, N_res, N_res, num_bins)
+        s_init = s.repeat(B, 1, 1) 
+        s = s.repeat(B, 1, 1) 
+        z = z.repeat(B, 1, 1, 1)
         distogram_logit = distogram_logit.repeat(B, 1, 1, 1) # (B, N_res, N_res, num_bins)
 
         return s_init, s, z, distogram_logit

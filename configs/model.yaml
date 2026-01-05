@@ -2,7 +2,8 @@ model:
   c_s: 384
   c_token: 768
   c_z: 128
-  train_confidence: True
+  train_confidence: False
+  train_affinity: True
   symmetric: False
   
   node_features:
@@ -129,3 +130,17 @@ model:
     zero_init_residual_condition_transition: False
     zero_init_dit_output: True
     zero_init_atom_decoder_linear: False
+  
+  affinity_head: 
+    use_affinity: ${model.train_affinity}
+    n_blocks: 3
+    c_s: 384
+    c_z: 128
+    c_s_inputs: 384
+    pairformer_dropout: 0.0
+    blocks_per_ckpt: null
+    distance_bin_start: 3.25
+    distance_bin_end: 52.0
+    distance_bin_step: 1.25
+    stop_gradient: True
+    use_coords: True

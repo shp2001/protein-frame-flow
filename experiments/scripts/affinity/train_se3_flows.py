@@ -8,9 +8,9 @@ from pytorch_lightning import LightningDataModule, LightningModule, Trainer, Cal
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from data.datasets import ScopeDataset, PdbDataset
-from data.protein_dataloader import ProteinData
-from models.flow_module import FlowModule
+from data.datasets_affinity import PdbDataset
+from data.protein_dataloader_affinity import ProteinData
+from models.affinity_module import AffinityModule
 from experiments import utils as eu
 import wandb
 
@@ -33,11 +33,17 @@ class Experiment:
             valid_dataset=self._valid_dataset
         )
 
-        self._module: LightningModule = FlowModule(self._cfg)
+        self._module: LightningModule = AffinityModule(self._cfg)
 
     def _setup_dataset(self):
-        self._train_dataset, self._valid_dataset = eu.dataset_creation(
-            PdbDataset, self._cfg.pdb_dataset, self._task)
+        if self._data_cfg.dataset == 'scope':
+            self._train_dataset, self._valid_dataset = eu.dataset_creation(
+                ScopeDataset, self._cfg.scope_dataset, self._task)
+        elif self._data_cfg.dataset == 'pdb':
+            self._train_dataset, self._valid_dataset = eu.dataset_creation(
+                PdbDataset, self._cfg.pdb_dataset, self._task)
+        else:
+            raise ValueError(f'Unrecognized dataset {self._data_cfg.dataset}') 
         
     def train(self):
         callbacks = []

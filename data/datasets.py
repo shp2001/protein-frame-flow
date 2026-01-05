@@ -160,14 +160,14 @@ class BaseDataset(Dataset):
         
     def _create_split(self, data_csv):
         # Training or validation specific logic.
+        self.csv = data_csv
         if self.is_training:
-            self.csv = data_csv
             self._log.info(
                 f'Training: {len(self.csv)} examples')
         else:
-            self.csv = data_csv
             self._log.info(
                 f'Validation: {len(self.csv)} examples')
+            
         self.csv['index'] = list(range(len(self.csv)))
 
     def process_csv_row(self, csv_row, idx):

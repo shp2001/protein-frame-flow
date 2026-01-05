@@ -143,14 +143,14 @@ class ProteinData(LightningDataModule):
 
     def collate_fn(self, batch):
         """
-        batch: List of dicts. Each dict has keys [0, 1, 'label']
+        batch: List of dicts. Each dict has keys ['batch_0', 'batch_1', 'label']
         """
         # 1. 0번 Feat 모으기
-        feats_0 = [item[0] for item in batch]
+        feats_0 = [item["batch_0"] for item in batch]
         collated_0 = self._collate_single_side(feats_0)
         
         # 2. 1번 Feat 모으기
-        feats_1 = [item[1] for item in batch]
+        feats_1 = [item["batch_1"] for item in batch]
         collated_1 = self._collate_single_side(feats_1)
         
         # 3. Label 모으기
@@ -158,19 +158,17 @@ class ProteinData(LightningDataModule):
         labels = torch.tensor(labels, dtype=torch.long)
         
         return {
-            0: collated_0,
-            1: collated_1,
+            'batch_0': collated_0,
+            'batch_1': collated_1,
             'label': labels
         }
     
     def train_dataloader(self, rank=None, num_replicas=None):
         return DataLoader(
             self._train_dataset,
-            batch_sampler=LengthBatcher(
-                sampler_cfg=self.sampler_cfg,
-                metadata_csv=self._train_dataset.csv,
-                rank=rank,
-                num_replicas=num_replicas,
+            batch_sampler=DistributedSampler(
+                self._train_dataset,
+                shuffle=True
             ),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
@@ -200,158 +198,3 @@ class ProteinData(LightningDataModule):
             collate_fn=self.collate_fn,
         )
 
-
-class LengthBatcher:
-    def __init__(self, 
-                 *, 
-                 sampler_cfg, 
-                 metadata_csv, 
-                 seed=123, 
-                 shuffle=True,
-                 num_replicas=None,
-                 rank=None):
-        super().__init__()
-        self._log = logging.getLogger(__name__)
-
-        if num_replicas is None:
-            self.num_replicas = dist.get_world_size()
-        else:
-            self.num_replicas = num_replicas
-        
-        if rank is None:
-            self.rank = dist.get_rank()
-        else:
-            self.rank = rank
-        
-        self._sampler_cfg = sampler_cfg
-        self._data_csv = metadata_csv
-        self.seed = seed
-        self.shuffle = shuffle
-        self.epoch = 0
-        self.max_batch_size = self._sampler_cfg.max_batch_size
-        
-
-    def _sample_indices(self):
-        if 'cluster' in self._data_csv.columns:
-            random_seed = self.seed + self.epoch
-            cluster_sample = self._data_csv[self._data_csv['mode'].isin(['ab', 'nanobody', 'polymer'])].groupby('cluster').sample(
-                1, random_state=random_seed
-            )
-            # stage 1 
-            monomer_df = self._data_csv[self._data_csv['mode'] == 'monomer'] 
-            if not monomer_df.empty:
-                monomer_sample = monomer_df.groupby('cluster').sample(
-                    1, random_state=random_seed
-                )
-                if len(monomer_df) > cluster_sample.shape[0]:
-                    monomer_sample = monomer_sample.sample(
-                        len(cluster_sample), random_state=random_seed, replace=False
-                    )
-                    # print(f"sampled_monomer", len(monomer_sample['cluster']))
-                    cluster_sample = pd.concat([cluster_sample, monomer_sample])
-                 
-            # stage 2
-            general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
-            if len(general_df) > cluster_sample.shape[0]: 
-                general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
-                    cluster_sample.shape[0], random_state=random_seed, replace=False
-                )
-                cluster_sample = pd.concat([cluster_sample, general_sample])
-            
-            index_list = cluster_sample['index'].tolist()
-            return index_list
-        else:
-            # cluster 정보가 없다면 전체 인덱스 반환
-            return self._data_csv['index'].tolist()
-
-
-    def _replica_epoch_batches(self):
-        rng = torch.Generator()
-        rng.manual_seed(self.seed + self.epoch)
-        
-        # 1. 사용할 인덱스 추출
-        indices = self._sample_indices()
-
-        # 2. 인덱스 셔플 (랜덤성 부여) 후 Rank 분배
-        #    참고: Bucketing을 하려면 길이 순 정렬이 필요하지만, 
-        #    전체 데이터셋에서 랜덤하게 Rank에 할당된 부분집합을 가져온 뒤 그 안에서 정렬하는 것이 일반적임.
-        if self.shuffle:
-            new_order = torch.randperm(len(indices), generator=rng).tolist()
-            indices = [indices[i] for i in new_order]
-
-        # Rank에 맞는 부분 데이터만 가져오기
-        if len(indices) > self.num_replicas:
-            replica_indices = indices[self.rank::self.num_replicas]
-        else:
-            replica_indices = indices
-
-        # 3. 데이터프레임에서 해당 인덱스들 가져와서 '길이(seq_len)' 순으로 정렬 (내림차순)
-        #    내림차순 정렬 시 가장 긴 시퀀스 기준으로 배치가 형성되므로 padding issue나 OOM 방지에 유리
-        subset = self._data_csv.loc[replica_indices].sort_values('seq_len', ascending=False)
-
-        batches = []
-        current_batch = []
-        current_max_bs = -1
-
-        # 4. 정렬된 데이터를 순회하며 Dynamic Batching 수행
-        for _, row in subset.iterrows():
-            seq_len = row['seq_len']
-            
-            # 길이 제한 적용 (기존 로직 유지)
-            if row['mode'] in ['ab', 'nanobody'] and seq_len > self._sampler_cfg.ab_max_num_res:
-                seq_len = self._sampler_cfg.ab_max_num_res
-            elif row['mode'] in ['general', 'polymer', 'monomer'] and seq_len > self._sampler_cfg.general_max_num_res:
-                seq_len = self._sampler_cfg.general_max_num_res
-
-            # 현재 샘플의 길이를 기준으로 최대 배치 크기 계산
-            # 길이가 길수록 max_batch_size는 작아짐
-            sample_max_bs = max(1, min(
-                self.max_batch_size,
-                self._sampler_cfg.max_num_res_squared // (seq_len ** 2) + 1
-            ))
-
-            # 첫 샘플이거나, 새로운 배치가 시작될 때 기준 Batch Size 설정
-            if not current_batch:
-                current_max_bs = sample_max_bs
-            
-            # 현재 배치의 기준 크기는 배치 내 가장 긴 샘플(정렬했으므로 첫번째)에 의해 결정되거나,
-            # 안전을 위해 현재 샘플의 max_bs와 비교하여 더 보수적인 값을 취할 수도 있음.
-            # 여기서는 내림차순 정렬되어 있으므로, current_max_bs(배치 시작 시점의 max_bs)가 
-            # 뒤에 오는 샘플들(더 짧음 -> 더 큰 허용 배수)보다 작거나 같으므로 safe함.
-            
-            current_batch.append(row['index'])
-
-            # 배치 사이즈가 꽉 차면 결과에 추가하고 초기화
-            if len(current_batch) >= current_max_bs:
-                batches.append(current_batch)
-                current_batch = []
-                current_max_bs = -1
-
-        # 남은 자투리 데이터 처리
-        if current_batch:
-            batches.append(current_batch)
-
-        # 5. 생성된 배치들의 순서를 셔플
-        if self.shuffle:
-            # 배치 내부(샘플끼리)는 길이순 정렬 유지, 배치 간의 순서만 섞음
-            new_order = torch.randperm(len(batches), generator=rng).numpy().tolist()
-            return [batches[i] for i in new_order]
-        
-        return batches
-
-    def _create_batches(self):
-        self.sample_order = []
-        self.sample_order.extend(self._replica_epoch_batches())
-
-    def __iter__(self):
-        self._create_batches()
-        self.epoch += 1
-        return iter(self.sample_order)
-
-    def __len__(self):
-        # __len__은 DataLoader 초기화 시에는 정확히 알 수 없고 epoch마다 달라질 수 있음.
-        # 가장 최근 생성된 sample_order 길이를 반환하거나, 근사치를 반환해야 함.
-        # PyTorch Lightning은 이 값을 기준으로 진행률 표시줄(tqdm)을 그림.
-        if not hasattr(self, 'sample_order'):
-             self._create_batches()
-        return len(self.sample_order)
