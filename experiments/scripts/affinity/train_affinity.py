@@ -36,15 +36,9 @@ class Experiment:
         self._module: LightningModule = AffinityModule(self._cfg)
 
     def _setup_dataset(self):
-        if self._data_cfg.dataset == 'scope':
-            self._train_dataset, self._valid_dataset = eu.dataset_creation(
-                ScopeDataset, self._cfg.scope_dataset, self._task)
-        elif self._data_cfg.dataset == 'pdb':
-            self._train_dataset, self._valid_dataset = eu.dataset_creation(
-                PdbDataset, self._cfg.pdb_dataset, self._task)
-        else:
-            raise ValueError(f'Unrecognized dataset {self._data_cfg.dataset}') 
-        
+        self._train_dataset, self._valid_dataset = eu.dataset_creation(
+            PdbDataset, self._cfg.pdb_dataset, self._task)
+
     def train(self):
         callbacks = []
         if self._exp_cfg.debug:
@@ -79,9 +73,10 @@ class Experiment:
             log.info(f"Loading weights from checkpoint: {self._exp_cfg.warm_start}")
             # Load the model with weights from the checkpoint.
             # The optimizer and scheduler will be re-initialized from scratch.
-            self._module = FlowModule.load_from_checkpoint(
+            self._module = AffinityModule.load_from_checkpoint(
                 checkpoint_path=self._exp_cfg.warm_start,
                 cfg=self._cfg,
+                strict=False
             )
         else:
             log.info("No warm start checkpoint found. Training from scratch.")

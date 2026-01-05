@@ -534,10 +534,7 @@ def _length_filter(data_csv, min_res, max_res):
     ]
 
 
-
-
 class PdbDataset(AffinityDataset):
-
     def __init__(
             self,
             *,
