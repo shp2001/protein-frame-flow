@@ -227,10 +227,14 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
 # 2. 데이터 전처리 및 환경 설정 클래스
 # ==============================================================================
 class DataManager:
-    def __init__(self, main_csv_path, meta_csv_path):
-        self.main_csv_path = main_csv_path
-        self.meta_csv_path = meta_csv_path
-        
+    def __init__(self, dataset_cfg, is_training):
+        if is_training:
+            self.main_csv_path = dataset_cfg.train_csv_path
+            self.meta_csv_path = dataset_cfg.train_meta_path
+        else:
+            self.main_csv_path = dataset_cfg.valid_csv_path 
+            self.meta_csv_path = dataset_cfg.valid_meta_path 
+
         print(">> Loading Metadata...")
         self.chain_to_meta_row = self._load_metadata()
         
@@ -265,29 +269,28 @@ class DataManager:
 # ==============================================================================
 
 class AffinityPairSampler:
-    def __init__(self, data_manager, pairs_per_cluster=6):
-        """
-        Args:
-            pairs_per_cluster (int): 클러스터 당 생성할 Intra pair 목표 개수 (기본값: 3)
-        """
+    def __init__(self, data_manager, pairs_per_cluster=6, is_training=True, seed=42):
         self.affinity_df = data_manager.affinity_df
         self.cluster_dict = data_manager.cluster_group
         self.clusters = list(self.cluster_dict.keys())
         self.kd_values = self.affinity_df['Affinity_Kd [nM]'].values
         
-        # [변수 설정] 사용자가 지정한 개수 저장
         self.pairs_per_cluster = pairs_per_cluster
+        self.is_training = is_training
+        self.seed = seed
+        
+        # Generator 초기화 (Training이면 None -> 랜덤, Valid면 고정 값)
+        # Validation에서도 매 Epoch마다 똑같은 결과를 얻으려면 generate 함수 안에서 리셋해야 함
+        self.rng = np.random.default_rng(None if is_training else seed)
 
     def check_kd_ratio(self, idx1, idx2):
+        # ... (기존과 동일) ...
         kd1 = self.kd_values[idx1]
         kd2 = self.kd_values[idx2]
 
-        if kd1 == float('inf') and kd2 == float('inf'):
-            return None, False
-        
+        if kd1 == float('inf') and kd2 == float('inf'): return None, False
         if kd1 == float('inf'): return 0, True
         if kd2 == float('inf'): return 1, True
-        
         if kd1 <= 0 or kd2 <= 0: return None, False
 
         if kd1 >= 10 * kd2: return 0, True
@@ -295,20 +298,30 @@ class AffinityPairSampler:
         else: return None, False
 
     def generate_epoch_pairs(self):
+        # [핵심] Validation 모드일 경우, 함수 호출 시마다 시드를 리셋하여 
+        # 항상 '똑같은 Pair 조합'이 나오도록 보장합니다.
+        if not self.is_training:
+            self.rng = np.random.default_rng(self.seed)
+            print(f"   >> [Valid] Seed reset to {self.seed} for deterministic pairing.")
+        else:
+            # Training일 때는 계속 랜덤 상태 유지
+            pass
+
         pairs = []
         seen_pairs = set() 
-        
-        # 목표 개수를 채우지 못한 클러스터 카운트
         clusters_insufficient = 0
         
-        random.shuffle(self.clusters) 
+        # Generator를 이용해 셔플 (이제 random.shuffle 대신 self.rng.shuffle 사용)
+        # self.clusters는 원본 보존을 위해 복사 후 셔플 추천
+        current_clusters = self.clusters.copy()
+        self.rng.shuffle(current_clusters) 
 
         # ==================================================================
         # 1. Intra-Cluster Pairing
         # ==================================================================
-        print(f"   >> Processing Intra-cluster pairing (Target per cluster: {self.pairs_per_cluster})...")
+        print(f"   >> Processing Intra-cluster pairing...")
         
-        for cluster in self.clusters:
+        for cluster in current_clusters:
             indices = self.cluster_dict[cluster]
             n_samples = len(indices)
             
@@ -318,10 +331,10 @@ class AffinityPairSampler:
 
             found_for_this_cluster = 0
             
-            # Case A: 작은 클러스터 (30개 이하) -> 조합(Combination) 사용
             if n_samples <= 30:
                 all_combos = list(itertools.combinations(indices, 2))
-                random.shuffle(all_combos)
+                # 리스트 셔플도 rng 사용
+                self.rng.shuffle(all_combos)
                 
                 for idx1, idx2 in all_combos:
                     pair_key = tuple(sorted((idx1, idx2)))
@@ -332,19 +345,14 @@ class AffinityPairSampler:
                         pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'type': 'intra'})
                         seen_pairs.add(pair_key)
                         found_for_this_cluster += 1
-                    
-                    # [변수 사용] 목표 개수 도달 시 중단
-                    if found_for_this_cluster >= self.pairs_per_cluster:
-                        break
+                        if found_for_this_cluster >= self.pairs_per_cluster: break
             
-            # Case B: 큰 클러스터 -> Random Sampling
             else:
                 attempts = 0
-                max_attempts = 100 
-                
-                while found_for_this_cluster < self.pairs_per_cluster and attempts < max_attempts:
+                while found_for_this_cluster < self.pairs_per_cluster and attempts < 100:
                     attempts += 1
-                    idx1, idx2 = np.random.choice(indices, 2, replace=False)
+                    # rng.choice 사용
+                    idx1, idx2 = self.rng.choice(indices, 2, replace=False)
                     
                     pair_key = tuple(sorted((idx1, idx2)))
                     if pair_key in seen_pairs: continue
@@ -355,25 +363,24 @@ class AffinityPairSampler:
                         seen_pairs.add(pair_key)
                         found_for_this_cluster += 1
 
-            # [변수 사용] 목표치 미달 체크
             if found_for_this_cluster < self.pairs_per_cluster:
                 clusters_insufficient += 1
 
         # ==================================================================
-        # 2. Inter-Cluster Pairing (기존 동일)
+        # 2. Inter-Cluster Pairing
         # ==================================================================
         print("   >> Processing Inter-cluster pairing...")
         
-        for cluster_a in self.clusters:
+        for cluster_a in current_clusters:
             indices_a = self.cluster_dict[cluster_a]
-            idx1 = np.random.choice(indices_a) # Anchor
+            idx1 = self.rng.choice(indices_a) # rng 사용
             
             for _ in range(20):
-                cluster_b = np.random.choice(self.clusters)
+                cluster_b = self.rng.choice(current_clusters) # rng 사용
                 if cluster_a == cluster_b: continue
                 
                 indices_b = self.cluster_dict[cluster_b]
-                idx2 = np.random.choice(indices_b)
+                idx2 = self.rng.choice(indices_b) # rng 사용
                 
                 pair_key = tuple(sorted((idx1, idx2)))
                 if pair_key in seen_pairs: continue
@@ -383,12 +390,6 @@ class AffinityPairSampler:
                     pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'type': 'inter'})
                     seen_pairs.add(pair_key)
                     break
-        
-        # 통계 정보 출력
-        print(f"\n   [Intra-Cluster Report]")
-        print(f"   - Target pairs per cluster: {self.pairs_per_cluster}")
-        print(f"   - Total Clusters: {len(self.clusters)}")
-        print(f"   - Clusters with < {self.pairs_per_cluster} pairs: {clusters_insufficient}")
         
         return pd.DataFrame(pairs)
 
@@ -400,7 +401,7 @@ class AffinityDataset(Dataset):
         self.main_df = data_manager.affinity_df
         self.pair_df = pair_df
         self.meta_row_mapping = data_manager.chain_to_meta_row
-        
+
     def __len__(self):
         return len(self.pair_df)
 
@@ -431,6 +432,7 @@ class AffinityDataset(Dataset):
 
         processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = csv_row['mode']
+        processed_row['raw_path'] = csv_row['raw_path'] 
 
         return processed_row
 
@@ -480,8 +482,8 @@ class AffinityDataset(Dataset):
         label = pair_row['label']
         feats_paired = {}
 
-        for i in range(2):
-            mut, meta_row = self._get_single_sample(pair_row[f'idx{i}'])
+        for sample_num in range(2):
+            mut, meta_row = self._get_single_sample(pair_row[f'idx{sample_num+1}'])
             feats = self.process_csv_row(meta_row, mut)
         
             rigids_1 = rigid_utils.Rigid.from_tensor_4x4(feats['rigidgroups_gt_frames'])[:, 0]
@@ -503,9 +505,9 @@ class AffinityDataset(Dataset):
                 diffuse_mask = feats['loop_mask']
             else:
                 asym_id = []
-                for i, chain_len in enumerate(chain_len_list):
+                for chain_idx, chain_len in enumerate(chain_len_list):
                     for _ in range(chain_len):
-                        asym_id.append(i)
+                        asym_id.append(chain_idx)
                 asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
@@ -521,18 +523,10 @@ class AffinityDataset(Dataset):
                 mode=feats['mode'],
                 )
             feats['loop_mask'] = feats['loop_mask'].int()
-            feats_paired[f"batch_{i}"] = feats
+            feats_paired[f"batch_{sample_num}"] = feats
         feats_paired['label'] = label
         
         return feats_paired
-
-
-def _length_filter(data_csv, min_res, max_res):
-    return data_csv[
-        (data_csv.seq_len >= min_res)
-        & (data_csv.seq_len <= max_res)
-    ]
-
 
 class PdbDataset(AffinityDataset):
     def __init__(
@@ -544,28 +538,66 @@ class PdbDataset(AffinityDataset):
         ):
         self._log = logging.getLogger(__name__)
         self._is_training = is_training
-        self._dataset_cfg = dataset_cfg
+        self.dataset_cfg = dataset_cfg
         self.task = task
-        self._rng = np.random.default_rng(seed=self._dataset_cfg.seed)
         self.current_epoch = 0
-        # Process clusters
-        metadata_csv = self._filter_metadata(self.raw_csv)
-        metadata_csv = metadata_csv.sort_values(
-            'seq_len', ascending=False)
 
-        self._missing_pdbs = 0
-        self._create_split(metadata_csv)
+        # ------------------------------------------------------------------
+        # 1. DataManager & Sampler 초기화
+        # ------------------------------------------------------------------
+        # 데이터를 로드합니다.
+        self.data_manager = DataManager(dataset_cfg, is_training)
+        
+        # Sampler를 초기화합니다.
+
+        # ------------------------------------------------------------------
+        # 2. 초기 Pair 생성
+        # ------------------------------------------------------------------
+        # 학습 초기 Pair를 생성합니다.
+        if self._is_training:
+            print(f">> [Init] Generating initial pairs for training...")
+            self.sampler = AffinityPairSampler(
+                self.data_manager, 
+                pairs_per_cluster=dataset_cfg.pairs_per_cluster,
+                is_training=True
+            )
+            initial_pairs = self.sampler.generate_epoch_pairs()
+        else:
+            print(f">> [Init] Generating pairs for validation...")
+            self.sampler = AffinityPairSampler(
+                self.data_manager, 
+                pairs_per_cluster=dataset_cfg.pairs_per_cluster,
+                is_training=False
+            )
+            initial_pairs = self.sampler.generate_epoch_pairs()
+
+        # ------------------------------------------------------------------
+        # 3. 부모 클래스 (AffinityDataset) 초기화
+        # ------------------------------------------------------------------
+        super().__init__(self.data_manager, initial_pairs)
+        
+        # AffinityDataset의 __getitem__에서 crop_antigen 호출 시 
+        # self.dataset_cfg에 접근하므로 여기서 확실히 할당해둡니다.
+        self.dataset_cfg = dataset_cfg 
+
+        self._log.info(f'{("Training" if is_training else "Validation")} Dataset initialized.')
+        self._log.info(f'Total Pairs: {len(self.pair_df)}')
+
 
     def set_current_epoch(self, epoch):
+        """
+        Trainer에서 매 Epoch 시작 시 호출해주어야 합니다.
+        새로운 Epoch마다 Pair를 다시 샘플링하여 데이터 다양성을 확보합니다.
+        """
         self.current_epoch = epoch
-
-    def _filter_metadata(self, raw_csv):
-        """Filter metadata."""
-        filter_cfg = self.dataset_cfg.filter
-        data_csv = raw_csv
-
-        # if self._is_training:
-        data_csv = _length_filter(
-            data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
-
-        return data_csv
+        
+        # 학습 모드일 때만 매 Epoch마다 Pair를 섞어줍니다.
+        if self._is_training:
+            self._log.info(f">> [Epoch {epoch}] Regenerating pairs for diversity...")
+            
+            # 1. 새로운 Pair 생성
+            new_pairs = self.sampler.generate_epoch_pairs()
+            
+            # 2. 데이터셋 내부의 pair_df 교체
+            self.pair_df = new_pairs
+            self._log.info(f">> [Epoch {epoch}] Pair regeneration complete. Total pairs: {len(self.pair_df)}")

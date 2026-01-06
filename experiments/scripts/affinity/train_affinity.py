@@ -104,7 +104,7 @@ class Experiment:
         )
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="base.yaml")
+@hydra.main(version_base=None, config_path="../../../configs", config_name="base.yaml")
 def main(cfg: DictConfig):
 
     exp = Experiment(cfg=cfg)

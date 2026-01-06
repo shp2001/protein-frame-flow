@@ -22,7 +22,7 @@ data:
 
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 40
+    max_batch_size: 1
     max_num_res_squared: 200_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -62,7 +62,7 @@ interpolant:
 
   save_traj: False 
 
-mini_rollout:
+rollout:
   min_t: 1e-2
 
   twisting:
@@ -92,15 +92,14 @@ mini_rollout:
     num_timesteps: 15
     do_sde: False
 
-  use_prmsd: ${model.confidence_head.use_confidence}
   save_traj: False 
   
 experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage2/2025-12-05_16-29-09/epoch=45-step=65918_copy.ckpt
+  num_devices: 4
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2_confidence/CDRFlow_v2.3.2.2_stage_3_confidence_only_plddt/2025-12-12_09-21-35/epoch=27-step=40124.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -161,8 +160,8 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage3
-    project: v2.3.2
+    name: v2.3.2.2_affinity
+    project: v2.3.2.2_affinity
   optimizer:
     warmup_steps: 0
     decay_steps: 270_000

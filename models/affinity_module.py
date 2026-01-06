@@ -49,11 +49,11 @@ class AffinityModule(LightningModule):
             distance_bin_step=self._affinity_cfg.distance_bin_step,
             stop_gradient=self._affinity_cfg.stop_gradient,
         )
+        # Set-up interpolant for mini-rollout
         self.rollout = Interpolant(cfg.rollout)
-
-        # Set-up interpolant
+        # Set-up interpolant for validation or prediction
         self.interpolant = Interpolant(cfg.interpolant)
-        self.mini_rollout = Interpolant(cfg.mini_rollout)
+
         self.learning_rate = self._exp_cfg.optimizer.max_lr
         self.validation_epoch_metrics = []
         self.validation_epoch_samples = []
@@ -158,7 +158,7 @@ class AffinityModule(LightningModule):
             # rollout for affinity
             self.rollout.set_device(batch['edge_mask'].device)
             with torch.no_grad():
-                s_init, z_init = self.flow_model.embed_input(batch)
+                s_init, z_init, trans_perturbed = self.flow_model.embed_input(batch)
                 _, s, z, pair_outputs = self.flow_model.do_pairformer(
                     s_init, 
                     z_init, 
@@ -213,7 +213,8 @@ class AffinityModule(LightningModule):
             self.interpolant.set_device(loop_mask.device)
             num_batch, num_res = loop_mask.shape
 
-            raw_path = batch['raw_path']
+            raw_path = batch['raw_path'][0]
+            print("raw_path", raw_path)
             pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
             diffuse_mask = batch["diffuse_mask"]
@@ -223,7 +224,7 @@ class AffinityModule(LightningModule):
 
             # rollout for affinity
             with torch.no_grad():
-                s_init, z_init = self.flow_model.embed_input(batch)
+                s_init, z_init, trans_perturbed = self.flow_model.embed_input(batch)
                 _, s, z, pair_outputs = self.flow_model.do_pairformer(
                     s_init, 
                     z_init, 
@@ -233,7 +234,7 @@ class AffinityModule(LightningModule):
                     )
                 
                 if self._affinity_cfg.use_coords:
-                    r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.rollout.sample(
+                    r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
                         self.flow_model,
                         batch,
                         s,

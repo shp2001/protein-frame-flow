@@ -42,7 +42,7 @@ class ProteinData(LightningDataModule):
         cropped_batch = []
         for feat in batch_feats:
             cropped_feat = {}
-            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
+            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
             for key in feat.keys():
                 if key not in not_crop_key:
                     cropped_feat[key] = feat[key][feat['crop_idx']]
@@ -64,7 +64,6 @@ class ProteinData(LightningDataModule):
             cropped_feat['entity_id'] = torch.tensor(entity_id)
             cropped_feat['sym_id'] = torch.tensor(sym_id)
             cropped_feat['crop_idx'] = torch.tensor(feat['crop_idx'])
-            cropped_feat['csv_idx'] = feat['csv_idx']
             del cropped_feat['chain_seq_list']
             cropped_batch.append(cropped_feat)
 
@@ -80,7 +79,7 @@ class ProteinData(LightningDataModule):
         # mode나 raw_path가 배치 내에서 다를 수 있다면 리스트로 유지하는 것이 좋으나, 
         # 기존 코드 호환성을 위해 tensor 변환이 안되는 항목은 리스트 혹은 첫번째 값 사용
         collated_batch['mode'] = batch_feats[0]['mode'] 
-        collated_batch['raw_path'] = [f['raw_path'] for f in batch_feats]
+        collated_batch['raw_path'] = batch_feats[0]['raw_path']
 
         # 3. Featurizer & Masks
         ref_space_uid, ref_element, ref_charge, ref_atom_name_chars, atom_to_token_idx, atom_to_tokatom_idx, ref_pos = \
