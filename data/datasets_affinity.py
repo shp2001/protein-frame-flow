@@ -570,7 +570,7 @@ class PdbDataset(AffinityDataset):
                 is_training=False
             )
             initial_pairs = self.sampler.generate_epoch_pairs()
-
+            print(initial_pairs)
         # ------------------------------------------------------------------
         # 3. 부모 클래스 (AffinityDataset) 초기화
         # ------------------------------------------------------------------

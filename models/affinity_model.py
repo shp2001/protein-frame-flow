@@ -158,11 +158,12 @@ class AffinityHead(nn.Module):
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                     inter_pair_mask=inter_pair_mask,
-                    x_pred_rep_coords=x_pred_coords,
+                    x_pred_rep_coords=x_pred_coords[..., i, :, :],
                     use_coords=use_coords,
             )
             affinity_values.append(affinity_value)
-        affinity_values = torch.stack(affinity_values, dim=-3)
+        affinity_values = torch.tensor(affinity_values)
+        print("affinity_values", affinity_values.shape)
         return affinity_values
 
     def memory_efficient_forward(
@@ -209,12 +210,14 @@ class AffinityHead(nn.Module):
         )
 
         # Upcast after pairformer
-        z_pair = z_pair.to(torch.float32)
+        z_pair = z_pair.to(torch.float32) # (L, L, 128)
         
         # apply MeanPooling 
-        g = torch.sum(z_pair * inter_pair_mask, dim=(1,2)) / torch.sum(inter_pair_mask, dim=(1,2)) # (B, c_z)
+        print("inter_pair_mask", inter_pair_mask.shape)
+        print("z_pair", z_pair.shape)
+        g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
         
         # Affinity MLP 
-        affinity_value = self.affinity_out_mlp(g) # (B, 1)
+        affinity_value = self.affinity_out_mlp(g) # (1)
 
         return affinity_value

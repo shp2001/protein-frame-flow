@@ -13,6 +13,7 @@ from pytorch_lightning import LightningModule
 from analysis import utils as au
 from models.flow_model import FlowModel
 from models.affinity_model import AffinityHead
+
 from models import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
@@ -35,8 +36,7 @@ class AffinityModule(LightningModule):
         self._interpolant_cfg = cfg.interpolant
 
         # Set-up vector field prediction model
-        self.flow_model = FlowModel(cfg.model)
-
+        self.model = FlowModel(cfg.model)
         self._affinity_cfg = cfg.model.affinity_head
         self.affinity_model = AffinityHead(
             n_blocks=self._affinity_cfg.n_blocks,
@@ -158,8 +158,8 @@ class AffinityModule(LightningModule):
             # rollout for affinity
             self.rollout.set_device(batch['edge_mask'].device)
             with torch.no_grad():
-                s_init, z_init, trans_perturbed = self.flow_model.embed_input(batch)
-                _, s, z, pair_outputs = self.flow_model.do_pairformer(
+                s_init, z_init, trans_perturbed = self.model.embed_input(batch)
+                _, s, z, pair_outputs = self.model.do_pairformer(
                     s_init, 
                     z_init, 
                     batch['edge_mask'][0][None, ...], 
@@ -169,7 +169,7 @@ class AffinityModule(LightningModule):
                 
                 if self._affinity_cfg.use_coords:
                     r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.rollout.sample(
-                        self.flow_model,
+                        self.model,
                         batch,
                         s,
                         s,
@@ -180,7 +180,6 @@ class AffinityModule(LightningModule):
             
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred = self.affinity_model(
-                batch['ref_feature_dict'],
                 s_init[0],
                 s[0],
                 z[0],
@@ -192,7 +191,7 @@ class AffinityModule(LightningModule):
         # calculate affinity loss 
         affinity_pred_0 = affinity_preds[0]
         affinity_pred_1 = affinity_preds[1]
-        target = 1.0 - 2.0 * paired_batch['label']
+        target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
 
         margin_loss_fn = nn.MarginRankingLoss(margin=0.1)
         affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
@@ -213,7 +212,7 @@ class AffinityModule(LightningModule):
             self.interpolant.set_device(loop_mask.device)
             num_batch, num_res = loop_mask.shape
 
-            raw_path = batch['raw_path'][0]
+            raw_path = batch['raw_path']
             print("raw_path", raw_path)
             pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
@@ -224,8 +223,8 @@ class AffinityModule(LightningModule):
 
             # rollout for affinity
             with torch.no_grad():
-                s_init, z_init, trans_perturbed = self.flow_model.embed_input(batch)
-                _, s, z, pair_outputs = self.flow_model.do_pairformer(
+                s_init, z_init, trans_perturbed = self.model.embed_input(batch)
+                _, s, z, pair_outputs = self.model.do_pairformer(
                     s_init, 
                     z_init, 
                     batch['edge_mask'][0][None, ...], 
@@ -235,7 +234,7 @@ class AffinityModule(LightningModule):
                 
                 if self._affinity_cfg.use_coords:
                     r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
-                        self.flow_model,
+                        self.model,
                         batch,
                         s,
                         s,
@@ -244,15 +243,15 @@ class AffinityModule(LightningModule):
                 else:
                     pred_trans_1 = None
 
-            if hasattr(self, "confidence_model"):
-                plddt_pred, pae_pred = self.confidence_model(
-                    batch['ref_feature_dict'],
-                    s_init[0],
-                    s[0],
-                    z[0],
-                    batch['edge_mask'][0],
-                    pred_trans_1,
-                )  
+            # if hasattr(self, "confidence_model"):
+            #     plddt_pred, pae_pred = self.confidence_model(
+            #         batch['ref_feature_dict'],
+            #         s_init[0],
+            #         s[0],
+            #         z[0],
+            #         batch['edge_mask'][0],
+            #         pred_trans_1,
+            #     )  
 
             # save 3d structure for validation 
             pred_positions_37 = []
@@ -270,23 +269,10 @@ class AffinityModule(LightningModule):
             )
             os.makedirs(sample_dir, exist_ok=True)
 
-            plddt_bins = plddt_pred.shape[-1]
-            plddt_probs = nn.functional.softmax(plddt_pred, dim=-1)  # [B, N_atom, plddt_bins]
-            bin_values = torch.linspace(0, 1, plddt_bins, device=plddt_pred.device)  # [plddt_bins]
-            plddt_score = torch.sum(plddt_probs * bin_values, dim=-1)  # [B, N_atom]
-            b_factors_14 = du.atom_unflatten(plddt_score, batch['atom14_gt_exists']) # [B, N_token, 14]
-            b_factors_14 = du.to_numpy(b_factors_14) * 100
-
-            b_factors = []
-            for i in range(num_batch):
-                b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch)
-                b_factors.append(np.squeeze(b_factors_37, axis=-1))
-            b_factors = np.stack(b_factors)
                 
             for i in range(num_batch):
                 # Write out sample to PDB file (wo b-factors)
                 final_pos = pred_positions[i]
-                b_factor = b_factors[i]
 
                 if batch['mode'] == 'polymer' or batch['mode'] == 'monomer':
                     unique_vals, mapped = torch.unique(batch['chain_idx'][0], return_inverse=True)
@@ -299,13 +285,12 @@ class AffinityModule(LightningModule):
                     chain_index=batch['chain_idx'].cpu(),
                     no_indexing=False,
                     overwrite=True,
-                    b_factors=b_factor
+                    b_factors=None
                 )
 
             # affinity prediction 
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred = self.affinity_model(
-                batch['ref_feature_dict'],
                 s_init[0],
                 s[0],
                 z[0],
@@ -317,10 +302,12 @@ class AffinityModule(LightningModule):
         # calculate affinity loss 
         affinity_pred_0 = affinity_preds[0]
         affinity_pred_1 = affinity_preds[1]
-        target = 1.0 - 2.0 * paired_batch['label']
+        target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
 
         margin_loss_fn = nn.MarginRankingLoss(margin=0.1)
         affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
+        affinity_loss_dict = {'affinity_loss': affinity_loss}
+        batch_metrics.append(affinity_loss_dict)
 
         # calculate trans diffuse loss (rmsd)
         gt_trans_1 = batch['trans_1']
