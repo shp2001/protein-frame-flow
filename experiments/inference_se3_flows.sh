@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.2_SBE_ins
+#SBATCH -J v2.3.2.2_affinity
 #SBATCH -p gpu
-#SBATCH -w gpu02
-#SBATCH --gres=gpu:A5000:1
+#SBATCH -w gpu01
+#SBATCH --gres=gpu:A6000:1
 #SBATCH --mem=36g
 #SBATCH -c 12
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/inf.log

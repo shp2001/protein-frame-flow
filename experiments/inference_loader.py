@@ -274,9 +274,9 @@ def collate_fn(batch):
                 feat['trans_1'],
                 cdr_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=2000,
+                max_len=350,
                 seq_list=feat['chain_seq_list'],
-                crop_ab=False,
+                crop_ab=True,
                 include_ag=include_ag
                 )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
