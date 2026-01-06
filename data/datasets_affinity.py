@@ -155,8 +155,8 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
 
     # make chain sequence list (for the multimer relpos embedding)
     int_to_aa = {i: restype for restype, i in rc.restype_order_with_x.items()}
-    aatypes = processed_feats["aatype"]             # [L]
-    chain_indices = processed_feats["chain_index"]  # [L]
+    aatypes = processed_feats["aatype"].tolist()            # [L]
+    chain_indices = processed_feats["chain_index"].tolist()  # [L]
 
     chain_seqs = defaultdict(list)
     chain_order = []
@@ -166,7 +166,7 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
         chain_seqs[chain_id].append(aa_letter)
         if chain_id not in chain_order:
             chain_order.append(chain_id)
-
+    print("chain_seqs", chain_seqs)
     chain_seq_list = ["".join(chain_seqs[chain_id]) for chain_id in chain_order]
 
     # Run through OpenFold data transforms.
@@ -509,6 +509,8 @@ class AffinityDataset(Dataset):
                     for _ in range(chain_len):
                         asym_id.append(chain_idx)
                 asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
+                print("asym_id", asym_id.shape)
+                print("loop_mask", feats['loop_mask'].shape)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
             feats['diffuse_mask'] = diffuse_mask
@@ -570,7 +572,6 @@ class PdbDataset(AffinityDataset):
                 is_training=False
             )
             initial_pairs = self.sampler.generate_epoch_pairs()
-            print(initial_pairs)
         # ------------------------------------------------------------------
         # 3. 부모 클래스 (AffinityDataset) 초기화
         # ------------------------------------------------------------------

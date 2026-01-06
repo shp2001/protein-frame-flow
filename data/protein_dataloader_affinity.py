@@ -165,7 +165,7 @@ class ProteinData(LightningDataModule):
     def train_dataloader(self, rank=None, num_replicas=None):
         return DataLoader(
             self._train_dataset,
-            batch_sampler=DistributedSampler(
+            sampler=DistributedSampler(
                 self._train_dataset,
                 shuffle=True
             ),

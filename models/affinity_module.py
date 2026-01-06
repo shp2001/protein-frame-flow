@@ -193,10 +193,13 @@ class AffinityModule(LightningModule):
         affinity_pred_1 = affinity_preds[1]
         target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
 
-        margin_loss_fn = nn.MarginRankingLoss(margin=0.1)
+        margin_loss_fn = nn.MarginRankingLoss(margin=0.1, reduce=False)
         affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
+        if len(affinity_loss.shape) == 1:
+            affinity_loss = affinity_loss[None, ...]
+        
         total_loss = affinity_loss
-
+        
         return {
             "total_loss": total_loss,
             "affinity_loss": affinity_loss,
@@ -304,8 +307,10 @@ class AffinityModule(LightningModule):
         affinity_pred_1 = affinity_preds[1]
         target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
 
-        margin_loss_fn = nn.MarginRankingLoss(margin=0.1)
+        margin_loss_fn = nn.MarginRankingLoss(margin=0.1, reduce=False)
         affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
+        if len(affinity_loss.shape) == 1:
+            affinity_loss = affinity_loss[None, ...]
         affinity_loss_dict = {'affinity_loss': affinity_loss}
         batch_metrics.append(affinity_loss_dict)
 

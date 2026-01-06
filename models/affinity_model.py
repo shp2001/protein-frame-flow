@@ -163,7 +163,6 @@ class AffinityHead(nn.Module):
             )
             affinity_values.append(affinity_value)
         affinity_values = torch.tensor(affinity_values)
-        print("affinity_values", affinity_values.shape)
         return affinity_values
 
     def memory_efficient_forward(
@@ -213,8 +212,6 @@ class AffinityHead(nn.Module):
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
         
         # apply MeanPooling 
-        print("inter_pair_mask", inter_pair_mask.shape)
-        print("z_pair", z_pair.shape)
         g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
         
         # Affinity MLP 

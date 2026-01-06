@@ -1,243 +1,20 @@
-W0106 17:05:16.272000 140165203416896 torch/distributed/run.py:757] 
-W0106 17:05:16.272000 140165203416896 torch/distributed/run.py:757] *****************************************
-W0106 17:05:16.272000 140165203416896 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W0106 17:05:16.272000 140165203416896 torch/distributed/run.py:757] *****************************************
+W0106 17:47:02.677000 139750566446912 torch/distributed/run.py:757] 
+W0106 17:47:02.677000 139750566446912 torch/distributed/run.py:757] *****************************************
+W0106 17:47:02.677000 139750566446912 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0106 17:47:02.677000 139750566446912 torch/distributed/run.py:757] *****************************************
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
 wandb: wandb version 0.23.1 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20260106_170550-ze4xb29i
+wandb: Run data is saved locally in ./wandb/run-20260106_174737-fmvcxte9
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run v2.3.2.2_affinity
 wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2.2_affinity
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2.2_affinity/runs/ze4xb29i
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2.2_affinity/runs/fmvcxte9
 Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/4
-Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/4
-Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/4
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/saving.py:161: UserWarning: Found keys that are in the model state dict but not in the checkpoint: ['affinity_model.lower_bins', 'affinity_model.upper_bins', 'affinity_model.linear_no_bias_s1.weight', 'affinity_model.linear_no_bias_s2.weight', 'affinity_model.input_strunk_ln.weight', 'affinity_model.input_strunk_ln.bias', 'affinity_model.linear_no_bias_d.weight', 'affinity_model.linear_no_bias_d_wo_onehot.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_z.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_out.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_z.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.0.tri_mul_in.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.linear.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.linear.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.0.pair_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.0.pair_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_a.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_a.bias', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_q.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_q.bias', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_k.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_v.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_o.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_g.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_z.weight', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_z.bias', 'affinity_model.pairformer_stack.blocks.0.attention_pair_bias.linear_nobias_z.weight', 'affinity_model.pairformer_stack.blocks.0.single_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.0.single_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.0.single_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.0.single_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.0.single_transition.linear_no_bias.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_z.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_out.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_z.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.1.tri_mul_in.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.linear.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.linear.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.1.pair_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.1.pair_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_a.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_a.bias', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_q.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_q.bias', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_k.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_v.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_o.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_g.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_z.weight', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_z.bias', 'affinity_model.pairformer_stack.blocks.1.attention_pair_bias.linear_nobias_z.weight', 'affinity_model.pairformer_stack.blocks.1.single_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.1.single_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.1.single_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.1.single_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.1.single_transition.linear_no_bias.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_z.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_out.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_z.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_in.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_in.bias', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_out.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_out.bias', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_a_p.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_a_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_b_p.weight', 'affinity_model.pairformer_stack.blocks.2.tri_mul_in.linear_b_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.linear.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.layer_norm.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.layer_norm.bias', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.linear.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_q.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_k.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_v.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_o.weight', 'affinity_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_g.weight', 'affinity_model.pairformer_stack.blocks.2.pair_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.2.pair_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_a.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_a.bias', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_q.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_q.bias', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_k.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_v.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_o.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_g.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_z.weight', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_z.bias', 'affinity_model.pairformer_stack.blocks.2.attention_pair_bias.linear_nobias_z.weight', 'affinity_model.pairformer_stack.blocks.2.single_transition.layernorm1.weight', 'affinity_model.pairformer_stack.blocks.2.single_transition.layernorm1.bias', 'affinity_model.pairformer_stack.blocks.2.single_transition.linear_no_bias_a.weight', 'affinity_model.pairformer_stack.blocks.2.single_transition.linear_no_bias_b.weight', 'affinity_model.pairformer_stack.blocks.2.single_transition.linear_no_bias.weight', 'affinity_model.affinity_out_mlp.0.weight', 'affinity_model.affinity_out_mlp.0.bias', 'affinity_model.affinity_out_mlp.2.weight', 'affinity_model.affinity_out_mlp.2.bias', 'affinity_model.affinity_out_mlp.4.weight', 'affinity_model.affinity_out_mlp.4.bias']
-  rank_zero_warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/core/saving.py:165: UserWarning: Found keys that are not in the model state dict but in the checkpoint: ['confidence_model.lower_bins', 'confidence_model.upper_bins', 'confidence_model.plddt_weight', 'confidence_model.linear_no_bias_s1.weight', 'confidence_model.linear_no_bias_s2.weight', 'confidence_model.linear_no_bias_d.weight', 'confidence_model.linear_no_bias_d_wo_onehot.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_z.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_out.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_z.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.0.tri_mul_in.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.linear.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_start.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.linear.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.0.tri_att_end.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.0.pair_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.0.pair_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.0.pair_transition.linear_no_bias.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_a.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_a.bias', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_q.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_q.bias', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_k.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_v.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_o.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.attention.linear_g.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_z.weight', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.layernorm_z.bias', 'confidence_model.pairformer_stack.blocks.0.attention_pair_bias.linear_nobias_z.weight', 'confidence_model.pairformer_stack.blocks.0.single_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.0.single_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.0.single_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.0.single_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.0.single_transition.linear_no_bias.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_z.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_out.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_z.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.1.tri_mul_in.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.linear.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_start.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.linear.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.1.tri_att_end.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.1.pair_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.1.pair_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.1.pair_transition.linear_no_bias.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_a.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_a.bias', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_q.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_q.bias', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_k.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_v.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_o.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.attention.linear_g.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_z.weight', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.layernorm_z.bias', 'confidence_model.pairformer_stack.blocks.1.attention_pair_bias.linear_nobias_z.weight', 'confidence_model.pairformer_stack.blocks.1.single_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.1.single_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.1.single_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.1.single_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.1.single_transition.linear_no_bias.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_z.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_out.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_z.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_in.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_in.bias', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_out.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.layer_norm_out.bias', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_a_p.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_a_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_b_p.weight', 'confidence_model.pairformer_stack.blocks.2.tri_mul_in.linear_b_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.linear.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_start.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.layer_norm.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.layer_norm.bias', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.linear.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_q.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_k.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_v.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_o.weight', 'confidence_model.pairformer_stack.blocks.2.tri_att_end.mha.linear_g.weight', 'confidence_model.pairformer_stack.blocks.2.pair_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.2.pair_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.2.pair_transition.linear_no_bias.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_a.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_a.bias', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_q.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_q.bias', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_k.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_v.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_o.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.attention.linear_g.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_z.weight', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.layernorm_z.bias', 'confidence_model.pairformer_stack.blocks.2.attention_pair_bias.linear_nobias_z.weight', 'confidence_model.pairformer_stack.blocks.2.single_transition.layernorm1.weight', 'confidence_model.pairformer_stack.blocks.2.single_transition.layernorm1.bias', 'confidence_model.pairformer_stack.blocks.2.single_transition.linear_no_bias_a.weight', 'confidence_model.pairformer_stack.blocks.2.single_transition.linear_no_bias_b.weight', 'confidence_model.pairformer_stack.blocks.2.single_transition.linear_no_bias.weight', 'confidence_model.linear_no_bias_pae.weight', 'confidence_model.input_strunk_ln.weight', 'confidence_model.input_strunk_ln.bias', 'confidence_model.pae_ln.weight', 'confidence_model.pae_ln.bias', 'confidence_model.plddt_ln.weight', 'confidence_model.plddt_ln.bias']
-  rank_zero_warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/plugins/environments/slurm.py:168: PossibleUserWarning: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /home/psh/protein-frame-flow/experiments/scripts ...
-  rank_zero_warn(
-GPU available: True (cuda), used: True
-TPU available: False, using: 0 TPU cores
-IPU available: False, using: 0 IPUs
-HPU available: False, using: 0 HPUs
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
-----------------------------------------------------------------------------------------------------
-distributed_backend=nccl
-All distributed processes registered. Starting with 4 processes
-----------------------------------------------------------------------------------------------------
-
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_affinity/2026-01-06_17-05-24 exists and is not empty.
-  rank_zero_warn(f"Checkpoint directory {dirpath} exists and is not empty.")
-LOCAL_RANK: 3 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
-LOCAL_RANK: 2 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
-LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
-
-  | Name           | Type         | Params
-------------------------------------------------
-0 | model          | FlowModel    | 228 M 
-1 | affinity_model | AffinityHead | 9.3 M 
-------------------------------------------------
-238 M     Trainable params
-78        Non-trainable params
-238 M     Total params
-953.071   Total estimated model params size (MB)
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:438: PossibleUserWarning: The dataloader, val_dataloader, does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` (try 128 which is the number of cpus on this machine) in the `DataLoader` init to improve performance.
-  rank_zero_warn(
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:490: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets_affinity.py:491: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-Error executing job with overrides: []
-Error executing job with overrides: []
 Error executing job with overrides: []
 Error executing job with overrides: []
 Traceback (most recent call last):
-Traceback (most recent call last):
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 111, in main
-    exp.train()
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 101, in train
-    trainer.fit(
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 111, in main
-    exp.train()
-Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
-    call._call_and_handle_interrupt(
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 101, in train
-    trainer.fit(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
-    call._call_and_handle_interrupt(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
-    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
-    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
-    return function(*args, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
-    return function(*args, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
-    self._run(model, ckpt_path=ckpt_path)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
-    self._run(model, ckpt_path=ckpt_path)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
-    results = self._run_stage()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
-    results = self._run_stage()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
-    self.fit_loop.run()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
-    self.fit_loop.run()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
-    self.epoch_loop.run(self._data_fetcher)
-Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
-    self.epoch_loop.run(self._data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
-    self.advance(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
-    self.advance(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 190, in advance
-    batch = next(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 190, in advance
-    batch = next(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
-    self._fetch_next_batch(self.dataloader_iter)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
-    self._fetch_next_batch(self.dataloader_iter)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
-    batch = next(iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
-    batch = next(iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
-    out = next(self._iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
-    out = next(self._iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 65, in __next__
-    out[i] = next(self.iterators[i])
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 65, in __next__
-    out[i] = next(self.iterators[i])
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
-    data = self._next_data()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
-    data = self._next_data()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1346, in _next_data
-    return self._process_data(data)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1346, in _next_data
-    return self._process_data(data)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
-    data.reraise()
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 111, in main
-    exp.train()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
-    data.reraise()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
-    raise exception
-  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 101, in train
-    trainer.fit(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
-    raise exception
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
-    call._call_and_handle_interrupt(
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
-    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
-TypeError: Caught TypeError in DataLoader worker process 0.
-Original Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
-    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-TypeError: 'int' object is not iterable
-
-TypeError: Caught TypeError in DataLoader worker process 0.
-Original Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
-    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-TypeError: 'int' object is not iterable
-
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
-    return function(*args, **kwargs)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
-    self._run(model, ckpt_path=ckpt_path)
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
-    results = self._run_stage()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
-    self.fit_loop.run()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
-    self.epoch_loop.run(self._data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
-    self.advance(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 190, in advance
-    batch = next(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
-    self._fetch_next_batch(self.dataloader_iter)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
-    batch = next(iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
-    out = next(self._iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 65, in __next__
-    out[i] = next(self.iterators[i])
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
-    data = self._next_data()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1346, in _next_data
-    return self._process_data(data)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
-    data.reraise()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
-    raise exception
-TypeError: Caught TypeError in DataLoader worker process 0.
-Original Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
-    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-TypeError: 'int' object is not iterable
-
-
-Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
   File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 111, in main
     exp.train()
   File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 101, in train
@@ -250,51 +27,48 @@ Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
     return function(*args, **kwargs)
   File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
     self._run(model, ckpt_path=ckpt_path)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
-    results = self._run_stage()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
-    self.fit_loop.run()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
-    self.advance()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
-    self.epoch_loop.run(self._data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
-    self.advance(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 190, in advance
-    batch = next(data_fetcher)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
-    self._fetch_next_batch(self.dataloader_iter)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
-    batch = next(iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
-    out = next(self._iterator)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 65, in __next__
-    out[i] = next(self.iterators[i])
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
-    data = self._next_data()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1346, in _next_data
-    return self._process_data(data)
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
-    data.reraise()
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
-    raise exception
-TypeError: Caught TypeError in DataLoader worker process 0.
-Original Traceback (most recent call last):
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
-    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
-  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-TypeError: 'int' object is not iterable
-
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 938, in _run
+    self.strategy.setup_environment()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 143, in setup_environment
+    self.setup_distributed()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 190, in setup_distributed
+    self._process_group_backend = self._get_process_group_backend()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 195, in _get_process_group_backend
+    return self._process_group_backend or _get_default_process_group_backend_for_device(self.root_device)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 112, in root_device
+    return self.parallel_devices[self.local_rank]
+IndexError: list index out of range
 
 Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
-wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
-wandb: 🚀 View run v2.3.2.2_affinity at: https://wandb.ai/cwp2001-seoul-national-university/v2.3.2.2_affinity/runs/ze4xb29i
-wandb: ️⚡ View job at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2.2_affinity/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjgyNDEwMzI0Nw==/version_details/v1
-wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ./wandb/run-20260106_170550-ze4xb29i/logs
-W0106 17:06:41.529000 140165203416896 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 2832684 closing signal SIGTERM
-E0106 17:06:41.843000 140165203416896 torch/distributed/elastic/multiprocessing/api.py:826] failed (exitcode: 1) local_rank: 1 (pid: 2832685) of binary: /home/psh/mambaforge/envs/fm/bin/python3.10
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 111, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/scripts/affinity/train_affinity.py", line 101, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
+    return function(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 938, in _run
+    self.strategy.setup_environment()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 143, in setup_environment
+    self.setup_distributed()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 190, in setup_distributed
+    self._process_group_backend = self._get_process_group_backend()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 195, in _get_process_group_backend
+    return self._process_group_backend or _get_default_process_group_backend_for_device(self.root_device)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/ddp.py", line 112, in root_device
+    return self.parallel_devices[self.local_rank]
+IndexError: list index out of range
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+W0106 17:48:07.891000 139750566446912 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 1268011 closing signal SIGTERM
+W0106 17:48:07.891000 139750566446912 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 1268012 closing signal SIGTERM
+E0106 17:48:08.280000 139750566446912 torch/distributed/elastic/multiprocessing/api.py:826] failed (exitcode: 1) local_rank: 2 (pid: 1268013) of binary: /home/psh/mambaforge/envs/fm/bin/python3.10
 Traceback (most recent call last):
   File "/home/psh/mambaforge/envs/fm/bin/torchrun", line 8, in <module>
     sys.exit(main())
@@ -314,26 +88,19 @@ torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
 ------------------------------------------------------------
 Failures:
 [1]:
-  time      : 2026-01-06_17:06:41
-  host      : gpu05.localdomain
-  rank      : 2 (local_rank: 2)
-  exitcode  : 1 (pid: 2832686)
-  error_file: <N/A>
-  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
-[2]:
-  time      : 2026-01-06_17:06:41
-  host      : gpu05.localdomain
+  time      : 2026-01-06_17:48:07
+  host      : gpu04.localdomain
   rank      : 3 (local_rank: 3)
-  exitcode  : 1 (pid: 2832687)
+  exitcode  : 1 (pid: 1268014)
   error_file: <N/A>
   traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
 ------------------------------------------------------------
 Root Cause (first observed failure):
 [0]:
-  time      : 2026-01-06_17:06:41
-  host      : gpu05.localdomain
-  rank      : 1 (local_rank: 1)
-  exitcode  : 1 (pid: 2832685)
+  time      : 2026-01-06_17:48:07
+  host      : gpu04.localdomain
+  rank      : 2 (local_rank: 2)
+  exitcode  : 1 (pid: 1268013)
   error_file: <N/A>
   traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
 ============================================================
