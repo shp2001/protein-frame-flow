@@ -15,8 +15,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2_confidence/CDRFlow_v2.3.2.2_stage_3_confidence_only_plddt/2025-12-12_09-21-35/epoch=27-step=40124.ckpt
-  use_gpu: True
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_affinity_wo_coords/2026-01-08_15-53-52/epoch=213-step=1712.ckpt
   num_gpus: 1
 
   # trans rot perturbation 
@@ -84,13 +83,13 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/BioBetter/kkh_sbe_gkr_04U/meta/metadata_2.csv
+    csv_path: /home/psh/data/affinity/affinity_abrank_dms/sabdab_mt_info.csv
 
     # Number of scaffolds to sample per target.
-    samples_per_target: 10
+    samples_per_target: 1
 
     # Batch size when sampling from the model
-    batch_size: 10
+    batch_size: 1
     num_workers: 8
     prefetch_factor: 4
 

@@ -1,24 +1,10 @@
-# Copyright 2024 ByteDance and/or its affiliates.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from typing import Optional, Union
 
 import torch
 import torch.nn as nn
 
 from protenix.model.modules.pairformer import PairformerStack
-from protenix.model.modules.primitives import LinearNoBias
+from protenix.model.modules.primitives import LinearNoBias, Linear, BiasInitLinear
 from protenix.model.utils import broadcast_token_to_atom, one_hot
 from protenix.openfold_local.model.primitives import LayerNorm
 
@@ -90,15 +76,32 @@ class AffinityHead(nn.Module):
             blocks_per_ckpt=blocks_per_ckpt,
         )
 
+        self.norm_g = nn.LayerNorm(self.c_z)
+
         self.affinity_out_mlp = nn.Sequential(
-            nn.Linear(self.c_z, self.c_z),
+            Linear(self.c_z, self.c_z, initializer='relu'),
             nn.ReLU(),
-            nn.Linear(self.c_z, self.c_z//2),
-            nn.ReLU(),
-            nn.Linear(self.c_z//2, 1),
-            nn.ReLU(),
+            Linear(self.c_z, self.c_z//2, initializer='relu'),
+            nn.ReLU()
         )
 
+        self.to_affinity_pred_value = nn.Sequential(
+            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            nn.ReLU(),
+            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            nn.ReLU(),
+            LinearNoBias(self.c_z//2, 1),
+        )
+
+        self.to_affinity_pred_score = nn.Sequential(
+            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            nn.ReLU(),
+            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            nn.ReLU(),
+            Linear(self.c_z//2, 1),
+        )
+
+        self.to_affinity_logits_binary = Linear(1, 1)
 
     def forward(
         self,
@@ -141,8 +144,6 @@ class AffinityHead(nn.Module):
             else:
                 z_trunk = 0 * z_trunk
 
-        x_pred_rep_coords = x_pred_coords
-        N_sample = x_pred_rep_coords.size(-3)
         z_init = (
             self.linear_no_bias_s1(s_inputs)[..., None, :, :]
             + self.linear_no_bias_s2(s_inputs)[..., None, :]
@@ -152,18 +153,40 @@ class AffinityHead(nn.Module):
             del z_init
             torch.cuda.empty_cache()
 
-        affinity_values = []
-        for i in range(N_sample):
-            affinity_value = self.memory_efficient_forward(
+        affinity_values, affinity_logits = (
+            [],
+            []
+        )
+        x_pred_rep_coords = x_pred_coords
+
+        if use_coords:
+            N_sample = x_pred_rep_coords.size(-3)
+            for i in range(N_sample):
+                affinity_value, affinity_logit = self.memory_efficient_forward(
+                        s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
+                        z_pair=z_trunk.clone() if inplace_safe else z_trunk,
+                        inter_pair_mask=inter_pair_mask,
+                        x_pred_rep_coords=x_pred_coords[..., i, :, :],
+                        use_coords=use_coords,
+                )
+                affinity_values.append(affinity_value)
+                affinity_logits.append(affinity_logit)
+
+        else:
+            affinity_value, affinity_logit = self.memory_efficient_forward(
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                     inter_pair_mask=inter_pair_mask,
-                    x_pred_rep_coords=x_pred_coords[..., i, :, :],
+                    x_pred_rep_coords=x_pred_coords,
                     use_coords=use_coords,
             )
             affinity_values.append(affinity_value)
-        affinity_values = torch.tensor(affinity_values)
-        return affinity_values
+            affinity_logits.append(affinity_logit)
+
+        affinity_values = torch.stack(affinity_values).squeeze(-1)
+        affinity_logits = torch.stack(affinity_logits).squeeze(-1)
+
+        return affinity_values, affinity_logits
 
     def memory_efficient_forward(
         self,
@@ -179,14 +202,14 @@ class AffinityHead(nn.Module):
             x_pred_coords (torch.Tensor): predicted coordinates
                 [..., N_atoms, 3] # Note: N_sample = 1 for avoiding CUDA OOM
         """
-        # Embed pair distances of representative atoms:
-        with torch.amp.autocast("cuda", enabled=False):
-            x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
-            distance_pred = torch.cdist(
-                x_pred_rep_coords, x_pred_rep_coords
-            )  # [..., N_tokens, N_tokens]
-
+        
         if use_coords: 
+            # Embed pair distances of representative atoms:
+            with torch.amp.autocast("cuda", enabled=False):
+                x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
+                distance_pred = torch.cdist(
+                    x_pred_rep_coords, x_pred_rep_coords
+                )  # [..., N_tokens, N_tokens]
             z_pair = z_pair + self.linear_no_bias_d(
                 one_hot(
                     x=distance_pred,
@@ -210,11 +233,15 @@ class AffinityHead(nn.Module):
 
         # Upcast after pairformer
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
-        
         # apply MeanPooling 
         g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
+        g = self.norm_g(g)
         
         # Affinity MLP 
-        affinity_value = self.affinity_out_mlp(g) # (1)
+        g = self.affinity_out_mlp(g) # (64)
+        
+        affinity_pred_value = self.to_affinity_pred_value(g)
+        affinity_pred_score = self.to_affinity_pred_score(g)
+        affinity_logits_binary = self.to_affinity_logits_binary(affinity_pred_score)
 
-        return affinity_value
+        return affinity_pred_value, affinity_logits_binary

@@ -5,6 +5,7 @@ from omegaconf import DictConfig, OmegaConf
 
 # Pytorch lightning imports
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer, Callback
+from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
@@ -71,8 +72,6 @@ class Experiment:
         # Check if a warm start checkpoint is provided to load weights
         if self._exp_cfg.warm_start and os.path.exists(self._exp_cfg.warm_start):
             log.info(f"Loading weights from checkpoint: {self._exp_cfg.warm_start}")
-            # Load the model with weights from the checkpoint.
-            # The optimizer and scheduler will be re-initialized from scratch.
             self._module = AffinityModule.load_from_checkpoint(
                 checkpoint_path=self._exp_cfg.warm_start,
                 cfg=self._cfg,
@@ -88,7 +87,7 @@ class Experiment:
             use_distributed_sampler=False,
             enable_progress_bar=True,
             enable_model_summary=True,
-            strategy='ddp',
+            strategy=DDPStrategy(find_unused_parameters=True),
             devices=self._exp_cfg.num_devices,
             gradient_clip_val=1.0
         )

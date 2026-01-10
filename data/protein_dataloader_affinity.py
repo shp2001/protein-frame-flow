@@ -156,10 +156,16 @@ class ProteinData(LightningDataModule):
         labels = [item['label'] for item in batch]
         labels = torch.tensor(labels, dtype=torch.long)
         
+        kd1s = [item['kd1'] for item in batch]
+        kd1s = torch.tensor(kd1s, dtype=torch.float)
+        kd2s = [item['kd2'] for item in batch]
+        kd2s = torch.tensor(kd2s, dtype=torch.float)
         return {
             'batch_0': collated_0,
             'batch_1': collated_1,
-            'label': labels
+            'label': labels,
+            'kd1': kd1s,
+            'kd2': kd2s
         }
     
     def train_dataloader(self, rank=None, num_replicas=None):

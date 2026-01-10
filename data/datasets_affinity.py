@@ -166,7 +166,6 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
         chain_seqs[chain_id].append(aa_letter)
         if chain_id not in chain_order:
             chain_order.append(chain_id)
-    print("chain_seqs", chain_seqs)
     chain_seq_list = ["".join(chain_seqs[chain_id]) for chain_id in chain_order]
 
     # Run through OpenFold data transforms.
@@ -235,10 +234,8 @@ class DataManager:
             self.main_csv_path = dataset_cfg.valid_csv_path 
             self.meta_csv_path = dataset_cfg.valid_meta_path 
 
-        print(">> Loading Metadata...")
         self.chain_to_meta_row = self._load_metadata()
         
-        print(">> Loading and Preprocessing Main Data...")
         self.affinity_df, self.cluster_group = self._load_main_data()
         
     def _load_metadata(self):
@@ -260,8 +257,6 @@ class DataManager:
         df['cluster_id'] = df['Ab_cluster_0.9'].astype(str) + "_" + df['Ag_cluster_0.75'].astype(str)
         cluster_group = df.groupby('cluster_id').indices
         
-        print(f"   Total Valid Samples: {len(df)}")
-        print(f"   Total Unique Clusters: {len(cluster_group)}")
         return df, cluster_group
 
 # ==============================================================================
@@ -289,12 +284,12 @@ class AffinityPairSampler:
         kd2 = self.kd_values[idx2]
 
         if kd1 == float('inf') and kd2 == float('inf'): return None, False
-        if kd1 == float('inf'): return 0, True
-        if kd2 == float('inf'): return 1, True
+        if kd1 == float('inf'): return 0.0, True
+        if kd2 == float('inf'): return 1.0, True
         if kd1 <= 0 or kd2 <= 0: return None, False
 
-        if kd1 >= 10 * kd2: return 0, True
-        elif kd2 >= 10 * kd1: return 1, True
+        if kd1 >= 10 * kd2: return 0.0, True
+        elif kd2 >= 10 * kd1: return 1.0, True
         else: return None, False
 
     def generate_epoch_pairs(self):
@@ -302,7 +297,6 @@ class AffinityPairSampler:
         # 항상 '똑같은 Pair 조합'이 나오도록 보장합니다.
         if not self.is_training:
             self.rng = np.random.default_rng(self.seed)
-            print(f"   >> [Valid] Seed reset to {self.seed} for deterministic pairing.")
         else:
             # Training일 때는 계속 랜덤 상태 유지
             pass
@@ -319,7 +313,6 @@ class AffinityPairSampler:
         # ==================================================================
         # 1. Intra-Cluster Pairing
         # ==================================================================
-        print(f"   >> Processing Intra-cluster pairing...")
         
         for cluster in current_clusters:
             indices = self.cluster_dict[cluster]
@@ -342,7 +335,7 @@ class AffinityPairSampler:
 
                     label, is_valid = self.check_kd_ratio(idx1, idx2)
                     if is_valid:
-                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'type': 'intra'})
+                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
                         seen_pairs.add(pair_key)
                         found_for_this_cluster += 1
                         if found_for_this_cluster >= self.pairs_per_cluster: break
@@ -359,7 +352,7 @@ class AffinityPairSampler:
                     
                     label, is_valid = self.check_kd_ratio(idx1, idx2)
                     if is_valid:
-                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'type': 'intra'})
+                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
                         seen_pairs.add(pair_key)
                         found_for_this_cluster += 1
 
@@ -369,7 +362,6 @@ class AffinityPairSampler:
         # ==================================================================
         # 2. Inter-Cluster Pairing
         # ==================================================================
-        print("   >> Processing Inter-cluster pairing...")
         
         for cluster_a in current_clusters:
             indices_a = self.cluster_dict[cluster_a]
@@ -387,7 +379,7 @@ class AffinityPairSampler:
                 
                 label, is_valid = self.check_kd_ratio(idx1, idx2)
                 if is_valid:
-                    pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'type': 'inter'})
+                    pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'inter'})
                     seen_pairs.add(pair_key)
                     break
         
@@ -509,8 +501,6 @@ class AffinityDataset(Dataset):
                     for _ in range(chain_len):
                         asym_id.append(chain_idx)
                 asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
-                print("asym_id", asym_id.shape)
-                print("loop_mask", feats['loop_mask'].shape)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
             feats['diffuse_mask'] = diffuse_mask
@@ -527,7 +517,8 @@ class AffinityDataset(Dataset):
             feats['loop_mask'] = feats['loop_mask'].int()
             feats_paired[f"batch_{sample_num}"] = feats
         feats_paired['label'] = label
-        
+        feats_paired['kd1'] = pair_row['kd1']
+        feats_paired['kd2'] = pair_row['kd2']
         return feats_paired
 
 class PdbDataset(AffinityDataset):

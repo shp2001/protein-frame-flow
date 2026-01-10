@@ -99,22 +99,24 @@ class AffinityModule(LightningModule):
     def on_train_start(self):
         self._epoch_start_time = time.time()
 
-    def on_train_batch_start(self, batch, batch_idx):
-        optimizer = self.trainer.optimizers[0]
-        current_lr = optimizer.param_groups[0]['lr']
-        self.log(
-            'lr',
-            current_lr,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=False
-        )
+    # def on_train_batch_start(self, batch, batch_idx):
+    #     optimizer = self.trainer.optimizers[0]
+    #     current_lr = optimizer.param_groups[0]['lr']
+    #     self.log(
+    #         'lr',
+    #         current_lr,
+    #         on_step=True,
+    #         on_epoch=True,
+    #         prog_bar=False
+    #     )
     # def on_train_batch_start(self, batch, batch_idx):
     #     # 모든 학습 가능한 파라미터 초기화
+    #     for n, p in self.named_parameters():
+    #         print(f"{n}: {p.requires_grad}")
     #     for p in self.parameters():
     #         if p.requires_grad:
     #             p.grad = None
-        
+
     #     # Forward pass 전 파라미터 기록 (메모리 주소까지 추적)
     #     self._params_before = {id(p): n for n, p in self.named_parameters() if p.requires_grad}
 
@@ -128,10 +130,13 @@ class AffinityModule(LightningModule):
     #     # 사용되지 않은 파라미터 찾기
     #     unused = [self._params_before[id_p] for id_p in self._params_before 
     #             if id_p not in grads]
-        
+    #     used = [self._params_before[id_p] for id_p in self._params_before 
+    #             if id_p in grads]
+    #     if used:
+    #         print(f"✅ 실제로 사용된 파라미터: {used}")
     #     if unused:
     #         print(f"🔥 실제로 사용되지 않은 파라미터: {unused}")
-    #         raise RuntimeError("Unused parameters detected")  # 즉시 오류 발생시키기
+
     #     else:
     #         print("✅ 모든 파라미터가 사용되었습니다.")
 
@@ -147,7 +152,9 @@ class AffinityModule(LightningModule):
         self._epoch_start_time = time.time()
 
     def model_step(self, paired_batch, N_cycle):
-        affinity_preds = []
+        affinity_pred_values = []
+        affinity_pred_logits = []
+
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
             diffuse_mask = batch["diffuse_mask"]
@@ -179,36 +186,74 @@ class AffinityModule(LightningModule):
                     pred_trans_1 = None
             
             inter_pair_mask = batch['edge_mask'] * inter_mask
-            affinity_pred = self.affinity_model(
-                s_init[0],
-                s[0],
-                z[0],
-                inter_pair_mask[0],
-                pred_trans_1,
+            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+                s_inputs=s_init[0],
+                s_trunk=s[0],
+                z_trunk=z[0],
+                inter_pair_mask=inter_pair_mask[0],
+                x_pred_coords=pred_trans_1,
+                use_coords=self._affinity_cfg.use_coords
                 )       
-            affinity_preds.append(affinity_pred)
+            affinity_pred_values.append(affinity_pred_value)
+            affinity_pred_logits.append(affinity_pred_logit)
         
-        # calculate affinity loss 
-        affinity_pred_0 = affinity_preds[0]
-        affinity_pred_1 = affinity_preds[1]
-        target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
+        label = paired_batch['label'].to(batch['edge_mask'].device)
+        kd1 = paired_batch["kd1"].to(batch['edge_mask'].device)
+        kd2 = paired_batch["kd2"].to(batch['edge_mask'].device)
+        
+        # calculate affinity rank loss 
+        target = 1.0 - 2.0 * label
+        margin_loss_fn = nn.MarginRankingLoss(margin=self._exp_cfg.training.rank_margin, reduce=False)
+        affinity_rank_loss = margin_loss_fn(affinity_pred_values[0], affinity_pred_values[1], target)      # batch_0 > batch_1 * 10 -> label: 0
+        if len(affinity_rank_loss.shape) == 1:
+            affinity_rank_loss = affinity_rank_loss[None, ...]
+        
+        # calculate affinity regression loss 
+        preds = torch.stack(affinity_pred_values)
+        targets = torch.stack([torch.log10(kd1), torch.log10(kd2)])
+        mask = targets != float('inf')
+        diff = torch.abs(preds[mask] - targets[mask])
+        affinity_reg_loss = torch.mean(nn.functional.relu(diff - self._exp_cfg.training.reg_margin))
+        if len(affinity_reg_loss.shape) == 1:
+            affinity_reg_loss = affinity_reg_loss[None, ...]
 
-        margin_loss_fn = nn.MarginRankingLoss(margin=0.1, reduce=False)
-        affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
-        if len(affinity_loss.shape) == 1:
-            affinity_loss = affinity_loss[None, ...]
-        
-        total_loss = affinity_loss
-        
+        # calculate affinity probability loss 
+        if paired_batch["kd1"] == float('inf') or paired_batch["kd2"] == float('inf'):
+            target_0 = label.float()
+            target_1 = 1.0 - label 
+            loss_0 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[0].float(), target_0, reduction='none')
+            loss_1 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[1].float(), target_1, reduction='none')
+            affinity_binding_prob_loss = (loss_0 + loss_1) / 2
+            if len(affinity_binding_prob_loss.shape) == 1:
+                affinity_binding_prob_loss = affinity_binding_prob_loss[None, ...]
+        else:
+            affinity_binding_prob_loss = torch.zeros_like(label, dtype=torch.float32, requires_grad=True)
+
+        total_loss = affinity_rank_loss * self._exp_cfg.training.rank_loss_weight + affinity_reg_loss * self._exp_cfg.training.reg_loss_weight + affinity_binding_prob_loss * self._exp_cfg.training.prob_loss_weight
+        print("--------------------------------")
+        print("affinity_pred_values[0]", affinity_pred_values[0])
+        print("affinity_pred_values[1]", affinity_pred_values[1])
+        print("log_kd1", torch.log10(paired_batch['kd1']))
+        print("log_kd2", torch.log10(paired_batch['kd2']))
+        print("affinity_rank_loss", affinity_rank_loss)
+        print("affinity_reg_loss", affinity_reg_loss)
+        print("affinity_binding_prob_loss", affinity_binding_prob_loss)
+        print("total_loss", total_loss)
+        print("--------------------------------")
+
         return {
             "total_loss": total_loss,
-            "affinity_loss": affinity_loss,
+            "affinity_rank_loss": affinity_rank_loss,
+            "affinity_reg_loss": affinity_reg_loss,
+            "affinity_binding_prob_loss": affinity_binding_prob_loss,
         }
 
 
     def validation_step(self, paired_batch: Any, batch_idx: int):
+        batch_metrics = []
+        affinity_pred_values = []
+        affinity_pred_logits = []
 
-        affinity_preds = []
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
             loop_mask = batch['loop_mask']
@@ -243,6 +288,39 @@ class AffinityModule(LightningModule):
                         s,
                         z
                     ) 
+                    # save 3d structure for validation 
+                    pred_positions_37 = []
+                    pred_positions = du.to_numpy(pred_positions)
+                    for i in range(pred_positions.shape[0]):
+                        pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch)
+                        pred_positions_37.append(pred_position_37)
+                    
+                    pred_positions = np.stack(pred_positions_37)
+                    
+                    sample_dir = os.path.join(
+                        self.checkpoint_dir,
+                        f'{pdb_id}_len_{num_res}'
+                    )
+                    os.makedirs(sample_dir, exist_ok=True)
+
+                        
+                    for i in range(num_batch):
+                        # Write out sample to PDB file (wo b-factors)
+                        final_pos = pred_positions[i]
+
+                        if batch['mode'] == 'polymer' or batch['mode'] == 'monomer':
+                            unique_vals, mapped = torch.unique(batch['chain_idx'][0], return_inverse=True)
+                            batch['chain_idx'] = mapped.unsqueeze(0).expand(num_batch, -1)
+
+                        saved_path = au.write_prot_to_pdb(
+                            final_pos,
+                            file_path=os.path.join(sample_dir, pdb_id+'.pdb'),
+                            aatype=batch['aatype'].cpu(),
+                            chain_index=batch['chain_idx'].cpu(),
+                            no_indexing=False,
+                            overwrite=True,
+                            b_factors=None
+                        )
                 else:
                     pred_trans_1 = None
 
@@ -256,120 +334,116 @@ class AffinityModule(LightningModule):
             #         pred_trans_1,
             #     )  
 
-            # save 3d structure for validation 
-            pred_positions_37 = []
-            pred_positions = du.to_numpy(pred_positions)
-            for i in range(pred_positions.shape[0]):
-                pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch)
-                pred_positions_37.append(pred_position_37)
-            
-            pred_positions = np.stack(pred_positions_37)
-            batch_metrics = []
-            
-            sample_dir = os.path.join(
-                self.checkpoint_dir,
-                f'{pdb_id}_len_{num_res}'
-            )
-            os.makedirs(sample_dir, exist_ok=True)
-
-                
-            for i in range(num_batch):
-                # Write out sample to PDB file (wo b-factors)
-                final_pos = pred_positions[i]
-
-                if batch['mode'] == 'polymer' or batch['mode'] == 'monomer':
-                    unique_vals, mapped = torch.unique(batch['chain_idx'][0], return_inverse=True)
-                    batch['chain_idx'] = mapped.unsqueeze(0).expand(num_batch, -1)
-
-                saved_path = au.write_prot_to_pdb(
-                    final_pos,
-                    file_path=os.path.join(sample_dir, pdb_id+'.pdb'),
-                    aatype=batch['aatype'].cpu(),
-                    chain_index=batch['chain_idx'].cpu(),
-                    no_indexing=False,
-                    overwrite=True,
-                    b_factors=None
-                )
-
             # affinity prediction 
             inter_pair_mask = batch['edge_mask'] * inter_mask
-            affinity_pred = self.affinity_model(
-                s_init[0],
-                s[0],
-                z[0],
-                inter_pair_mask[0],
-                pred_trans_1,
-                )       
-            affinity_preds.append(affinity_pred)
+            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+                s_inputs=s_init[0],
+                s_trunk=s[0],
+                z_trunk=z[0],
+                inter_pair_mask=inter_pair_mask[0],
+                x_pred_coords=pred_trans_1,
+                use_coords=self._affinity_cfg.use_coords
+                ) 
+  
+            affinity_pred_values.append(affinity_pred_value)
+            affinity_pred_logits.append(affinity_pred_logit)
+
 
         # calculate affinity loss 
-        affinity_pred_0 = affinity_preds[0]
-        affinity_pred_1 = affinity_preds[1]
-        target = (1.0 - 2.0 * paired_batch['label']).to(affinity_pred_0.device)
+        label = paired_batch['label'].to(batch['edge_mask'].device)
+        kd1 = paired_batch["kd1"].to(batch['edge_mask'].device)
+        kd2 = paired_batch["kd2"].to(batch['edge_mask'].device)
 
-        margin_loss_fn = nn.MarginRankingLoss(margin=0.1, reduce=False)
-        affinity_loss = margin_loss_fn(affinity_pred_0, affinity_pred_1, target)      # batch_0 > batch_1 * 10 -> label: 0
-        if len(affinity_loss.shape) == 1:
-            affinity_loss = affinity_loss[None, ...]
-        affinity_loss_dict = {'affinity_loss': affinity_loss}
+        # calculate affinity rank loss 
+        target = 1.0 - 2.0 * label
+        margin_loss_fn = nn.MarginRankingLoss(margin=self._exp_cfg.training.rank_margin, reduce=False)
+        affinity_rank_loss = margin_loss_fn(affinity_pred_values[0], affinity_pred_values[1], target)      # batch_0 > batch_1 * 10 -> label: 0
+        if len(affinity_rank_loss.shape) == 1:
+            affinity_rank_loss = affinity_rank_loss[None, ...]
+        
+        # calculate affinity regression loss 
+        preds = torch.stack(affinity_pred_values)
+        targets = torch.stack([torch.log10(kd1), torch.log10(kd2)])
+        mask = targets != float('inf')
+        diff = torch.abs(preds[mask] - targets[mask])
+        affinity_reg_loss = torch.mean(nn.functional.relu(diff - self._exp_cfg.training.reg_margin))
+        if len(affinity_reg_loss.shape) == 1:
+            affinity_reg_loss = affinity_reg_loss[None, ...]
+
+        # calculate affinity probability loss 
+        if paired_batch["kd1"] == float('inf') or paired_batch["kd2"] == float('inf'):
+            target_0 = label.float()
+            target_1 = 1.0 - label 
+            loss_0 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[0].float(), target_0, reduction='none')
+            loss_1 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[1].float(), target_1, reduction='none')
+            affinity_binding_prob_loss = (loss_0 + loss_1) / 2
+            if len(affinity_binding_prob_loss.shape) == 1:
+                affinity_binding_prob_loss = affinity_binding_prob_loss[None, ...]
+        else:
+            affinity_binding_prob_loss = torch.zeros_like(label, dtype=torch.float32, requires_grad=True)
+
+        affinity_loss_dict = {'affinity_rank_loss': affinity_rank_loss,
+                              'affinity_reg_loss': affinity_reg_loss,
+                              'affinity_binding_prob_loss': affinity_binding_prob_loss}
         batch_metrics.append(affinity_loss_dict)
 
         # calculate trans diffuse loss (rmsd)
-        gt_trans_1 = batch['trans_1']
-        trans_error = (gt_trans_1 - pred_trans_1) 
-        trans_diffuse_loss = torch.sum(
-            trans_error ** 2 * diffuse_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(diffuse_mask, dim=-1) * 3)
-        trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
-        batch_metrics.append(trans_diffuse_loss_dict)
+        if self._affinity_cfg.use_coords:
+            gt_trans_1 = batch['trans_1']
+            trans_error = (gt_trans_1 - pred_trans_1) 
+            trans_diffuse_loss = torch.sum(
+                trans_error ** 2 * diffuse_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(diffuse_mask, dim=-1) * 3)
+            trans_diffuse_loss_dict = {'trans_diffuse_loss': trans_diffuse_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
 
-        frame_mask = diffuse_mask * (1 - loop_mask)
-        trans_frame_loss = torch.sum(
-            trans_error ** 2 * frame_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(diffuse_mask, dim=-1) * 3)
-        trans_diffuse_loss_dict = {'trans_frame_loss': trans_frame_loss**0.5}
-        batch_metrics.append(trans_diffuse_loss_dict)
+            frame_mask = diffuse_mask * (1 - loop_mask)
+            trans_frame_loss = torch.sum(
+                trans_error ** 2 * frame_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(diffuse_mask, dim=-1) * 3)
+            trans_diffuse_loss_dict = {'trans_frame_loss': trans_frame_loss**0.5}
+            batch_metrics.append(trans_diffuse_loss_dict)
 
-        # calculate trans loop loss (rmsd)
-        trans_loop_loss = torch.sum(
-            trans_error ** 2 * loop_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(loop_mask, dim=-1) * 3)
-        trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
-        batch_metrics.append(trans_loop_loss_dict)
+            # calculate trans loop loss (rmsd)
+            trans_loop_loss = torch.sum(
+                trans_error ** 2 * loop_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(loop_mask, dim=-1) * 3)
+            trans_loop_loss_dict = {'trans_loop_loss': trans_loop_loss**0.5}
+            batch_metrics.append(trans_loop_loss_dict)
 
-        # calcuclate trans loss (h3 rmsd)
-        h3_mask = torch.zeros_like(loop_mask)
-        count = 0
-        for i in range(num_batch):
-            count = 0  
-            in_group = False  
-            group_start = None  
-            
-            # 연속된 1들의 그룹을 추적
-            for j in range(num_res):
-                if loop_mask[i, j] == 1:
-                    if not in_group:  # 새로운 그룹 시작
-                        group_start = j
-                        in_group = True
-                else:
-                    if in_group:  # 그룹이 끝나는 지점
-                        count += 1
-                        # 세 번째 그룹만 남기고 나머지 그룹은 0
-                        if count == 3:
-                            h3_mask[i, group_start:j] = 1
-                        in_group = False
-            
-        # calculate h3 trans loss (rmsd)
-        h3_trans_loss = torch.sum(
-            trans_error ** 2 * h3_mask[..., None],
-            dim=(-1, -2)
-        ) / (torch.sum(h3_mask, dim=-1) * 3)
-        h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
+            # calcuclate trans loss (h3 rmsd)
+            h3_mask = torch.zeros_like(loop_mask)
+            count = 0
+            for i in range(num_batch):
+                count = 0  
+                in_group = False  
+                group_start = None  
+                
+                # 연속된 1들의 그룹을 추적
+                for j in range(num_res):
+                    if loop_mask[i, j] == 1:
+                        if not in_group:  # 새로운 그룹 시작
+                            group_start = j
+                            in_group = True
+                    else:
+                        if in_group:  # 그룹이 끝나는 지점
+                            count += 1
+                            # 세 번째 그룹만 남기고 나머지 그룹은 0
+                            if count == 3:
+                                h3_mask[i, group_start:j] = 1
+                            in_group = False
+                
+            # calculate h3 trans loss (rmsd)
+            h3_trans_loss = torch.sum(
+                trans_error ** 2 * h3_mask[..., None],
+                dim=(-1, -2)
+            ) / (torch.sum(h3_mask, dim=-1) * 3)
+            h3_trans_loss_dict = {'h3_trans_loss': h3_trans_loss**0.5}
 
-        batch_metrics.append(h3_trans_loss_dict)
+            batch_metrics.append(h3_trans_loss_dict)
 
         batch_metrics = pd.DataFrame(batch_metrics)
         self.validation_epoch_metrics.append(batch_metrics)
@@ -504,32 +578,6 @@ class AffinityModule(LightningModule):
                 }
             }
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure, *args, **kwargs):
-    
-        if self.is_loss_nan:
-            self.print(f"❌ NaN in closure at step {self.global_step}")
-            optimizer.zero_grad()
-            return
-
-        # grad 검사
-        nan_in_grad = False
-        for name, param in self.named_parameters():
-            if param.grad is not None and torch.isnan(param.grad).any():
-                self.print(f"⚠️ NaN in grad: {name}")
-                nan_in_grad = True
-
-        if nan_in_grad:
-            optimizer.zero_grad()
-            return
-
-        optimizer.step(closure=optimizer_closure)
-
-    def on_train_batch_start(self, batch, batch_idx):
-        # 첫 번째 optimizer 기준
-        optimizer = self.trainer.optimizers[0]
-        lr = optimizer.param_groups[0]['lr']
-        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
-
     def on_predict_start(self):
         self.pairformer_cache = {}
         self.current_pdb_id = None
@@ -543,6 +591,7 @@ class AffinityModule(LightningModule):
 
         num_batch = batch['sample_id'].shape[0]
         pdb_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
+        diffuse_mask = batch['diffuse_mask']
 
         if 'sample' in pdb_id:
             parts = batch['processed_path'].split('/')
@@ -551,9 +600,6 @@ class AffinityModule(LightningModule):
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
             
-        
-
-# ############################################################################################################
         if pdb_id != self.current_pdb_id:
             self.pairformer_cache.clear()
             self.current_pdb_id = pdb_id
@@ -562,9 +608,9 @@ class AffinityModule(LightningModule):
             s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_id]
             
         else:
-            s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
-            s_init, s, z, pair_outputs = self.model.do_pairformer(
-                s_init_embed,
+            s_init, z_init, trans_perturbed = self.model.embed_input(batch)
+            _, s, z, pair_outputs = self.model.do_pairformer(
+                s_init,
                 z_init,
                 batch['edge_mask'][0][None, ...],
                 self._model_cfg.pairformer.n_cycles,
@@ -573,36 +619,11 @@ class AffinityModule(LightningModule):
 
             # 결과를 캐시에 저장합니다.
             self.pairformer_cache[pdb_id] = (s_init, s, z, trans_perturbed)
-############################################################################################################
-############################################################################################################
-        # s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
-        # s_init, s, z, pair_outputs = self.model.do_pairformer(
-        #     s_init_embed,
-        #     z_init,
-        #     batch['edge_mask'][0][None, ...],
-        #     self._model_cfg.pairformer.n_cycles,
-        #     num_batch
-        # )
-
-        # # row-wise
-        # loop_mask = batch['loop_mask'][0]
-        # rows_selected = z[0][loop_mask, :, :]          # [L_selected, L, C]
-        # # col-wise
-        # cols_selected = z[0][:, loop_mask, :]          # [L, L_selected, C]
-        # cols_selected = cols_selected.permute(1, 0, 2)     # [L_selected, L, C]
-        # # concat
-        # z_cdr = torch.cat([rows_selected, cols_selected], dim=0)  # [L_selected*2, L, C]
-
-        # # flatten to [feature_dim]
-        # z_cdr = z_cdr.mean(dim=1).mean(dim=0)  # [C]
-        # torch.save({"z": z[0], "loop_mask": loop_mask}, os.path.join(sample_root_dir, "pair.pt"))
-
-############################################################################################################
 
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
             batch,
-            s_init,
+            s,
             s,
             z
         )
@@ -618,7 +639,7 @@ class AffinityModule(LightningModule):
         if hasattr(self, "confidence_model"):
             plddt_pred, pae_pred = self.confidence_model(
                 batch['ref_feature_dict'],
-                s_init[0],
+                s[0],
                 s[0],
                 z[0],
                 batch['edge_mask'][0],
@@ -665,6 +686,20 @@ class AffinityModule(LightningModule):
             b_factor_alt = diffuse_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
 
+        if hasattr(self, "affinity_model"):
+            diffuse_mask_i = diffuse_mask[:, :, None]  # (B, L, 1)
+            diffuse_mask_j = diffuse_mask[:, None, :]  # (B, 1, L)
+            inter_mask = 1 - (diffuse_mask_i == diffuse_mask_j).float() # 0: diag / 1: off-diag
+            inter_pair_mask = batch['edge_mask'] * inter_mask
+            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+                s_inputs=s_init[0],
+                s_trunk=s[0],
+                z_trunk=z[0],
+                inter_pair_mask=inter_pair_mask[0],
+                x_pred_coords=pred_trans_1,
+                use_coords=self._affinity_cfg.use_coords
+                )
+            
         for i in range(pred_positions.shape[0]):
             pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
             pred_positions_37.append(pred_position_37)
@@ -738,3 +773,12 @@ class AffinityModule(LightningModule):
                 # JSON으로 저장
                 with open(json_path, 'w') as f:
                     json.dump(plddt_by_cdr_dict, f, indent=4)
+            
+            if hasattr(self, 'affinity_model'):
+                affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
+                affinity_dict = {
+                    "affinity_pred_value": affinity_pred_value.squeeze().item(),
+                    "affinity_pred_logit": affinity_pred_logit.squeeze().item()
+                }
+                with open(affinity_json_path, 'w') as f:
+                    json.dump(affinity_dict, f, indent=4)
