@@ -84,7 +84,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/BioBetter/ai-assisted-affinity-maturation/meta/split_4.csv
+    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
 
     # Number of scaffolds to sample per target.
     samples_per_target: 1
@@ -96,3 +96,4 @@ inference:
 
     # Subset of targets to scaffold.
     target_subset: null  # e.g. ['5TPN']
+    save_traj: False

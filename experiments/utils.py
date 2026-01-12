@@ -235,7 +235,7 @@ def save_traj(
 
     # Write sample.
     sample_path = output_path
-
+    prot_traj_path = output_path.replace('.pdb', '_traj.pdb')
     if b_factors is None:
         b_factor_alt = diffuse_mask
         b_factors = np.tile((b_factor_alt * 100)[:, None], (1, 37))
@@ -254,29 +254,29 @@ def save_traj(
             'sample_path': sample_path,
         }
     
-    # else:
-    #     prot_traj_path = au.write_prot_to_pdb(
-    #         bb_prot_traj,
-    #         prot_traj_path,
-    #         b_factors=b_factors,
-    #         no_indexing=False,
-    #         aatype=aatype,
-    #         chain_index=chain_index,
-    #         residue_index=residue_index
-    #     )
-    #     # x0_traj_path = au.write_prot_to_pdb(
-    #     #     x0_traj,
-    #     #     x0_traj_path,
-    #     #     b_factors=b_factors,
-    #     #     no_indexing=False,
-    #     #     aatype=aatype,
-    #     #     chain_index=chain_index
-    #     # )
-    #     return {
-    #         'sample_path': sample_path,
-    #         'traj_path': prot_traj_path,
-    #         # 'x0_traj_path': x0_traj_path,
-    #     }
+    else:
+        prot_traj_path = au.write_prot_to_pdb(
+            bb_prot_traj,
+            prot_traj_path,
+            b_factors=b_factors,
+            no_indexing=False,
+            aatype=aatype,
+            chain_index=chain_index,
+            residue_index=residue_index
+        )
+        # x0_traj_path = au.write_prot_to_pdb(
+        #     x0_traj,
+        #     x0_traj_path,
+        #     b_factors=b_factors,
+        #     no_indexing=False,
+        #     aatype=aatype,
+        #     chain_index=chain_index
+        # )
+        return {
+            'sample_path': sample_path,
+            'traj_path': prot_traj_path,
+            # 'x0_traj_path': x0_traj_path,
+        }
 
 
 

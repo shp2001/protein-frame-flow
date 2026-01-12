@@ -947,7 +947,7 @@ class FlowModule(LightningModule):
 
 ############################################################################################################
 
-        atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
+        r3_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
             batch,
             s_init,
@@ -955,12 +955,27 @@ class FlowModule(LightningModule):
             z
         )
 
-        bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1)) # (B, N_steps, L, 37, 3)
+        r3_traj = torch.stack(r3_traj, dim=1)
+        atom37_trajs = []
+        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
+        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
+
+        for ts in range(r3_traj.shape[1]):
+            atom14_traj = du.atom_unflatten(r3_traj[:, ts], batch['atom14_gt_exists']) # (B, L, 14, 3)
+            atom37_traj_batch = []
+            for i in range(atom14_traj.shape[0]):
+                atom37_traj_one_ts = all_atom.atom14_to_atom37(du.to_numpy(atom14_traj[i]), batch) # (L, 37, 3)
+                atom37_traj_batch.append(atom37_traj_one_ts)
+            
+            atom37_traj = np.stack(atom37_traj_batch, axis=0) # (B, L, 37, 3)
+            atom37_trajs.append(atom37_traj)
+        atom_trajs = np.stack(atom37_trajs, axis=1) # (B, N_steps, L, 37, 3)
+        print("atom_trajs", atom_trajs.shape)
+
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []
 
-        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
-        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
+
 
 
         if hasattr(self, "confidence_model"):
@@ -1016,6 +1031,7 @@ class FlowModule(LightningModule):
         for i in range(pred_positions.shape[0]):
             pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
             pred_positions_37.append(pred_position_37)
+            
         pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
 
         samples = os.listdir(sample_root_dir)
@@ -1031,7 +1047,7 @@ class FlowModule(LightningModule):
             next_sample_num += 1
             sample_path = os.path.join(sample_root_dir, f"{pdb_id}_sample_{next_sample_num}.pdb")
             pred_position = pred_positions[i]
-            bb_traj = bb_trajs[i]
+            atom_traj = atom_trajs[i]
 
             # save structure data 
             aatype = du.to_numpy(batch['aatype'][i].int())
@@ -1039,9 +1055,11 @@ class FlowModule(LightningModule):
             residue_idx = du.to_numpy(batch['residue_index'][i].int())
             diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
             b_factor = b_factors[i]
+            print("atom37_traj", atom_traj.shape)
+            print("pred_position", pred_position.shape)
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
-                bb_prot_traj=bb_traj, 
+                bb_prot_traj=atom_traj, 
                 x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
                 b_factors=b_factor,  # 위의 prmsd 집어넣기 
                 diffuse_mask=diffuse_mask,
@@ -1049,7 +1067,7 @@ class FlowModule(LightningModule):
                 aatype=aatype,
                 chain_index=chain_idx,
                 residue_index=residue_idx,
-                save_traj_bool=self._interpolant_cfg.save_traj
+                save_traj_bool=self._infer_cfg.samples.save_traj
             )
             # save perturbed trans 
             if trans_perturbed != None:
