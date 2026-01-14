@@ -7,6 +7,7 @@ from Bio.SeqUtils import seq1
 from bisect import bisect_left, bisect_right
 
 import random
+import numpy as np 
 import json 
 
 def get_pdb_chain_seq(
@@ -129,7 +130,7 @@ def load_monomer_mask(mask_info_file, seq_len, seed=None):
 
     return start, end
 
-def load_polymer_mask(mask_info_file, seed=None):
+def load_polymer_mask(mask_info_file, select_num=1, seed=None):
     if seed is not None:
         random.seed(seed)
 
@@ -174,20 +175,36 @@ def load_polymer_mask(mask_info_file, seed=None):
     if not interface_list:
         raise ValueError(f"{mask_info_file}: No interface residues found for chain {selected_chain}")
 
-    interface = random.choices(interface_list, weights=[len(g) for g in interface_list])[0]
+    if len(interface_list) < select_num:
+        select_num = len(interface_list)
 
-    # 5. clipping: 선택된 체인의 범위 안에서만 확장
-    min_res = max(start_index, interface[0] - 5)
-    max_res = min(end_index, interface[-1] + 5)
+    weights = np.array([len(g) for g in interface_list], dtype=float)
+    weights /= weights.sum()  # 확률로 정규화
+
+    idx = np.random.choice(
+        len(interface_list),
+        size=select_num,
+        replace=False,
+        p=weights
+    )
+
+    interfaces = [interface_list[i] for i in idx]
     
-    interface = [res for res in interface if min_res <= res <= max_res]
+    # 5. clipping: 선택된 체인의 범위 안에서만 확장
 
-    # 6. 길이 자르기 (30 초과시 연속 30개)
-    if len(interface) > 30:
-        start = random.randint(0, len(interface) - 30)
-        interface = interface[start:start + 30]
+    selected_residues_list = []
+    for interface in interfaces:
+        min_res = max(start_index, interface[0] - 3)
+        max_res = min(end_index, interface[-1] + 3)
+        selected_residues = [res for res in interface if min_res <= res <= max_res]
 
-    return int(min_res), int(max_res)
+        if len(selected_residues) > 30:
+            start = random.randint(0, len(selected_residues) - 30)
+            selected_residues = selected_residues[start:start + 30]
+        
+        selected_residues_list.append(selected_residues)
+
+    return [(selected_residues[0], selected_residues[-1]) for selected_residues in selected_residues_list] 
     
 ######################## crop_antigen ########################
 
@@ -353,15 +370,19 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
     L = sum(chain_len_list)
     residue_indices = None
 
-    anchor = find_anchor(loop_mask, only_h3=False)
-    start = anchor[0] ; end = anchor[1]
-    loop_indices = [i for i in range(start+1, end) if nan_mask[i] == 1]
 
-    if len(loop_indices) < 10:
+    loop_indices = (
+        (loop_mask == 1) & (nan_mask == 1)
+    ).nonzero(as_tuple=True)[0].tolist()
+    print("nan_mask", nan_mask)
+    print("loop_mask", loop_mask)
+    print("loop_indices", loop_indices)
+
+    if torch.sum(loop_mask) < 10:
         max_len = max_len // 2
-    elif len(loop_indices) < 15:
+    elif torch.sum(loop_mask) < 15:
         max_len = (max_len * 3) // 5
-    elif len(loop_indices) < 20:
+    elif torch.sum(loop_mask) < 20:
         max_len = (max_len * 4) // 5
     else:
         max_len = max_len

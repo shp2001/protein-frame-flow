@@ -17,6 +17,7 @@ from models import utils as mu
 from data.interpolant import Interpolant 
 from data import utils as du
 from data import all_atom
+from data.protein import PDB_MAX_CHAINS
 from experiments import utils as eu
 from models.loss import *
 from openfold.utils.loss import between_residue_bond_loss
@@ -891,6 +892,8 @@ class FlowModule(LightningModule):
 
         num_batch = batch['sample_id'].shape[0]
         pdb_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
+        diffuse_mask = batch['diffuse_mask']
+        loop_mask = batch['loop_mask']
 
         if 'sample' in pdb_id:
             parts = batch['processed_path'].split('/')
@@ -921,31 +924,6 @@ class FlowModule(LightningModule):
 
             # 결과를 캐시에 저장합니다.
             self.pairformer_cache[pdb_id] = (s_init, s, z, trans_perturbed)
-############################################################################################################
-############################################################################################################
-        # s_init_embed, z_init, trans_perturbed = self.model.embed_input(batch)
-        # s_init, s, z, pair_outputs = self.model.do_pairformer(
-        #     s_init_embed,
-        #     z_init,
-        #     batch['edge_mask'][0][None, ...],
-        #     self._model_cfg.pairformer.n_cycles,
-        #     num_batch
-        # )
-
-        # # row-wise
-        # loop_mask = batch['loop_mask'][0]
-        # rows_selected = z[0][loop_mask, :, :]          # [L_selected, L, C]
-        # # col-wise
-        # cols_selected = z[0][:, loop_mask, :]          # [L, L_selected, C]
-        # cols_selected = cols_selected.permute(1, 0, 2)     # [L_selected, L, C]
-        # # concat
-        # z_cdr = torch.cat([rows_selected, cols_selected], dim=0)  # [L_selected*2, L, C]
-
-        # # flatten to [feature_dim]
-        # z_cdr = z_cdr.mean(dim=1).mean(dim=0)  # [C]
-        # torch.save({"z": z[0], "loop_mask": loop_mask}, os.path.join(sample_root_dir, "pair.pt"))
-
-############################################################################################################
 
         r3_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
@@ -974,9 +952,6 @@ class FlowModule(LightningModule):
 
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []
-
-
-
 
         if hasattr(self, "confidence_model"):
             plddt_pred, pae_pred = self.confidence_model(
@@ -1025,7 +1000,7 @@ class FlowModule(LightningModule):
 
 
         else:
-            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factor_alt = loop_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
 
         for i in range(pred_positions.shape[0]):
@@ -1055,8 +1030,9 @@ class FlowModule(LightningModule):
             residue_idx = du.to_numpy(batch['residue_index'][i].int())
             diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
             b_factor = b_factors[i]
-            print("atom37_traj", atom_traj.shape)
-            print("pred_position", pred_position.shape)
+
+            if max(chain_idx) > PDB_MAX_CHAINS:
+                chain_idx = pd.factorize(chain_idx, sort=False)[0]
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
                 bb_prot_traj=atom_traj, 

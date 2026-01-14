@@ -159,9 +159,11 @@ class BaseDataset(Dataset):
 
         if csv_row['mode'] == 'polymer':
             mask_info_file = csv_row['mask_info_file']
-            interface_start, interface_end = load_polymer_mask(mask_info_file, seed=123)
-            scaffold_idx[f'loop_start'] = interface_start
-            scaffold_idx[f'loop_end'] = interface_end
+            interfaces = load_polymer_mask(mask_info_file, select_num=3, seed=123)
+
+            for i in range(len(interfaces)):
+                scaffold_idx[f'loop_start_{i}'] = interfaces[i][0]
+                scaffold_idx[f'loop_end_{i}'] = interfaces[i][-1]
 
         # Large protein files are slow to read. Cache them.
         use_cache = True
@@ -185,21 +187,14 @@ class BaseDataset(Dataset):
         scaffold_idx = batch['scaffold_idx']
         scaffold_mask = torch.zeros(num_res)
 
-        if len(scaffold_idx.keys()) == 2: # general loop PPI
-            loop_indices = []
-            for scf, idx in scaffold_idx.items():
-                loop_indices.append(idx)
-            loop_indices = sorted(loop_indices)
 
-            scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
-
-        elif len(scaffold_idx.keys()) == 12: # antibody-antigen
-            cdr_indices = []
-            for scf, idx in scaffold_idx.items():
-                cdr_indices.append(idx)
-            cdr_indices = sorted(cdr_indices)
-            for i in range(6):
-                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+        loop_indices = []
+        loop_num = len(scaffold_idx.keys()) // 2
+        for scf, idx in scaffold_idx.items():
+            loop_indices.append(idx)
+        loop_indices = sorted(loop_indices)
+        for i in range(loop_num):
+            scaffold_mask[loop_indices[2*i]:loop_indices[2*i+1]+1] = 1.0
 
         return scaffold_mask * batch['res_mask']
     
@@ -225,10 +220,12 @@ class BaseDataset(Dataset):
 
             rng = np.random.default_rng(seed=123)
             self.setup_inpainting(feats, rng)
-            feats['loop_mask'] = provide_anchor(feats['loop_mask'], 
-                                                   feats['res_mask'], 
-                                                   feats['chain_index'],
-                                                   feats['mode']).to(torch.long)
+            feats['loop_mask'] = provide_anchor(
+                feats['loop_mask'], 
+                feats['res_mask'], 
+                feats['chain_index'],
+                feats['mode']
+                ).to(torch.long)
 
         else:
             raise ValueError(f'Unknown task {self.task}')
@@ -280,11 +277,12 @@ def collate_fn(batch):
                 include_ag=include_ag
                 )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
+            print(feat['raw_path'])
             cropped_feat['crop_idx'] = crop_general_protein(
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=256,
+                max_len=500,
                 seq_list=feat['chain_seq_list']
                 )
 

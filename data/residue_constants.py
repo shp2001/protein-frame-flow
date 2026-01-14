@@ -113,6 +113,7 @@ atom_type_to_charge = {
     'CZ3': 0,
     'NZ': +1,   # Lys
     'OXT': -1,  
+    'UNK': 0
 }
 
 # Distance from one CA to next CA [trans configuration: omega = 180].
@@ -403,6 +404,7 @@ atom_positions_ideal = {
          ['CG1', (-0.497, -0.528, 2.487)],
          ['CG2', (-0.218, 1.543, 1.119)],
   ],
+  'UNK': [['UNK', (0,0, 0.0, 0.0)]],
 }
 
 rigid_group_atom_positions = {
@@ -804,7 +806,7 @@ restype_name_to_atom14_names = {
     'TRP': ['N', 'CA', 'C', 'O', 'CB', 'CG',  'CD1', 'CD2', 'NE1', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2'],
     'TYR': ['N', 'CA', 'C', 'O', 'CB', 'CG',  'CD1', 'CD2', 'CE1', 'CE2', 'CZ',  'OH',  '',    ''],
     'VAL': ['N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', '',    '',    '',    '',    '',    '',    ''],
-    'UNK': ['',  '',   '',  '',  '',   '',    '',    '',    '',    '',    '',    '',    '',    ''],
+    'UNK': ['UNK',  '',   '',  '',  '',   '',    '',    '',    '',    '',    '',    '',    '',    ''],
 
 }
 # pylint: enable=line-too-long

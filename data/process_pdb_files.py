@@ -32,7 +32,7 @@ parser.add_argument(
     '--num_processes',
     help='Number of processes.',
     type=int,
-    default=50)
+    default=10)
 parser.add_argument(
     '--write_dir',
     help='Path to write results to.',
@@ -170,17 +170,24 @@ def process_file(file_path: str, write_dir: str, cfg: str, chothia_file_path=Non
 
 def process_serially(all_paths, write_dir, cfg, chothia_file_paths=None):
     all_metadata = []
-    assert not (chothia_file_paths==None and cfg['mode'] in ['ab', 'nanobody'])
 
     for i, file_path in enumerate(all_paths):
         try:
             start_time = time.time()
-            metadata = process_file(
-                file_path,
-                write_dir,
-                cfg,
-                chothia_file_paths[i]
-                )
+            if chothia_file_paths != None:
+                metadata = process_file(
+                    file_path,
+                    write_dir,
+                    cfg,
+                    chothia_file_paths[i]
+                    )
+            else:
+                metadata = process_file(
+                    file_path,
+                    write_dir,
+                    cfg,
+                    chothia_file_paths
+                    )    
             elapsed_time = time.time() - start_time
             print(f'Finished {file_path} in {elapsed_time:2.2f}s')
             all_metadata.append(metadata)
