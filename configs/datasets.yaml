@@ -10,7 +10,7 @@ shared:
   max_motif_percent: 1
 
   # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
-  mode: ab
+  mode: affinity
   loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
   
   # masking scheduling 
@@ -41,11 +41,11 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/affinity/affinity_abrank_dms/affinity_mutation_info_clean_train.csv
-  valid_csv_path: /home/psh/data/affinity/affinity_abrank_dms/affinity_mutation_info_clean_valid.csv
+  train_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_train.csv
+  valid_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_valid.csv
 
-  train_meta_path: /home/psh/data/affinity/affinity_abrank_dms/metadata_train.csv
-  valid_meta_path: /home/psh/data/affinity/affinity_abrank_dms/metadata_valid.csv
+  train_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_train.csv
+  valid_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_valid.csv
 
   pairs_per_cluster: 6
 
@@ -65,12 +65,14 @@ pdb_dataset:
   ab_threshold: 40
   general_threshold: 40
   ab_max_num_res: 300
-  general_max_num_res: 256
+  general_max_num_res: 450
   
   # Filtering
   filter:
-    max_num_res: 2000
+    max_num_res: 1200
     min_num_res: 100
+    max_num_chain: 6
+    max_mask_residues: 220
     max_coil_percent: 1.0
     rog_quantile: 1.0
     # oligomeric: ['monomeric', 'heteromer']

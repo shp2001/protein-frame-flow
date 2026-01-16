@@ -210,6 +210,23 @@ def chain_str_to_int(chain_str: str):
         chain_int += CHAIN_TO_INT[chain_char] + (i * len(ALPHANUMERIC))
     return chain_int
 
+def chain_int_to_str(chain_int: int) -> str:
+    n = len(ALPHANUMERIC)
+    length = 1
+    while True:
+        offset = (length * (length - 1) // 2) * n
+        max_val = offset + length * (n - 1)
+        if chain_int <= max_val:
+            break
+        length += 1
+    char_sum_target = chain_int - offset
+    chars = []
+    for _ in range(length):
+        val = min(char_sum_target, n - 1)
+        chars.append(INT_TO_CHAIN[val])
+        char_sum_target -= val
+
+    return "".join(reversed(chars))
 
 def parse_chain_feats(chain_feats, scale_factor=1.):
     ca_idx = rc.atom_order['CA']

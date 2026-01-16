@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J v2.3.2.2_affinity_wo_coords_margin_0.2
+#SBATCH -J v2.3.2.2_affinity_general
 #SBATCH -p gpu
 #SBATCH --gres=gpu:A6000:2
 #SBATCH --mem=240g

@@ -1,13 +1,14 @@
 import sys
 import torch 
+import random
+import json 
 
 from os.path import splitext, basename
 from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 from bisect import bisect_left, bisect_right
 
-import random
-import json 
+import data.utils as du 
 
 def get_pdb_chain_seq(
     pdb_file,
@@ -358,42 +359,65 @@ def crop_antigen(
 
 ######################## crop_general_protein ########################
 
-def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):  
-    chain_len_list = [len(seq) for seq in seq_list]
-    L = sum(chain_len_list)
-    residue_indices = None
+def crop_general_affinity(
+    trans_1, 
+    loop_mask, 
+    nan_mask, 
+    max_len,
+    mask_info,
+    residue_index,
+    chain_index,
+    max_res_num_interface=220
+    ):  
+    
+    L = loop_mask.shape[0]
+    device = trans_1.device
+    
+    res_num_interface = sum(
+        len(inner)
+        for outer in mask_info.values()
+        for inner in outer
+    )
 
-    anchor = find_anchor(loop_mask, only_h3=False)
-    start = anchor[0] ; end = anchor[1]
-    loop_indices = [i for i in range(start+1, end) if nan_mask[i] == 1]
+    lower_bound = max_len // 3
+    upper_bound = max_len 
 
-    if len(loop_indices) < 10:
-        max_len = max_len // 2
-    elif len(loop_indices) < 15:
-        max_len = (max_len * 3) // 5
-    elif len(loop_indices) < 20:
-        max_len = (max_len * 4) // 5
-    else:
-        max_len = max_len
-        
+    ratio = min(res_num_interface / max_res_num_interface, 1.0)
+    dynamic_max_len = lower_bound + (ratio * (upper_bound - lower_bound))
+    max_len = int(dynamic_max_len)
+
     if torch.sum(nan_mask) <= max_len:
-        residue_indices = [i for i in range(L) if nan_mask[i]==1]
+        crop_idx = [i for i in range(L) if nan_mask[i] == 1]
 
     else:
-        distance_map = get_distance_map(trans_1)
-        distance_vectors = []
+        priority_mask = torch.zeros(L, dtype=torch.bool, device=device)
         
-        for i in loop_indices:
-            distance_vectors.append(distance_map[i])
+        for chain_str, res_blocks in mask_info.items():
+            c_int = du.chain_str_to_int(chain_str)
+            chain_bool = (chain_index == c_int)
+            
+            for res_block in res_blocks:
+                for pdb_res_id in res_block:
+                    match = chain_bool & (residue_index == pdb_res_id)
+                    priority_mask = priority_mask | match
 
-        distance_vectors = torch.stack(distance_vectors)
-        distance_vector, _ = torch.min(distance_vectors, dim=0)
-        values, indices = torch.topk(distance_vector, max_len, largest=False)
+        distance_map = get_distance_map(trans_1) # (L, L)
+        loop_indices = loop_mask.nonzero().flatten()
 
-        residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
-        residue_indices = [i for i in residue_indices if nan_mask[i] == 1]
+        dist_vectors = distance_map[loop_indices, :] # (Num_Loop, L)
+        min_dist_vector, _ = torch.min(dist_vectors, dim=0) # (L,) 각 잔기별 Loop까지의 최단 거리
+        ranking_scores = min_dist_vector.clone()
+        ranking_scores[priority_mask] = -1.0
+        ranking_scores[nan_mask == 0] = float('inf')
+        k = min(max_len, L)
 
-    return residue_indices
+        _, selected_indices = torch.topk(ranking_scores, k, largest=False)
+        crop_idx = sorted(selected_indices.tolist())
+        
+        # 혹시 모를 inf 값 포함(max_len > valid_len 인 경우) 방지를 위해 nan_mask 재확인
+        crop_idx = [i for i in crop_idx if nan_mask[i] == 1]
+
+    return crop_idx
 
 ######################## relpos ########################
 

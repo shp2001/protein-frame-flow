@@ -3,10 +3,11 @@ import numpy as np
 import random
 from collections import defaultdict
 
-
 import itertools 
 import re
 import copy 
+import json 
+import os 
 
 import torch 
 from torch.utils.data import Dataset
@@ -17,7 +18,7 @@ from data import residue_constants as rc
 from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 
-from data.motif_index import crop_antigen
+from data.motif_index import crop_antigen, provide_anchor, crop_general_affinity
 
 import logging
 
@@ -234,8 +235,9 @@ class DataManager:
             self.main_csv_path = dataset_cfg.valid_csv_path 
             self.meta_csv_path = dataset_cfg.valid_meta_path 
 
+        self.dataset_cfg = dataset_cfg
+
         self.chain_to_meta_row = self._load_metadata()
-        
         self.affinity_df, self.cluster_group = self._load_main_data()
         
     def _load_metadata(self):
@@ -245,19 +247,118 @@ class DataManager:
             meta_df = pd.read_csv(self.meta_csv_path)
             
             # 1. pdb_name을 인덱스로 설정 (Key로 사용하기 위함)
-            # 2. to_dict('index')를 사용하여 {인덱스: {컬럼명: 값, ...}} 형태로 변환
-            return meta_df.set_index('pdb_name').to_dict(orient='index')
+            return meta_df.set_index('processed_path').to_dict(orient='index')
+
+    def _filter_by_metadata(self, df):
+        """
+        Main DataFrame의 각 행에 대해 다음 단계로 필터링을 수행합니다.
+        1. Metadata(seq_len, num_chain) 조회 (Memory - Fast)
+        2. Mask Index JSON 파일 조회하여 총 Residue 개수 확인 (Disk I/O - Slow)
+        """
+        valid_indices = []
+        original_len = len(df)
+        
+        for idx, row in df.iterrows():
+            chains = str(row['mapped_chains']).split(';')
+            is_row_valid = True
+            
+            for chain_id in chains:
+                chain_key = chain_id.strip()
+
+                if chain_key not in self.chain_to_meta_row:
+                    is_row_valid = False
+                    break
+
+                meta_info = self.chain_to_meta_row[chain_key]
+
+                cur_len = meta_info.get('seq_len', 0)
+                if cur_len > self.dataset_cfg.filter.max_seq_len: 
+                    is_row_valid = False
+                    break
+                
+                cur_num_chain = meta_info.get('num_chain', 0)
+                if cur_num_chain > self.dataset_cfg.filter.max_num_chain: 
+                    is_row_valid = False
+                    break
+
+            if is_row_valid:
+                path = row['processed_path']
+                mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
+                
+                if os.path.exists(mask_path):
+                    try:
+                        with open(mask_path, 'r') as f:
+                            mask_data = json.load(f)
+                        
+                        total_residues = 0
+                        for chain_blocks in mask_data.values():
+                            for block in chain_blocks:
+                                if len(block) >= 2:
+                                    total_residues += (block[1] - block[0] + 1)
+                        
+                        if total_residues > self.dataset_cfg.filter.max_mask_residues:
+                            is_row_valid = False
+                            
+                    except Exception as e:
+                        print(f"Warning: Error reading mask file {mask_path}: {e}")
+                        is_row_valid = False
+                else:
+                    is_row_valid = False
+
+            if is_row_valid:
+                valid_indices.append(idx)
+
+        filtered_df = df.loc[valid_indices].reset_index(drop=True)
+        
+        dropped_count = original_len - len(filtered_df)
+        if dropped_count > 0:
+            print(f">> [Filter] Dropped {dropped_count} rows. (Total kept: {len(filtered_df)})")
+            
+        return filtered_df
 
     def _load_main_data(self):
         df = pd.read_csv(self.main_csv_path)
+
+        # Affinity 필터
         df = df[df['Affinity_Kd [nM]'] != -2].copy()
-        required_cols = ['Affinity_Kd [nM]', 'Ab_cluster_0.9', 'Ag_cluster_0.75', 'mapped_chains', 'mutation']
+
+        # --- cluster 컬럼 존재 여부에 따른 분기 ---
+        if 'cluster' in df.columns:
+            required_cols = [
+                'Affinity_Kd [nM]',
+                'cluster',
+                'mapped_chains',
+                'mutation'
+            ]
+        else:
+            required_cols = [
+                'Affinity_Kd [nM]',
+                'Ab_cluster_0.9',
+                'Ag_cluster_0.75',
+                'mapped_chains',
+                'mutation'
+            ]
+
         df = df.dropna(subset=required_cols).reset_index(drop=True)
+        df = self._filter_by_metadata(df)
+
+        # -1 → inf 처리
         df['Affinity_Kd [nM]'] = df['Affinity_Kd [nM]'].replace(-1, float('inf'))
-        df['cluster_id'] = df['Ab_cluster_0.9'].astype(str) + "_" + df['Ag_cluster_0.75'].astype(str)
+
+        # --- cluster_id 생성 ---
+        if 'cluster' in df.columns:
+            df['cluster_id'] = df['cluster'].astype(str)
+        else:
+            df['cluster_id'] = (
+                df['Ab_cluster_0.9'].astype(str)
+                + "_"
+                + df['Ag_cluster_0.75'].astype(str)
+            )
+
         cluster_group = df.groupby('cluster_id').indices
-        
+
         return df, cluster_group
+
 
 # ==============================================================================
 # 3. Pair Sampler (Pairing Logic - 변수 적용됨)
@@ -401,11 +502,8 @@ class AffinityDataset(Dataset):
         row = self.main_df.iloc[idx]
         chains = str(row['mapped_chains']).split(';')
         mutations = str(row['mutation']).split(';')
-        
-        if len(chains) != len(mutations):
-            part_idx = 0
-        else:
-            part_idx = random.randint(0, len(chains) - 1)
+    
+        part_idx = random.randint(0, len(chains) - 1)
             
         selected_chain = chains[part_idx].strip()
         selected_mutation = mutations[part_idx].strip()
@@ -413,14 +511,45 @@ class AffinityDataset(Dataset):
         
         return selected_mutation, selected_meta_row
 
-
     def process_csv_row(self, csv_row, mut):
         path = csv_row['processed_path']
         scaffold_idx = {}
         cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
-        for cdr in cdr_types:
-            scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
-            scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+
+        if "h1_start" in csv_row:
+            for cdr in cdr_types:
+                scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
+                scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+        else:
+            mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
+            complex_id = os.path.basename(mask_path).replace('.pkl', '')
+            pdb_id, ligand_chains, receptor_chains = complex_id.split('_')
+            ligand_chains = list(ligand_chains)
+            receptor_chains = list(receptor_chains)
+
+            with open(mask_path, 'r') as f:
+                mask_info = json.load(f)
+            
+            scaffold_idx = {}
+
+            for chain_id in ligand_chains:
+                for idx, block in enumerate(mask_info[chain_id]):
+                    scaffold_idx[f"{chain_id}_{idx}_start"] = block[0]
+                    scaffold_idx[f"{chain_id}_{idx}_end"] = block[-1]
+
+
+            if mut != "No_Mutation":
+                mut_parts = mut.split('_')          
+                for part in mut_parts:
+                    m_chain = part[1] # Chain ID 추출
+                    m_residue = int(part[2:-1]) # Residue ID 추출 (숫자 부분)
+
+                    if m_chain in receptor_chains and m_chain in mask_info:
+                        for idx, block in enumerate(mask_info[m_chain]):
+                            if m_residue in block:
+                                scaffold_idx[f"{m_chain}_{idx}_start"] = block[0]
+                                scaffold_idx[f"{m_chain}_{idx}_end"] = block[-1]
+                                break 
 
         processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = csv_row['mode']
@@ -453,7 +582,7 @@ class AffinityDataset(Dataset):
                 cdr_indices.append(idx)
             cdr_indices = sorted(cdr_indices)
             for i in range(6):
-                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1
 
         if mode == 'nanobody': # Nanobody-antigen
             cdr_indices = []
@@ -461,7 +590,27 @@ class AffinityDataset(Dataset):
                 cdr_indices.append(idx)
             cdr_indices = sorted(cdr_indices)
             for i in range(3):
-                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1
+
+        if 'affinity' in mode:
+            interface_points = []
+            for key, target_resid in scaffold_idx.items(): 
+                chain_str = key.split('_')[0]
+                ci_int = du.chain_str_to_int(chain_str)
+
+                found_idx = -1
+                for i, (b_chain, b_res) in enumerate(zip(batch['chain_index'], batch['residue_index'])):
+                    if b_chain == ci_int and b_res == target_resid:
+                        found_idx = i
+                        break
+                
+                if found_idx != -1:
+                    interface_points.append(found_idx)
+
+            for i in range(len(found_idx)):
+                scaffold_mask[interface_points[2*i]:interface_points[2*i+1]+1] = 1
+                if interface_points[2*i] == interface_points[2*i+1]:
+                    scaffold_mask[interface_points[2*i]-1:interface_points[2*i+1]+2] = 1
 
         return scaffold_mask * batch['res_mask']
 
@@ -483,13 +632,13 @@ class AffinityDataset(Dataset):
             feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 
             self.setup_inpainting(feats)
-            # # modify loop mask (if it is terminal mask, exclude end residue to provide an anchor)
-            # feats['loop_mask'] = provide_anchor(
-            #     feats['loop_mask'], 
-            #     feats['res_mask'], 
-            #     feats['chain_index'],
-            #     feats['mode']
-            #     ).to(torch.long)
+            # modify loop mask (if it is terminal mask, exclude end residue to provide an anchor)
+            feats['loop_mask'] = provide_anchor(
+                feats['loop_mask'], 
+                feats['res_mask'], 
+                feats['chain_index'],
+                feats['mode']
+                ).to(torch.long)
             
             # make diffuse_mask             
             chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
@@ -505,16 +654,30 @@ class AffinityDataset(Dataset):
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
             feats['diffuse_mask'] = diffuse_mask
 
-            feats['crop_idx'] = crop_antigen(
-                feats['trans_1'],
-                cdr_mask=feats['loop_mask'],
-                nan_mask=feats['res_mask'],
-                max_len=self.dataset_cfg.ab_max_num_res,
-                seq_list=feats['chain_seq_list'],
-                crop_ab=self.dataset_cfg.crop_ab,
-                mode=feats['mode'],
+            if feats['mode'] in ['ab', 'nanobody']:
+                feats['crop_idx'] = crop_antigen(
+                    feats['trans_1'],
+                    cdr_mask=feats['loop_mask'],
+                    nan_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.ab_max_num_res,
+                    seq_list=feats['chain_seq_list'],
+                    crop_ab=self.dataset_cfg.crop_ab,
+                    mode=feats['mode'],
+                    )
+            else:
+                mask_path = feats['processed_path'].replace("meta", "mask_index").replace('.pkl', '.json')
+                with open(mask_path, 'r') as f:
+                    mask_info = json.load(f)
+                feats['crop_idx'] = crop_general_affinity(
+                    trans_1=feats['trans_1'],
+                    loop_mask=feats['loop_mask'],
+                    res_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.general_max_num_res,
+                    mask_info=mask_info,
+                    residue_index=feats['residue_index'],
+                    chain_index=feats['chain_index'],
+                    max_res_num_interface=self.dataset_cfg.filter.max_mask_residues
                 )
-            feats['loop_mask'] = feats['loop_mask'].int()
             feats_paired[f"batch_{sample_num}"] = feats
         feats_paired['label'] = label
         feats_paired['kd1'] = pair_row['kd1']
@@ -573,7 +736,7 @@ class PdbDataset(AffinityDataset):
         self.dataset_cfg = dataset_cfg 
 
         self._log.info(f'{("Training" if is_training else "Validation")} Dataset initialized.')
-        self._log.info(f'Total Pairs: {len(self.pair_df)}')
+        self._log_pair_stats()
 
 
     def set_current_epoch(self, epoch):
@@ -593,3 +756,14 @@ class PdbDataset(AffinityDataset):
             # 2. 데이터셋 내부의 pair_df 교체
             self.pair_df = new_pairs
             self._log.info(f">> [Epoch {epoch}] Pair regeneration complete. Total pairs: {len(self.pair_df)}")
+
+    # [새로 추가할 헬퍼 함수]
+    def _log_pair_stats(self):
+        total = len(self.pair_df)
+        if total > 0 and 'type' in self.pair_df.columns:
+            counts = self.pair_df['type'].value_counts()
+            n_intra = counts.get('intra', 0)
+            n_inter = counts.get('inter', 0)
+            self._log.info(f"   [Stats] Total: {total} | Intra: {n_intra} | Inter: {n_inter}")
+        else:
+            self._log.info(f"   [Stats] Total: {total} (No type info available)")
