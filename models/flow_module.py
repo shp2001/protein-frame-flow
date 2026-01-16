@@ -1015,7 +1015,7 @@ class FlowModule(LightningModule):
 
         # protein의 n번째 (n>1) 배치를 생성할 때 
         if any('sample' in filename for filename in samples):
-            sample_nums = sorted([int(sample.replace("sample_", "").replace(".pdb", "")) for sample in samples if ('sample' in sample) and not ('plddt' in sample)])
+            sample_nums = sorted([int(sample.split('_')[-1].replace(".pdb", "")) for sample in samples if ('sample' in sample) and not ('plddt' in sample)])
             next_sample_num = sample_nums[-1]
 
         for i in range(num_batch):
