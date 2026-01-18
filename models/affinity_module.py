@@ -158,9 +158,16 @@ class AffinityModule(LightningModule):
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
             diffuse_mask = batch["diffuse_mask"]
-            diffuse_mask_i = diffuse_mask[:, :, None]  # (B, L, 1)
-            diffuse_mask_j = diffuse_mask[:, None, :]  # (B, 1, L)
-            inter_mask = 1 - (diffuse_mask_i == diffuse_mask_j).float() # 0: diag / 1: off-diag
+            print("diffuse_mask", diffuse_mask.shape)
+
+            if 'ligand_mask' in batch:
+                ligand_mask = batch['ligand_mask']
+            else:
+                ligand_mask = diffuse_mask
+
+            ligand_mask_i = ligand_mask[:, :, None]  # (B, L, 1)
+            ligand_mask_j = ligand_mask[:, None, :]  # (B, 1, L)
+            inter_mask = 1 - (ligand_mask_i == ligand_mask_j).float() # 0: diag / 1: off-diag
 
             # rollout for affinity
             self.rollout.set_device(batch['edge_mask'].device)
@@ -261,13 +268,19 @@ class AffinityModule(LightningModule):
             num_batch, num_res = loop_mask.shape
 
             raw_path = batch['raw_path']
-            print("raw_path", raw_path)
             pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
             diffuse_mask = batch["diffuse_mask"]
-            diffuse_mask_i = diffuse_mask[:, :, None]  # (B, L, 1)
-            diffuse_mask_j = diffuse_mask[:, None, :]  # (B, 1, L)
-            inter_mask = 1 - (diffuse_mask_i == diffuse_mask_j).float() # 0: diag / 1: off-diag
+            loop_mask = batch['loop_mask']
+
+            if "ligand_mask" not in batch:
+                ligand_mask = diffuse_mask 
+            else:
+                ligand_mask = batch['ligand_mask']
+
+            ligand_mask_i = ligand_mask[:, :, None]  # (B, L, 1)
+            ligand_mask_j = ligand_mask[:, None, :]  # (B, 1, L)
+            inter_mask = 1 - (ligand_mask_i == ligand_mask_j).float() # 0: diag / 1: off-diag
 
             # rollout for affinity
             with torch.no_grad():
@@ -303,10 +316,13 @@ class AffinityModule(LightningModule):
                     )
                     os.makedirs(sample_dir, exist_ok=True)
 
+                    b_factor_alt = loop_mask.cpu().numpy()
+                    b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
                         
                     for i in range(num_batch):
                         # Write out sample to PDB file (wo b-factors)
                         final_pos = pred_positions[i]
+                        b_factor = b_factors[i]
 
                         if batch['mode'] == 'polymer' or batch['mode'] == 'monomer':
                             unique_vals, mapped = torch.unique(batch['chain_idx'][0], return_inverse=True)
@@ -319,7 +335,7 @@ class AffinityModule(LightningModule):
                             chain_index=batch['chain_idx'].cpu(),
                             no_indexing=False,
                             overwrite=True,
-                            b_factors=None
+                            b_factors=b_factor
                         )
                 else:
                     pred_trans_1 = None
@@ -589,23 +605,32 @@ class AffinityModule(LightningModule):
         interpolant = Interpolant(self._infer_cfg.interpolant) 
         interpolant.set_device(device)
 
-        num_batch = batch['sample_id'].shape[0]
-        pdb_id = batch['processed_path'].split('/')[-1].replace('.pkl', '')
+        num_batch = batch['diffuse_mask'].shape[0]
+        mutation = batch['mutation']
+        data_source = batch['data_source']
+        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
         diffuse_mask = batch['diffuse_mask']
 
-        if 'sample' in pdb_id:
-            parts = batch['processed_path'].split('/')
-            pdb_id = parts[-2] + "_" + parts[-1].replace('.pkl', '')
-        sample_root_dir = os.path.join(self.inference_dir, pdb_id)
+        if "ligand_mask" not in batch:
+            ligand_mask = diffuse_mask 
+        else:
+            ligand_mask = batch['ligand_mask']
+            
+        ligand_mask_i = ligand_mask[:, :, None]  # (B, L, 1)
+        ligand_mask_j = ligand_mask[:, None, :]  # (B, 1, L)
+        inter_mask = 1 - (ligand_mask_i == ligand_mask_j).float() # 0: diag / 1: off-diag
+
+        sample_root_dir = os.path.join(self.inference_dir, pdb_mt_id)
+
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
             
-        if pdb_id != self.current_pdb_id:
+        if pdb_mt_id != self.current_pdb_id:
             self.pairformer_cache.clear()
-            self.current_pdb_id = pdb_id
+            self.current_pdb_id = pdb_mt_id
 
-        if pdb_id in self.pairformer_cache:
-            s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_id]
+        if pdb_mt_id in self.pairformer_cache:
+            s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_mt_id]
             
         else:
             s_init, z_init, trans_perturbed = self.model.embed_input(batch)
@@ -618,7 +643,7 @@ class AffinityModule(LightningModule):
             )
 
             # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[pdb_id] = (s_init, s, z, trans_perturbed)
+            self.pairformer_cache[pdb_mt_id] = (s_init, s, z, trans_perturbed)
 
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
@@ -634,7 +659,6 @@ class AffinityModule(LightningModule):
 
         batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
         batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
-
 
         if hasattr(self, "confidence_model"):
             plddt_pred, pae_pred = self.confidence_model(
@@ -685,11 +709,7 @@ class AffinityModule(LightningModule):
         else:
             b_factor_alt = diffuse_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
-
         if hasattr(self, "affinity_model"):
-            diffuse_mask_i = diffuse_mask[:, :, None]  # (B, L, 1)
-            diffuse_mask_j = diffuse_mask[:, None, :]  # (B, 1, L)
-            inter_mask = 1 - (diffuse_mask_i == diffuse_mask_j).float() # 0: diag / 1: off-diag
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred_value, affinity_pred_logit = self.affinity_model(
                 s_inputs=s_init[0],
@@ -711,7 +731,7 @@ class AffinityModule(LightningModule):
 
         # protein의 n번째 (n>1) 배치를 생성할 때 
         if any('sample' in filename for filename in samples):
-            sample_nums = sorted([int(sample.replace("sample_", "").replace(".pdb", "")) for sample in samples if ('sample' in sample) and not ('plddt' in sample)])
+            sample_nums = sorted([int(sample.replace("sample_", "").replace(".pdb", "")) for sample in samples if ('sample' in sample) and not ('affinity' in sample)])
             next_sample_num = sample_nums[-1]
 
         for i in range(num_batch):
@@ -778,7 +798,8 @@ class AffinityModule(LightningModule):
                 affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
                 affinity_dict = {
                     "affinity_pred_value": affinity_pred_value.squeeze().item(),
-                    "affinity_pred_logit": affinity_pred_logit.squeeze().item()
+                    "affinity_pred_logit": affinity_pred_logit.squeeze().item(),
+                    "affinity_true_log_value": torch.log10(batch['affinity_kd']).squeeze().item()
                 }
                 with open(affinity_json_path, 'w') as f:
                     json.dump(affinity_dict, f, indent=4)

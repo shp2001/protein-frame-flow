@@ -239,82 +239,85 @@ class DataManager:
 
         self.chain_to_meta_row = self._load_metadata()
         self.affinity_df, self.cluster_group = self._load_main_data()
-        
+
     def _load_metadata(self):
-            """
-            metadata.csv를 로드하여 {pdb_name: {row_data}} 매핑 딕셔너리 생성
-            """
-            meta_df = pd.read_csv(self.meta_csv_path)
-            
-            # 1. pdb_name을 인덱스로 설정 (Key로 사용하기 위함)
-            return meta_df.set_index('processed_path').to_dict(orient='index')
+        """
+        metadata.csv를 로드하여 {(pdb_name, data_source): {row_data}} 매핑 딕셔너리 생성
+        """
+        meta_df = pd.read_csv(self.meta_csv_path)
+        
+        # processed_path와 pdb_name 두 개의 열을 리스트로 묶어 인덱스로 설정
+        if 'data_source' in meta_df.columns:
+            return meta_df.set_index(['pdb_name', 'data_source']).to_dict(orient='index')
+        else:
+            return meta_df.set_index(['pdb_name']).to_dict(orient='index')
 
     def _filter_by_metadata(self, df):
         """
-        Main DataFrame의 각 행에 대해 다음 단계로 필터링을 수행합니다.
-        1. Metadata(seq_len, num_chain) 조회 (Memory - Fast)
-        2. Mask Index JSON 파일 조회하여 총 Residue 개수 확인 (Disk I/O - Slow)
+        Main DataFrame을 필터링합니다.
+        각 행에 대해 메타데이터(길이, 체인 수 등)와 마스크 파일(유효 잔기 수)을 검증합니다.
         """
-        valid_indices = []
         original_len = len(df)
         
-        for idx, row in df.iterrows():
-            chains = str(row['mapped_chains']).split(';')
-            is_row_valid = True
-            
-            for chain_id in chains:
-                chain_key = chain_id.strip()
-
-                if chain_key not in self.chain_to_meta_row:
-                    is_row_valid = False
-                    break
-
-                meta_info = self.chain_to_meta_row[chain_key]
-
-                cur_len = meta_info.get('seq_len', 0)
-                if cur_len > self.dataset_cfg.filter.max_seq_len: 
-                    is_row_valid = False
-                    break
-                
-                cur_num_chain = meta_info.get('num_chain', 0)
-                if cur_num_chain > self.dataset_cfg.filter.max_num_chain: 
-                    is_row_valid = False
-                    break
-
-            if is_row_valid:
-                path = row['processed_path']
-                mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
-                
-                if os.path.exists(mask_path):
-                    try:
-                        with open(mask_path, 'r') as f:
-                            mask_data = json.load(f)
-                        
-                        total_residues = 0
-                        for chain_blocks in mask_data.values():
-                            for block in chain_blocks:
-                                if len(block) >= 2:
-                                    total_residues += (block[1] - block[0] + 1)
-                        
-                        if total_residues > self.dataset_cfg.filter.max_mask_residues:
-                            is_row_valid = False
-                            
-                    except Exception as e:
-                        print(f"Warning: Error reading mask file {mask_path}: {e}")
-                        is_row_valid = False
-                else:
-                    is_row_valid = False
-
-            if is_row_valid:
-                valid_indices.append(idx)
-
-        filtered_df = df.loc[valid_indices].reset_index(drop=True)
+        # 모든 검증 로직(메타데이터 + 마스크파일)을 _check_row 함수 하나로 통합하여 적용
+        valid_meta_mask = df.apply(self._check_row, axis=1)
+        
+        filtered_df = df[valid_meta_mask].reset_index(drop=True)
         
         dropped_count = original_len - len(filtered_df)
         if dropped_count > 0:
             print(f">> [Filter] Dropped {dropped_count} rows. (Total kept: {len(filtered_df)})")
             
         return filtered_df
+
+    def _check_row(self, row):
+        """
+        단일 행에 대해 다음을 순차적으로 검증합니다:
+        1. Metadata Check: seq_len, num_chains (In-Memory, Fast)
+        2. Mask File Check: total_residues (Disk I/O, Slow)
+        """
+        # ---------------------------------------------------------
+        # 1. Metadata Check (In-Memory)
+        # ---------------------------------------------------------
+        chains = str(row['mapped_chains']).split(';')
+        has_source = 'Source Data Set' in row.index
+        source_dataset = row['Source Data Set'] if has_source else None
+
+        # 체인별 메타데이터 검증
+        for chain_id in chains:
+            chain_key = chain_id.strip()
+            if has_source:
+                chain_key = (chain_key, source_dataset)
+            
+            # 로드해둔 메타데이터 딕셔너리에서 조회
+            meta_info = self.chain_to_meta_row.get(chain_key)
+            
+            if meta_info is None:
+                # 메타데이터가 없으면 유효하지 않은 데이터로 간주
+                return False 
+            
+            # 설정된 최대 길이/체인 수 초과 시 제외
+            if meta_info['seq_len'] > self.dataset_cfg.filter.max_num_res:
+                return False
+            if meta_info['num_chains'] > self.dataset_cfg.filter.max_num_chain:
+                return False
+
+        if has_source:
+            path = meta_info['processed_path']
+            mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
+
+            with open(mask_path, 'r') as f:
+                mask_data = json.load(f)
+            
+            total_residues = 0
+            for chain_blocks in mask_data.values():
+                for block in chain_blocks:
+                    total_residues += len(block)
+
+            if total_residues > self.dataset_cfg.filter.max_mask_residues:
+                return False
+
+        return True
 
     def _load_main_data(self):
         df = pd.read_csv(self.main_csv_path)
@@ -502,12 +505,15 @@ class AffinityDataset(Dataset):
         row = self.main_df.iloc[idx]
         chains = str(row['mapped_chains']).split(';')
         mutations = str(row['mutation']).split(';')
-    
         part_idx = random.randint(0, len(chains) - 1)
             
-        selected_chain = chains[part_idx].strip()
+        meta_key = chains[part_idx].strip()
         selected_mutation = mutations[part_idx].strip()
-        selected_meta_row = self.meta_row_mapping[selected_chain]
+        has_source = 'Source Data Set' in row.index
+        if has_source:
+            source_dataset = row['Source Data Set']
+            meta_key = (meta_key, source_dataset)
+        selected_meta_row = self.meta_row_mapping[meta_key]
         
         return selected_mutation, selected_meta_row
 
@@ -522,21 +528,26 @@ class AffinityDataset(Dataset):
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
         else:
             mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
-            complex_id = os.path.basename(mask_path).replace('.pkl', '')
-            pdb_id, ligand_chains, receptor_chains = complex_id.split('_')
-            ligand_chains = list(ligand_chains)
-            receptor_chains = list(receptor_chains)
+            complex_id = os.path.basename(mask_path).replace('.json', '')
+            pdb_id, ligand_chains_str, receptor_chains_str = complex_id.split('_')
+            self.ligand_chains = list(ligand_chains_str)
+            self.receptor_chains = list(receptor_chains_str)
 
             with open(mask_path, 'r') as f:
                 mask_info = json.load(f)
             
             scaffold_idx = {}
 
-            for chain_id in ligand_chains:
+            if "TCR" in csv_row['mode']:
+                self.ligand_chains = list(receptor_chains_str)
+                self.receptor_chains = list(ligand_chains_str)
+
+            for chain_id in self.ligand_chains:
+                if chain_id not in mask_info:
+                    continue
                 for idx, block in enumerate(mask_info[chain_id]):
                     scaffold_idx[f"{chain_id}_{idx}_start"] = block[0]
                     scaffold_idx[f"{chain_id}_{idx}_end"] = block[-1]
-
 
             if mut != "No_Mutation":
                 mut_parts = mut.split('_')          
@@ -544,7 +555,7 @@ class AffinityDataset(Dataset):
                     m_chain = part[1] # Chain ID 추출
                     m_residue = int(part[2:-1]) # Residue ID 추출 (숫자 부분)
 
-                    if m_chain in receptor_chains and m_chain in mask_info:
+                    if m_chain in self.receptor_chains and m_chain in mask_info:
                         for idx, block in enumerate(mask_info[m_chain]):
                             if m_residue in block:
                                 scaffold_idx[f"{m_chain}_{idx}_start"] = block[0]
@@ -607,7 +618,8 @@ class AffinityDataset(Dataset):
                 if found_idx != -1:
                     interface_points.append(found_idx)
 
-            for i in range(len(found_idx)):
+            interface_points = sorted(interface_points)
+            for i in range(len(interface_points)//2):
                 scaffold_mask[interface_points[2*i]:interface_points[2*i+1]+1] = 1
                 if interface_points[2*i] == interface_points[2*i+1]:
                     scaffold_mask[interface_points[2*i]-1:interface_points[2*i+1]+2] = 1
@@ -644,7 +656,7 @@ class AffinityDataset(Dataset):
             chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
             if len(chain_len_list) == 1:
                 diffuse_mask = feats['loop_mask']
-            else:
+            elif 'affinity' not in feats['mode']:
                 asym_id = []
                 for chain_idx, chain_len in enumerate(chain_len_list):
                     for _ in range(chain_len):
@@ -652,8 +664,34 @@ class AffinityDataset(Dataset):
                 asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
-            feats['diffuse_mask'] = diffuse_mask
 
+            elif 'affinity' in feats['mode']:
+                # 1. 리간드 체인 인덱스 준비
+                ligand_chain_indices = [du.chain_str_to_int(c) for c in self.ligand_chains]
+                ligand_chain_tensor = torch.tensor(ligand_chain_indices, device=feats['loop_mask'].device)
+                chain_index = feats['chain_index']
+                
+                # 2. ligand_mask 생성 (단순히 리간드 체인에 속하면 1, 아니면 0)
+                # 크기: (residue_length,)
+                ligand_mask = torch.isin(chain_index, ligand_chain_tensor).to(torch.long)
+                diffuse_mask = torch.max(ligand_mask, feats['loop_mask'])
+                
+                # 4. 결과 저장
+                feats['ligand_mask'] = ligand_mask
+
+            diffuse_mask = provide_anchor(
+                diffuse_mask, 
+                feats['res_mask'], 
+                feats['chain_index'],
+                feats['mode']
+                ).to(torch.long)
+            
+            feats['diffuse_mask'] = diffuse_mask
+            if torch.sum(diffuse_mask) == 0:
+                raise ValueError(
+                    f"diffuse_mask is all zero for sample {feats['pdb_name']}. "
+                    "Check if ligand_chains or loop_mask (CDR/Interface) are correctly defined."
+                )
             if feats['mode'] in ['ab', 'nanobody']:
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
@@ -665,13 +703,15 @@ class AffinityDataset(Dataset):
                     mode=feats['mode'],
                     )
             else:
-                mask_path = feats['processed_path'].replace("meta", "mask_index").replace('.pkl', '.json')
+                mask_path = meta_row['processed_path'].replace("meta", "mask_index").replace('.pkl', '.json')
                 with open(mask_path, 'r') as f:
                     mask_info = json.load(f)
+                if torch.sum(feats['loop_mask']) == 0:
+                    print("mask_path", mask_path)
                 feats['crop_idx'] = crop_general_affinity(
                     trans_1=feats['trans_1'],
                     loop_mask=feats['loop_mask'],
-                    res_mask=feats['res_mask'],
+                    nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.general_max_num_res,
                     mask_info=mask_info,
                     residue_index=feats['residue_index'],

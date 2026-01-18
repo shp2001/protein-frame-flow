@@ -62,6 +62,10 @@ class Experiment:
             # Save config only for main process.
 
             cfg_path = os.path.join(ckpt_dir, 'config.yaml')
+            # no perturbation 
+            self._cfg.model.edge_features.contact_map_off_diag.perturb = False
+            self._cfg.model.pairformer.blocks_per_ckpt = 1
+            self._cfg.model.diffusion_transformer.blocks_per_ckpt = 3
             with open(cfg_path, 'w') as f:
                 OmegaConf.save(config=self._cfg, f=f.name)
             cfg_dict = OmegaConf.to_container(self._cfg, resolve=True)
@@ -72,6 +76,7 @@ class Experiment:
         # Check if a warm start checkpoint is provided to load weights
         if self._exp_cfg.warm_start and os.path.exists(self._exp_cfg.warm_start):
             log.info(f"Loading weights from checkpoint: {self._exp_cfg.warm_start}")
+            
             self._module = AffinityModule.load_from_checkpoint(
                 checkpoint_path=self._exp_cfg.warm_start,
                 cfg=self._cfg,

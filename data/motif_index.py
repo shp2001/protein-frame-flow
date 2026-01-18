@@ -403,7 +403,9 @@ def crop_general_affinity(
 
         distance_map = get_distance_map(trans_1) # (L, L)
         loop_indices = loop_mask.nonzero().flatten()
-
+        if len(loop_indices) == 0:
+            print("loop_mask", loop_mask)
+            print("mask_info", mask_info)
         dist_vectors = distance_map[loop_indices, :] # (Num_Loop, L)
         min_dist_vector, _ = torch.min(dist_vectors, dim=0) # (L,) 각 잔기별 Loop까지의 최단 거리
         ranking_scores = min_dist_vector.clone()

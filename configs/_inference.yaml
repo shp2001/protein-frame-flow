@@ -8,6 +8,12 @@ inference:
   predict_dir: /home/psh/protein-frame-flow/inference_outputs/
   inference_subdir: run_${now:%Y-%m-%d}_${now:%H-%M-%S}
 
+  # cropping 
+  ab_max_num_res: 400 
+  crop_ab: False
+  general_max_num_res: 500
+  max_mask_residues: 200
+
   # Use this to write with date-time stamp.
   name: run_${now:%Y-%m-%d}_${now:%H-%M}
   seed: 12
@@ -15,7 +21,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_affinity_wo_coords/2026-01-08_15-53-52/epoch=213-step=1712.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_wo_coords_general/2026-01-17_15-08-47/epoch=4-step=270.ckpt
   num_gpus: 1
 
   # trans rot perturbation 
@@ -83,8 +89,8 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/data/affinity/affinity_abrank_dms/sabdab_mt_info.csv
-
+    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_test.csv
+    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_test.csv
     # Number of scaffolds to sample per target.
     samples_per_target: 1
 

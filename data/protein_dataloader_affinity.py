@@ -112,22 +112,6 @@ class ProteinData(LightningDataModule):
         collated_batch['atom14_gt_positions'] = collated_batch['atom14_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
         collated_batch['atom14_alt_gt_positions'] = collated_batch['atom14_alt_gt_positions'] - motif_com[:, None, None, :] # (B, L, 14, 3)
         collated_batch['pseudo_beta'] = collated_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
-        
-        # get interface index 
-        if collated_batch['mode'] not in ["monomer", "polymer"]:
-            # 배치 처리를 위해 loop를 돌거나 au.get_cdr_and_neighbors가 배치 처리를 지원해야 함.
-            # 기존 코드는 cropped_batch['loop_mask'][0]를 써서 첫 샘플 기준이었음.
-            # 정확성을 위해 여기서는 첫 번째 샘플 기준으로 계산하거나, 필요 시 배치 전체 루프 구현 필요.
-            # 여기서는 기존 로직 유지 (첫번째 샘플 기준)
-            cdr_residues, neighbor_indices, anchor_residues = au.get_cdr_and_neighbors(
-                collated_batch['atom14_gt_positions'],
-                collated_batch['atom14_gt_exists'],
-                collated_batch['loop_mask'][0],
-                collated_batch['mode']
-            )
-            collated_batch['cdr_residues'] = cdr_residues
-            collated_batch['neighbor_indices'] = neighbor_indices
-            collated_batch['anchor_residues'] = anchor_residues
 
         # create atom diffuse_mask 
         atom_diffuse_mask = collated_batch['atom14_gt_exists'].clone() # (B, L, 14)

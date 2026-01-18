@@ -12,8 +12,8 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 2
-    prefetch_factor: 10
+    num_workers: 0
+    prefetch_factor: 2
 
   masking_scheduler: 
     mask_schedule: False
@@ -98,8 +98,8 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2_confidence/CDRFlow_v2.3.2.2_stage_3_confidence_only_plddt/2025-12-12_09-21-35/epoch=27-step=40124.ckpt
+  num_devices: 4
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.2_stage_2_ori_perturb_stage3/2025-12-06_22-56-57/epoch=52-step=75949_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -167,13 +167,13 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.3.2.2_wo_coords_perturb_margin_0.2_only_rank
+    name: v2.3.2.2_w_coords
     project: v2.3.2.2_affinity
   optimizer:
     warmup_steps: 0
-    decay_steps: 270_000
-    min_lr: 1e-3
-    max_lr: 1e-3
+    decay_steps: 0
+    min_lr: 1e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -182,7 +182,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 16
+    accumulate_grad_batches: 8
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
