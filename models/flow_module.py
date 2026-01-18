@@ -187,7 +187,6 @@ class FlowModule(LightningModule):
         alt_atom14_pos = noisy_batch['atom14_alt_gt_positions'].clone()
         gt_pseudo_beta = noisy_batch['pseudo_beta'].clone()
 
-        print("raw_path", noisy_batch['raw_path'])
 
         # Timestep used for normalization.
         t = noisy_batch['t']
@@ -512,6 +511,7 @@ class FlowModule(LightningModule):
         edge_mask = batch['edge_mask']
         loop_mask = batch['loop_mask']
         diffuse_mask = batch['diffuse_mask']
+        hotspot_mask = batch['ag_hotspot']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
@@ -551,7 +551,7 @@ class FlowModule(LightningModule):
         os.makedirs(sample_dir, exist_ok=True)
 
         if not hasattr(self, "confidence_model"):
-            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factor_alt = hotspot_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
         else:
             plddt_bins = plddt_pred.shape[-1]
@@ -948,7 +948,6 @@ class FlowModule(LightningModule):
             atom37_traj = np.stack(atom37_traj_batch, axis=0) # (B, L, 37, 3)
             atom37_trajs.append(atom37_traj)
         atom_trajs = np.stack(atom37_trajs, axis=1) # (B, N_steps, L, 37, 3)
-        print("atom_trajs", atom_trajs.shape)
 
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []

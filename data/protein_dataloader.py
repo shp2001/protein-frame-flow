@@ -22,6 +22,7 @@ class ProteinData(LightningDataModule):
         self.data_cfg = data_cfg
         self.loader_cfg = data_cfg.loader
         self.sampler_cfg = data_cfg.sampler
+        self.hotspot_cfg = data_cfg.hotspot
         self._train_dataset = train_dataset
         self._valid_dataset = valid_dataset
         self._predict_dataset = predict_dataset
@@ -88,7 +89,10 @@ class ProteinData(LightningDataModule):
             cropped_batch['pseudo_beta'],
             cropped_batch['loop_mask'],
             cropped_batch['diffuse_mask'],
-            threshold=8
+            threshold=self.hotspot_cfg.threshold,
+            masking_ratio=self.hotspot_cfg.hotspot_noise.masking_ratio,
+            false_hotspot_ratio=self.hotspot_cfg.hotspot_noise.false_hotspot_ratio,
+            noise_range=self.hotspot_cfg.hotspot_noise.noise_range
         )
 
         # Center based on motif locations
@@ -206,7 +210,6 @@ class LengthBatcher:
                 monomer_sample = monomer_sample.sample(
                     len(cluster_sample), random_state=random_seed, replace=False
                 )
-                print(f"sampled_monomer", len(monomer_sample['cluster']))
                 cluster_sample = pd.concat([cluster_sample, monomer_sample])
                  
             # stage 2

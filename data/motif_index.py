@@ -374,9 +374,6 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
     loop_indices = (
         (loop_mask == 1) & (nan_mask == 1)
     ).nonzero(as_tuple=True)[0].tolist()
-    print("nan_mask", nan_mask)
-    print("loop_mask", loop_mask)
-    print("loop_indices", loop_indices)
 
     if torch.sum(loop_mask) < 10:
         max_len = max_len // 2
@@ -446,7 +443,15 @@ def get_relpos_input(seq_list):
     
     return asym_id, entity_id, sym_id
 
-def get_ag_hotspot(pseudo_beta, loop_mask, diffuse_mask, threshold=5.0):
+def get_ag_hotspot(
+        pseudo_beta, 
+        loop_mask, 
+        diffuse_mask,
+        threshold,            # True Hotspot 기준 거리
+        masking_ratio,        # True Hotspot을 지울(drop) 확률
+        false_hotspot_ratio,  # Candidate 영역에서 False Hotspot을 생성할 확률
+        noise_range        # False Hotspot 후보군 거리 범위 (threshold ~ threshold + noise_range)
+    ):
     """
     pseudo_beta:   (B, L, 3) 좌표
     loop_mask:     (B, L) 1이면 loop residue
@@ -456,22 +461,32 @@ def get_ag_hotspot(pseudo_beta, loop_mask, diffuse_mask, threshold=5.0):
     B, L, _ = pseudo_beta.shape
     device = pseudo_beta.device
 
-    # 모든 batch에서 동일하므로 첫 번째 것만 사용
-    loop_mask = loop_mask[0].bool()          # (L,)
-    ag_mask   = (diffuse_mask[0] == 0).bool() # (L,)
+    loop_mask_bool = loop_mask[0].bool()           # (num_loop,)
+    ag_mask_bool   = (diffuse_mask[0] == 0).bool() # (num_ag,)
+    dist_map = torch.cdist(pseudo_beta, pseudo_beta)
+    d = dist_map[:, loop_mask_bool][:, :, ag_mask_bool]
+    min_dist_to_loop = d.min(dim=1).values 
 
-    # 거리 행렬 (B, L, L)
-    dist_map = torch.cdist(pseudo_beta, pseudo_beta)  # (B, L, L)
+    is_true_hotspot = min_dist_to_loop < threshold
+    drop_prob = torch.rand_like(min_dist_to_loop)
+    keep_mask = drop_prob > masking_ratio 
+    processed_true_hotspot = is_true_hotspot & keep_mask
 
-    # loop vs antigen 거리만 추출
-    d = dist_map[:, loop_mask][:, :, ag_mask]   # (B, num_loop, num_ag)
 
-    # antigen residue별 contact 여부
-    contact = (d < threshold).any(dim=1)        # (B, num_ag)
+    upper_threshold = threshold + noise_range
+    is_candidate_region = (min_dist_to_loop >= threshold) & (min_dist_to_loop < upper_threshold)
+    
+    # Add Mask 생성: false_hotspot_ratio 확률로 True(1)
+    # 독립적인 난수 생성
+    add_prob = torch.rand_like(min_dist_to_loop)
+    select_mask = add_prob < false_hotspot_ratio
+    processed_false_hotspot = is_candidate_region & select_mask
 
-    # hotspot 초기화
+    final_contact = processed_true_hotspot | processed_false_hotspot
+
+    # 4. 전체 시퀀스 크기로 복원
     hotspot = torch.zeros((B, L), dtype=torch.float, device=device)
-    ag_idx = torch.where(ag_mask)[0]
-    hotspot[:, ag_idx] = contact.float()
+    ag_idx = torch.where(ag_mask_bool)[0]
+    hotspot[:, ag_idx] = final_contact.float()
 
-    return hotspot  # (B, L)
+    return hotspot

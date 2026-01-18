@@ -15,10 +15,12 @@ data:
     num_workers: 6
     prefetch_factor: 10
 
-  masking_scheduler: 
-    mask_schedule: False
-    init_rate: 1.0
-    masking_increase_ratio: 0.02
+  hotspot:
+    threshold: 8
+    hotspot_noise:
+      masking_ratio: 0.3
+      false_hotspot_ratio: 0.3
+      noise_range: 5
 
   sampler:
     # Setting for 48GB GPUs
@@ -100,7 +102,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 2
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage2/2025-12-05_16-29-09/epoch=45-step=65918_copy.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.2_stage_2_ori_perturb_stage3/2025-12-06_22-56-57/epoch=52-step=75949_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -161,7 +163,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage3
+    name: CDRFlow_v2.3.2.2_hotspot_perturb_0.3
     project: v2.3.2
   optimizer:
     warmup_steps: 0
