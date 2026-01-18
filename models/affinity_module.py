@@ -607,8 +607,10 @@ class AffinityModule(LightningModule):
 
         num_batch = batch['diffuse_mask'].shape[0]
         mutation = batch['mutation']
-        data_source = batch['data_source']
-        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
+        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation
+        if 'data_source' in batch:
+            data_source = batch['data_source']
+            pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
         diffuse_mask = batch['diffuse_mask']
 
         if "ligand_mask" not in batch:
@@ -796,7 +798,9 @@ class AffinityModule(LightningModule):
             
             if hasattr(self, 'affinity_model'):
                 affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
+    
                 affinity_dict = {
+                    "category": batch['mode'],
                     "affinity_pred_value": affinity_pred_value.squeeze().item(),
                     "affinity_pred_logit": affinity_pred_logit.squeeze().item(),
                     "affinity_true_log_value": torch.log10(batch['affinity_kd']).squeeze().item()

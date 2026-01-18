@@ -591,7 +591,9 @@ def collate_fn(batch):
     cropped_batch["edge_mask"] = cropped_batch['res_mask'][:, None] * cropped_batch['res_mask'][:, :, None]
     cropped_batch["mutation"] = feat['mutation']
     cropped_batch['processed_path'] = feat['processed_path']
-    cropped_batch['data_source'] = feat['data_source']
+    if 'data_soruce' in feat:
+        cropped_batch['data_source'] = feat['data_source']
+    cropped_batch['mode'] = feat['mode']
     return cropped_batch
 
 

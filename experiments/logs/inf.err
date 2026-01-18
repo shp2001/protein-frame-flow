@@ -39,7 +39,7 @@ Traceback (most recent call last):
     data.reraise()
   File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
     raise exception
-KeyError: Caught KeyError in DataLoader worker process 3.
+KeyError: Caught KeyError in DataLoader worker process 7.
 Original Traceback (most recent call last):
   File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
     data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
@@ -49,7 +49,7 @@ Original Traceback (most recent call last):
     data = [self.dataset[idx] for idx in possibly_batched_index]
   File "/home/psh/protein-frame-flow/experiments/inference_loader.py", line 408, in __getitem__
     selected_meta_row = self.chain_to_meta_row[meta_key]
-KeyError: ('4ozg_ABC_DE', 'ATLAS')
+KeyError: ('3ux9_Bb_A', 'SAbDab')
 
 
 Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

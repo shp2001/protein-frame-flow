@@ -10,7 +10,7 @@ inference:
 
   # cropping 
   ab_max_num_res: 400 
-  crop_ab: False
+  crop_ab: True
   general_max_num_res: 500
   max_mask_residues: 200
 
@@ -21,7 +21,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_wo_coords_general/2026-01-17_15-08-47/epoch=4-step=270.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_w_coords_general_only_margin_pairformer_6/2026-01-17_22-31-25/epoch=34-step=1890.ckpt
   num_gpus: 1
 
   # trans rot perturbation 
@@ -89,8 +89,8 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_test.csv
-    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_test.csv
+    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_overfitting.csv
+    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_check_overfitting.csv
     # Number of scaffolds to sample per target.
     samples_per_target: 1
 
