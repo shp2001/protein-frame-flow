@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J gen_diff_mask
 #SBATCH -p cpu
-#SBATCH --mem=20g
-#SBATCH -c 15
-#SBATCH -w node02
+#SBATCH --mem=40g
+#SBATCH -c 60
+#SBATCH -w node01
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/make_mask.err
 

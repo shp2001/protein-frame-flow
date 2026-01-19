@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -J cif_2_pkl
 #SBATCH -p cpu
-#SBATCH --mem=30g
-#SBATCH -c 30
+#SBATCH --mem=100g
+#SBATCH -c 72
 #SBATCH -w node02
 #SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
 #SBATCH -e /home/psh/protein-frame-flow/experiments/logs/parse_cif.err
