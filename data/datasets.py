@@ -13,7 +13,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein, provide_anchor
+from data.motif_index import load_general_mask, crop_antigen, crop_general_protein, provide_anchor
 
 # def _rog_filter(df, quantile):
 #     y_quant = pd.pivot_table(
@@ -48,7 +48,7 @@ def _length_filter(data_csv, min_res, max_res):
     ]
 
 
-def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
+def _process_csv_row(processed_file_path):
     processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
@@ -100,7 +100,6 @@ def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'residue_index': residue_index,
-        'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
         'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
         'alt_torsion_angles_sin_cos': chain_feats['alt_torsion_angles_sin_cos'],
@@ -197,48 +196,41 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row, idx):
         path = csv_row['processed_path']
-        raw_path = csv_row['raw_path']
-        seq_len = csv_row['seq_len']
-        
-        masked_chain = None
-        first_chain_len = None
-
-        scaffold_idx = {}
+        processed_row = _process_csv_row(path)
 
         if csv_row['mode'] == 'ab':
+            scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+            processed_row['scaffold_idx'] = scaffold_idx
 
         if csv_row['mode'] == 'nanobody':
+            scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+            processed_row['scaffold_idx'] = scaffold_idx
 
-        if csv_row['mode'] == 'general':
-            loop_info_file = csv_row['loop_info_dir']
-            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=self.current_epoch + idx)
-            scaffold_idx[f'loop_start'] = loop_start
-            scaffold_idx[f'loop_end'] = loop_end
-        
-        if csv_row['mode'] == 'monomer':
+        if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
             mask_info_file = csv_row['mask_info_file']
-            loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=self.current_epoch + idx)
-            scaffold_idx[f'loop_start'] = loop_start
-            scaffold_idx[f'loop_end'] = loop_end
+            scaffold_mask, selected_chain = load_general_mask(
+                mask_info_file=mask_info_file, 
+                residue_index=processed_row['residue_index'],
+                chain_index=processed_row['chain_index'],
+                pseudo_beta=processed_row['pseudo_beta'],
+                threshold_min_dist=8,
+                threshold_max_dist=35,
+                threshold_length=25, 
+                seed=self.current_epoch + idx
+                )
+            scaffold_mask = torch.tensor(scaffold_mask)
+            processed_row['scaffold_mask'] = scaffold_mask
+            processed_row['selected_chain'] = selected_chain
 
-        if csv_row['mode'] == 'polymer':
-            mask_info_file = csv_row['mask_info_file']
-            interface_start, interface_end = load_polymer_mask(mask_info_file, seed=self.current_epoch + idx)
-            scaffold_idx[f'loop_start'] = interface_start
-            scaffold_idx[f'loop_end'] = interface_end
-
-        processed_row = _process_csv_row(path, raw_path, scaffold_idx)
-        processed_row['masked_chain'] = masked_chain
-        processed_row['first_chain_len'] = first_chain_len
-        processed_row['raw_path'] = raw_path
+        processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
 
         return processed_row
@@ -247,34 +239,23 @@ class BaseDataset(Dataset):
         aatype = batch['aatype']
         mode = batch['mode']
         num_res = aatype.shape[0]
-        scaffold_idx = batch['scaffold_idx']
-        scaffold_mask = torch.zeros(num_res)
 
-        if mode == 'general' or mode == 'polymer' or mode == 'monomer': # general loop PPI
-            loop_indices = []
-            for scf, idx in scaffold_idx.items():
-                loop_indices.append(idx)
-            loop_indices = sorted(loop_indices)
+        if 'scaffold_mask' in batch:
+            return batch['scaffold_mask'] * batch['res_mask']
 
-            scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
+        else:
+            scaffold_idx = batch['scaffold_idx']
+            scaffold_mask = torch.zeros(num_res)
 
-        if mode == 'ab': # antibody-antigen
-            cdr_indices = []
-            for scf, idx in scaffold_idx.items():
-                cdr_indices.append(idx)
-            cdr_indices = sorted(cdr_indices)
-            for i in range(6):
-                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+            if mode in ['ab', 'nanobody']:
+                cdr_indices = []
+                for scf, idx in scaffold_idx.items():
+                    cdr_indices.append(idx)
+                cdr_indices = sorted(cdr_indices)
+                for i in range(len(cdr_indices)//2):
+                    scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
 
-        if mode == 'nanobody': # Nanobody-antigen
-            cdr_indices = []
-            for scf, idx in scaffold_idx.items():
-                cdr_indices.append(idx)
-            cdr_indices = sorted(cdr_indices)
-            for i in range(3):
-                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
-
-        return scaffold_mask * batch['res_mask']
+            return scaffold_mask * batch['res_mask']
 
     
     def setup_inpainting(self, feats, rng):
@@ -329,15 +310,16 @@ class BaseDataset(Dataset):
                 asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
                 masked_chain = asym_id[feats['loop_mask'] == 1].unique()
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
+
             feats['diffuse_mask'] = diffuse_mask
 
             # create crop_idx for cropping 
             mode = feats['mode']
             
-            if mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
-                raise ValueError('Mode should be one of [ab, nanobody, general, monomer, polymer]')
+            if mode not in ['ab', 'nanobody', 'loop_ppi', 'monomer', 'polymer']:
+                raise ValueError('Mode should be one of [ab, nanobody, loop_ppi, monomer, polymer]')
 
-            if mode == 'ab':
+            if mode == ['ab', 'nanobody']:
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
                     cdr_mask=feats['loop_mask'],
@@ -347,17 +329,7 @@ class BaseDataset(Dataset):
                     crop_ab=self.dataset_cfg.crop_ab,
                     mode=mode,
                     )
-            if mode == 'nanobody':
-                feats['crop_idx'] = crop_antigen(
-                    feats['trans_1'],
-                    cdr_mask=feats['loop_mask'],
-                    nan_mask=feats['res_mask'],
-                    max_len=self.dataset_cfg.ab_max_num_res,
-                    seq_list=feats['chain_seq_list'],
-                    crop_ab=self.dataset_cfg.crop_ab,
-                    mode=mode,
-                    )   
-            if mode == 'general' or mode == 'polymer' or mode == 'monomer':
+            if mode in ['loop_ppi', 'polymer', 'monomer']:
                 feats['crop_idx'] = crop_general_protein(
                     feats['trans_1'],
                     loop_mask=feats['loop_mask'],
