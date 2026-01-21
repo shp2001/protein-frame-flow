@@ -5,12 +5,10 @@ from os.path import splitext, basename
 from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 from bisect import bisect_left, bisect_right
-import data.utils as du
+
 import random
 import numpy as np 
 import json 
-from scipy.spatial.distance import cdist
-from collections import defaultdict
 
 def get_pdb_chain_seq(
     pdb_file,
@@ -101,6 +99,7 @@ def get_cdr_range_dict(chothia_pdb_file, heavy_only=False, light_only=False, off
 
     return cdr_range_dict
 
+<<<<<<< HEAD
 def load_antibody_mask(
     scaffold_idx,
     chain_index,
@@ -276,82 +275,27 @@ def load_antibody_mask(
 
     scaffold_mask[final_interface_mask] = 1.0
     return scaffold_mask
+=======
+def load_loop_file(loop_file, seed=None):
+    """Gets the index of a given CDR loop"""
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
-def convert_mask_info_index(mask_info, residue_index, chain_index):
-    """
-    mask_info의 pdb residue id를 전체 시퀀스 기반의 python index로 변환합니다.
-    """
+    with open(loop_file, 'r') as file:
+        contact_idx_dict = json.load(file)
+
+    loop_indices = contact_idx_dict['loop_list']
+    masked_chain = contact_idx_dict['masked_chain']
+    first_chain_length = contact_idx_dict['chain_A_len']
     
-    if isinstance(residue_index, torch.Tensor):
-        residue_index = residue_index.tolist()
-    if isinstance(chain_index, torch.Tensor):
-        chain_index = chain_index.tolist()
+    if seed != None:
+        random.seed(seed)
+    loop_index = random.choice(loop_indices) # [start, end]
 
-    # 1. Lookup Table 생성
-    # 구조: {chain_int: {residue_id: python_index, ...}, ...}
-    lookup = defaultdict(dict)
-    
-    for i, (c, r) in enumerate(zip(chain_index, residue_index)):
-        lookup[c][r] = i
-        
-    converted_mask_info = {}
+    return int(loop_index[0]), int(loop_index[1]), masked_chain, first_chain_length
 
-    for chain_str, blocks in mask_info.items():
-        chain_int = du.CHAIN_TO_INT.get(chain_str)
-            
-        chain_map = lookup[chain_int]
-        
-        converted_blocks = []
-        for block in blocks:
-            converted_block = [chain_map[res_id] for res_id in block if res_id in chain_map]
-            if converted_block:
-                converted_blocks.append(converted_block)
-        
-        converted_mask_info[chain_str] = converted_blocks
-        
-    return converted_mask_info
-
-
-def load_general_mask(
-        mask_info_file,
-        residue_index,
-        chain_index, 
-        pseudo_beta,
-        threshold_min_dist,
-        threshold_max_dist,
-        threshold_length,
-        seed=None
-    ):
-
-    # --- [헬퍼 함수 1] 길이 제한 및 랜덤 슬라이싱 ---
-    def get_random_contiguous_segment(indices, limit):
-        if len(indices) > limit:
-            max_start_idx = len(indices) - limit
-            start_idx = random.randint(0, max_start_idx)
-            return indices[start_idx : start_idx + limit]
-        return indices
-
-    # --- [헬퍼 함수 2] 인덱스 리스트를 연속된 구간들로 분리 ---
-    def split_into_contiguous_segments(indices):
-        """
-        [0, 1, 2, 5, 6] -> [[0, 1, 2], [5, 6]]
-        """
-        if len(indices) == 0:
-            return []
-        segments = []
-        current_segment = [indices[0]]
-        for i in range(1, len(indices)):
-            if indices[i] == indices[i-1] + 1:
-                current_segment.append(indices[i])
-            else:
-                segments.append(current_segment)
-                current_segment = [indices[i]]
-        segments.append(current_segment)
-        return segments
-    # ------------------
-
-    # 1. JSON 로드
+def load_monomer_mask(mask_info_file, seq_len, seed=None):
     with open(mask_info_file, 'r') as file:
+<<<<<<< HEAD
         mask_info = json.load(file)
 
     # 2. 인덱스 변환
@@ -376,25 +320,96 @@ def load_general_mask(
     pivot_block = get_random_contiguous_segment(raw_pivot_block, limit=threshold_length)
 
     loop_index_set = set(pivot_block)
+=======
+        loop_indices = json.load(file)
     
-    # 거리 계산을 위해 pivot 좌표 추출
-    pivot_coords = pseudo_beta[pivot_block]    
+    if seed is not None:
+        random.seed(seed)
+    
+    loop_index = random.choice(loop_indices)
 
-    for c_key, blocks in mask_info.items():
-        for block in blocks:
-            target_coords = pseudo_beta[block]
-            
-            # Tensor/Numpy 호환성 처리
-            if isinstance(pivot_coords, torch.Tensor):
-                p_coords = pivot_coords.cpu().numpy()
-                t_coords = target_coords.cpu().numpy()
-            else:
-                p_coords = pivot_coords
-                t_coords = target_coords
+    # 시작과 끝을 clipping
+    start = max(0, int(loop_index[0]))
+    end = min(seq_len - 1, int(loop_index[-1]))
 
-            # 거리 행렬 계산 (Shape: [N_pivot, N_target])
-            dists = cdist(p_coords, t_coords)
+    return start, end
 
+def load_polymer_mask(mask_info_file, select_num=1, seed=None):
+    if seed is not None:
+        random.seed(seed)
+
+    with open(mask_info_file, 'r') as file:
+        interface_indices = json.load(file)
+
+    chain_lengths = interface_indices["chain_lengths"]
+    chain_ids = list(chain_lengths.keys())  # 등장 순서 보장
+
+    # interface_residues에 존재하는 체인 인덱스들만 추출
+    interface_residues = interface_indices["interface_residues"]
+    interface_chain_indices = [
+        idx for idx, residues in interface_residues.items()
+        if residues  # 빈 리스트가 아닌 경우
+    ]
+
+    interface_chains = [
+        chain_ids[int(idx)] for idx in interface_chain_indices
+    ]
+
+    long_chains = [c for c in interface_chains if chain_lengths[c] >= 50]
+
+    if long_chains:
+        selected_chain = random.choice(long_chains)
+    else:
+        selected_chain = max(interface_chains, key=lambda c: chain_lengths[c])
+
+    # 체인 오프셋 계산
+    chain_offsets = {}
+    offset = 0
+    for cid in chain_ids:
+        chain_offsets[cid] = offset
+        offset += chain_lengths[cid]
+
+    start_index = chain_offsets[selected_chain]
+    end_index = start_index + chain_lengths[selected_chain] - 1
+
+    # interface residue 리스트 가져오기
+    chain_index = str(chain_ids.index(selected_chain))  # 등장 순서 기반 인덱싱
+    interface_list = interface_indices["interface_residues"].get(chain_index, [])
+
+    if not interface_list:
+        raise ValueError(f"{mask_info_file}: No interface residues found for chain {selected_chain}")
+
+    if len(interface_list) < select_num:
+        select_num = len(interface_list)
+
+    weights = np.array([len(g) for g in interface_list], dtype=float)
+    weights /= weights.sum()  # 확률로 정규화
+
+    idx = np.random.choice(
+        len(interface_list),
+        size=select_num,
+        replace=False,
+        p=weights
+    )
+
+    interfaces = [interface_list[i] for i in idx]
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
+    
+    # 5. clipping: 선택된 체인의 범위 안에서만 확장
+
+    selected_residues_list = []
+    for interface in interfaces:
+        min_res = max(start_index, interface[0] - 3)
+        max_res = min(end_index, interface[-1] + 3)
+        selected_residues = [res for res in interface if min_res <= res <= max_res]
+
+        if len(selected_residues) > 30:
+            start = random.randint(0, len(selected_residues) - 30)
+            selected_residues = selected_residues[start:start + 30]
+        
+        selected_residues_list.append(selected_residues)
+
+<<<<<<< HEAD
             # Case 1: 블록 전체가 조건 만족 (유지)
             if (np.min(dists) < threshold_min_dist) and (np.max(dists) < threshold_max_dist):
                 selected_residues = get_random_contiguous_segment(block, limit=threshold_length)
@@ -423,12 +438,10 @@ def load_general_mask(
     final_loop_index = sorted(list(loop_index_set))
     L = len(residue_index)
     loop_mask = torch.zeros(L) 
+=======
+    return [(selected_residues[0], selected_residues[-1]) for selected_residues in selected_residues_list] 
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     
-    if final_loop_index:
-        loop_mask[final_loop_index] = 1.0
-    
-    return loop_mask, du.CHAIN_TO_INT.get(selected_chain)
-
 ######################## crop_antigen ########################
 
 def group_numbers(numbers, nan_mask):
@@ -587,6 +600,7 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, includ
     return residue_indices
 
 ######################## crop_general_protein ########################
+<<<<<<< HEAD
 def crop_general_protein(
         trans_1, 
         loop_mask,
@@ -594,20 +608,28 @@ def crop_general_protein(
         max_len, 
         seq_list
         ):  
+=======
+
+def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):  
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)
     residue_indices = None
-    num_loop_residues = torch.sum(loop_mask).item()
 
-    if num_loop_residues <= 10:
-        ratio = 0.5
-    elif num_loop_residues >= 60:
-        ratio = 1.0
+
+    loop_indices = (
+        (loop_mask == 1) & (nan_mask == 1)
+    ).nonzero(as_tuple=True)[0].tolist()
+
+    if torch.sum(loop_mask) < 10:
+        max_len = max_len // 2
+    elif torch.sum(loop_mask) < 15:
+        max_len = (max_len * 3) // 5
+    elif torch.sum(loop_mask) < 20:
+        max_len = (max_len * 4) // 5
     else:
-        ratio = 0.5 + (num_loop_residues - 10) * (0.5 / 50)
-
-    # 3. 새로운 max_len 결정 (정수형 변환)
-    max_len = int(max_len * ratio)        
+        max_len = max_len
+        
     if torch.sum(nan_mask) <= max_len:
         residue_indices = [i for i in range(L) if nan_mask[i]==1]
 
@@ -615,10 +637,6 @@ def crop_general_protein(
         distance_map = get_distance_map(trans_1)
         distance_vectors = []
         
-        loop_indices = (
-            (loop_mask == 1) & (nan_mask == 1)
-        ).nonzero(as_tuple=True)[0].tolist()
-
         for i in loop_indices:
             distance_vectors.append(distance_map[i])
 

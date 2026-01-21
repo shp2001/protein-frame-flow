@@ -13,7 +13,11 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
+<<<<<<< HEAD
 from data.motif_index import get_relpos_input, crop_antigen, load_antibody_mask, load_general_mask, crop_general_protein, provide_anchor, get_ag_hotspot
+=======
+from data.motif_index import get_relpos_input, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor, get_ag_hotspot
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 from data import residue_constants as rc
 
 from itertools import accumulate
@@ -22,7 +26,7 @@ import bisect
 from data import featurizer
 from torch.utils.data import SequentialSampler
 
-def _process_csv_row(processed_file_path):
+def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
@@ -72,6 +76,7 @@ def _process_csv_row(processed_file_path):
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'residue_index': residue_index,
+        'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
         'atom14_gt_exists': chain_feats['atom14_gt_exists'],
         'atom14_gt_positions': chain_feats['atom14_gt_positions'],
@@ -129,15 +134,25 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row):
         path = csv_row['processed_path']
+<<<<<<< HEAD
         complex_id = csv_row['pdb_name']
         processed_row = _process_csv_row(path)
+=======
+        raw_path = csv_row['raw_path']
+        seq_len = csv_row['seq_len']
+        
+        masked_chain = None
+        first_chain_len = None
+
+        scaffold_idx = {}
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
         if csv_row['mode'] == 'ab':
-            scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+<<<<<<< HEAD
             h, l = complex_id.split('_')[1:3]
             processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h), du.CHAIN_TO_INT.get(l)]
             scaffold_mask = load_antibody_mask(
@@ -162,9 +177,18 @@ class BaseDataset(Dataset):
                 ab_chains=processed_row['selected_chains'],
                 pseudo_beta=processed_row['pseudo_beta']
             )
+=======
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
-        if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
+        if csv_row['mode'] == 'general':
+            loop_info_file = csv_row['loop_info_dir']
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=123)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+        
+        if csv_row['mode'] == 'monomer':
             mask_info_file = csv_row['mask_info_file']
+<<<<<<< HEAD
             scaffold_mask, selected_chain = load_general_mask(
                 mask_info_file=mask_info_file, 
                 residue_index=processed_row['residue_index'],
@@ -180,10 +204,66 @@ class BaseDataset(Dataset):
 
         processed_row['loop_mask'] = scaffold_mask
         processed_row['raw_path'] = csv_row['raw_path']
-        processed_row['mode'] = csv_row['mode']
+=======
+            loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=123)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
 
-        return processed_row
+        if csv_row['mode'] == 'polymer':
+            mask_info_file = csv_row['mask_info_file']
+            interfaces = load_polymer_mask(mask_info_file, select_num=3, seed=123)
+
+            for i in range(len(interfaces)):
+                scaffold_idx[f'loop_start_{i}'] = interfaces[i][0]
+                scaffold_idx[f'loop_end_{i}'] = interfaces[i][-1]
+
+        # Large protein files are slow to read. Cache them.
+        use_cache = True
+        if use_cache and path in self._cache:
+            return self._cache[path]
         
+        processed_row = _process_csv_row(path, raw_path, scaffold_idx)
+        processed_row['masked_chain'] = masked_chain
+        processed_row['first_chain_len'] = first_chain_len
+        processed_row['raw_path'] = raw_path
+        processed_row['processed_path'] = path
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
+        processed_row['mode'] = csv_row['mode']
+        if use_cache:
+            self._cache[path] = processed_row
+        
+        return processed_row
+<<<<<<< HEAD
+        
+=======
+    
+    def _sample_scaffold_mask(self, batch, rng):
+        trans_1 = batch['trans_1']
+        num_res = trans_1.shape[0]
+        scaffold_idx = batch['scaffold_idx']
+        scaffold_mask = torch.zeros(num_res)
+
+
+        loop_indices = []
+        loop_num = len(scaffold_idx.keys()) // 2
+        for scf, idx in scaffold_idx.items():
+            loop_indices.append(idx)
+        loop_indices = sorted(loop_indices)
+        for i in range(loop_num):
+            scaffold_mask[loop_indices[2*i]:loop_indices[2*i+1]+1] = 1.0
+
+        return scaffold_mask * batch['res_mask']
+    
+    def setup_inpainting(self, feats, rng):
+        loop_mask = self._sample_scaffold_mask(feats, rng)
+        if 'plddt_mask' in feats:
+            loop_mask = loop_mask * feats['plddt_mask']
+        if torch.sum(loop_mask) < 1:
+            # Should only happen rarely.
+            loop_mask = torch.ones_like(loop_mask)
+        feats['loop_mask'] = loop_mask
+    
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row, sample_id = self._all_sample_ids[row_idx]
@@ -248,13 +328,13 @@ def collate_fn(batch):
                 crop_ab=True,
                 include_ag=include_ag
                 )
-        if mode == 'loop_ppi' or mode == 'polymer' or mode == 'monomer':
+        if mode == 'general' or mode == 'polymer' or mode == 'monomer':
             print(feat['raw_path'])
             cropped_feat['crop_idx'] = crop_general_protein(
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=350,
+                max_len=500,
                 seq_list=feat['chain_seq_list']
                 )
 
@@ -312,10 +392,7 @@ def collate_fn(batch):
         cropped_batch['pseudo_beta'],
         cropped_batch['loop_mask'],
         cropped_batch['diffuse_mask'],
-        threshold=8,
-        masking_ratio=0,        # True Hotspot을 지울(drop) 확률
-        false_hotspot_ratio=0,  # Candidate 영역에서 False Hotspot을 생성할 확률
-        noise_range=0        # False Hotspot 후보군 거리 범위 (threshold ~ threshold + noise_range)
+        threshold=8
     )
     # Center based on motif locations
     motif_mask = 1 - cropped_batch['loop_mask'] # (B, L)

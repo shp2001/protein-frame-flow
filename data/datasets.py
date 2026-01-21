@@ -14,7 +14,37 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
+<<<<<<< HEAD
 from data.motif_index import load_antibody_mask, load_general_mask, crop_antigen, crop_general_protein, provide_anchor
+=======
+from data.motif_index import load_loop_file, load_monomer_mask, load_polymer_mask, crop_antigen, crop_general_protein, provide_anchor
+
+# def _rog_filter(df, quantile):
+#     y_quant = pd.pivot_table(
+#         df,
+#         values='radius_gyration', 
+#         index='modeled_seq_len',
+#         aggfunc=lambda x: np.quantile(x, quantile)
+#     )
+#     x_quant = y_quant.index.to_numpy()
+#     y_quant = y_quant.radius_gyration.to_numpy()
+
+#     # Fit polynomial regressor
+#     poly = PolynomialFeatures(degree=4, include_bias=True)
+#     poly_features = poly.fit_transform(x_quant[:, None])
+#     poly_reg_model = LinearRegression()
+#     poly_reg_model.fit(poly_features, y_quant)
+
+#     # Calculate cutoff for all sequence lengths
+#     max_len = df.modeled_seq_len.max()
+#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
+#     # Add a little more.
+#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
+
+#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
+#     return df[df.radius_gyration < row_rog_cutoffs]
+
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
 def _length_filter(data_csv, min_res, max_res):
     return data_csv[
@@ -55,7 +85,7 @@ def _mask_file_filter(data_csv, max_interface_ratio):
     mask = data_csv.apply(check_ratio, axis=1)
     return data_csv[mask]
 
-def _process_csv_row(processed_file_path):
+def _process_csv_row(processed_file_path, raw_path, scaffold_idx):
     processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
@@ -107,6 +137,7 @@ def _process_csv_row(processed_file_path):
         'res_mask': res_mask,
         'chain_idx': chain_idx,
         'residue_index': residue_index,
+        'scaffold_idx': scaffold_idx,
         'chain_seq_list': chain_seq_list,
         'torsion_angles_sin_cos': chain_feats['torsion_angles_sin_cos'],
         'alt_torsion_angles_sin_cos': chain_feats['alt_torsion_angles_sin_cos'],
@@ -203,15 +234,25 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row, idx):
         path = csv_row['processed_path']
+<<<<<<< HEAD
         complex_id = csv_row['pdb_name']
         processed_row = _process_csv_row(path)
+=======
+        raw_path = csv_row['raw_path']
+        seq_len = csv_row['seq_len']
+        
+        masked_chain = None
+        first_chain_len = None
+
+        scaffold_idx = {}
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
         if csv_row['mode'] == 'ab':
-            scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+<<<<<<< HEAD
             h, l = complex_id.split('_')[1:3]
             processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h), du.CHAIN_TO_INT.get(l)]
             scaffold_mask = load_antibody_mask(
@@ -221,12 +262,15 @@ class BaseDataset(Dataset):
                 ab_chains=processed_row['selected_chains'],
                 pseudo_beta=processed_row['pseudo_beta']
             )
+=======
+
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
         if csv_row['mode'] == 'nanobody':
-            scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
+<<<<<<< HEAD
             h = complex_id.split('_')[1]
             processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h)]
             scaffold_mask = load_antibody_mask(
@@ -236,9 +280,18 @@ class BaseDataset(Dataset):
                 ab_chains=processed_row['selected_chains'],
                 pseudo_beta=processed_row['pseudo_beta']
             )
+=======
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
-        if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
+        if csv_row['mode'] == 'general':
+            loop_info_file = csv_row['loop_info_dir']
+            loop_start, loop_end, masked_chain, first_chain_len = load_loop_file(loop_info_file, seed=self.current_epoch + idx)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+        
+        if csv_row['mode'] == 'monomer':
             mask_info_file = csv_row['mask_info_file']
+<<<<<<< HEAD
             scaffold_mask, selected_chain = load_general_mask(
                 mask_info_file=mask_info_file, 
                 residue_index=processed_row['residue_index'],
@@ -254,10 +307,72 @@ class BaseDataset(Dataset):
 
         processed_row['loop_mask'] = scaffold_mask
         processed_row['raw_path'] = csv_row['raw_path']
+=======
+            loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=self.current_epoch + idx)
+            scaffold_idx[f'loop_start'] = loop_start
+            scaffold_idx[f'loop_end'] = loop_end
+
+        if csv_row['mode'] == 'polymer':
+            mask_info_file = csv_row['mask_info_file']
+            interface_start, interface_end = load_polymer_mask(mask_info_file, seed=self.current_epoch + idx)
+            scaffold_idx[f'loop_start'] = interface_start
+            scaffold_idx[f'loop_end'] = interface_end
+
+        processed_row = _process_csv_row(path, raw_path, scaffold_idx)
+        processed_row['masked_chain'] = masked_chain
+        processed_row['first_chain_len'] = first_chain_len
+        processed_row['raw_path'] = raw_path
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
         processed_row['mode'] = csv_row['mode']
 
         return processed_row
     
+<<<<<<< HEAD
+=======
+    def _sample_scaffold_mask(self, batch, rng):
+        aatype = batch['aatype']
+        mode = batch['mode']
+        num_res = aatype.shape[0]
+        scaffold_idx = batch['scaffold_idx']
+        scaffold_mask = torch.zeros(num_res)
+
+        if mode == 'general' or mode == 'polymer' or mode == 'monomer': # general loop PPI
+            loop_indices = []
+            for scf, idx in scaffold_idx.items():
+                loop_indices.append(idx)
+            loop_indices = sorted(loop_indices)
+
+            scaffold_mask[loop_indices[0]:loop_indices[1]+1] = 1.0
+
+        if mode == 'ab': # antibody-antigen
+            cdr_indices = []
+            for scf, idx in scaffold_idx.items():
+                cdr_indices.append(idx)
+            cdr_indices = sorted(cdr_indices)
+            for i in range(6):
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+
+        if mode == 'nanobody': # Nanobody-antigen
+            cdr_indices = []
+            for scf, idx in scaffold_idx.items():
+                cdr_indices.append(idx)
+            cdr_indices = sorted(cdr_indices)
+            for i in range(3):
+                scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
+
+        return scaffold_mask * batch['res_mask']
+
+    
+    def setup_inpainting(self, feats, rng):
+        loop_mask = self._sample_scaffold_mask(feats, rng)
+        if 'plddt_mask' in feats:
+            loop_mask = loop_mask * feats['plddt_mask']
+        if torch.sum(loop_mask) < 1:
+            # Should only happen rarely.
+            loop_mask = torch.ones_like(loop_mask)
+        feats['loop_mask'] = loop_mask
+
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row = self.csv.iloc[row_idx]
@@ -295,20 +410,30 @@ class BaseDataset(Dataset):
             if len(chain_len_list) == 1:
                 diffuse_mask = feats['loop_mask']
             else:
+<<<<<<< HEAD
                 selected_chains_tensor = torch.tensor(feats['selected_chains'], device=feats['chain_index'].device)         
                 is_selected_chain = torch.isin(feats['chain_index'], selected_chains_tensor)
                 is_loop = (feats['loop_mask'] == 1)
                 diffuse_mask = (is_selected_chain | is_loop).to(torch.long)
             
+=======
+                asym_id = []
+                for i, chain_len in enumerate(chain_len_list):
+                    for _ in range(chain_len):
+                        asym_id.append(i)
+                asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
+                masked_chain = asym_id[feats['loop_mask'] == 1].unique()
+                diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
+>>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
             feats['diffuse_mask'] = diffuse_mask
 
             # create crop_idx for cropping 
             mode = feats['mode']
             
-            if mode not in ['ab', 'nanobody', 'loop_ppi', 'monomer', 'polymer']:
-                raise ValueError('Mode should be one of [ab, nanobody, loop_ppi, monomer, polymer]')
+            if mode not in ['ab', 'nanobody', 'general', 'monomer', 'polymer']:
+                raise ValueError('Mode should be one of [ab, nanobody, general, monomer, polymer]')
 
-            if mode == ['ab', 'nanobody']:
+            if mode == 'ab':
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
                     cdr_mask=feats['loop_mask'],
@@ -318,7 +443,17 @@ class BaseDataset(Dataset):
                     crop_ab=self.dataset_cfg.crop_ab,
                     mode=mode,
                     )
-            if mode in ['loop_ppi', 'polymer', 'monomer']:
+            if mode == 'nanobody':
+                feats['crop_idx'] = crop_antigen(
+                    feats['trans_1'],
+                    cdr_mask=feats['loop_mask'],
+                    nan_mask=feats['res_mask'],
+                    max_len=self.dataset_cfg.ab_max_num_res,
+                    seq_list=feats['chain_seq_list'],
+                    crop_ab=self.dataset_cfg.crop_ab,
+                    mode=mode,
+                    )   
+            if mode == 'general' or mode == 'polymer' or mode == 'monomer':
                 feats['crop_idx'] = crop_general_protein(
                     feats['trans_1'],
                     loop_mask=feats['loop_mask'],
