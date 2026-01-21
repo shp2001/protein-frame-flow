@@ -1,33 +1,37 @@
-W0118 17:40:03.698000 139716637419328 torch/distributed/run.py:757] 
-W0118 17:40:03.698000 139716637419328 torch/distributed/run.py:757] *****************************************
-W0118 17:40:03.698000 139716637419328 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-W0118 17:40:03.698000 139716637419328 torch/distributed/run.py:757] *****************************************
+W0121 02:00:13.600000 139886093408064 torch/distributed/run.py:757] 
+W0121 02:00:13.600000 139886093408064 torch/distributed/run.py:757] *****************************************
+W0121 02:00:13.600000 139886093408064 torch/distributed/run.py:757] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0121 02:00:13.600000 139886093408064 torch/distributed/run.py:757] *****************************************
+Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/4
+Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/4
+Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/4
 wandb: Currently logged in as: cwp2001 (cwp2001-seoul-national-university). Use `wandb login --relogin` to force relogin
-wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.24.0 is available!  To upgrade, please run:
+wandb: wandb version 0.24.0 is available!  To upgrade, please run:
 wandb:  $ pip install wandb --upgrade
 wandb: Tracking run with wandb version 0.15.8
-wandb: Run data is saved locally in ./wandb/run-20260118_174036-opohmbum
+wandb: Run data is saved locally in ./wandb/run-20260121_020458-lqz2ho7j
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run CDRFlow_v2.3.2.2_hotspot_perturb_0.3
-wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2
-wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.3.2/runs/opohmbum
-Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/2
+wandb: Syncing run CDRFlow_v2.4.0_general_stage1
+wandb: ⭐️ View project at https://wandb.ai/cwp2001-seoul-national-university/v2.4.0
+wandb: 🚀 View run at https://wandb.ai/cwp2001-seoul-national-university/v2.4.0/runs/lqz2ho7j
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/lightning_fabric/plugins/environments/slurm.py:168: PossibleUserWarning: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3.10 /home/psh/protein-frame-flow/experiments/train_s ...
   rank_zero_warn(
 GPU available: True (cuda), used: True
 TPU available: False, using: 0 TPU cores
 IPU available: False, using: 0 IPUs
 HPU available: False, using: 0 HPUs
-Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/2
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
 ----------------------------------------------------------------------------------------------------
 distributed_backend=nccl
-All distributed processes registered. Starting with 2 processes
+All distributed processes registered. Starting with 4 processes
 ----------------------------------------------------------------------------------------------------
 
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.2_hotspot_perturb_0.3/2026-01-18_17-40-11 exists and is not empty.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/callbacks/model_checkpoint.py:617: UserWarning: Checkpoint directory /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1/2026-01-21_02-00-21 exists and is not empty.
   rank_zero_warn(f"Checkpoint directory {dirpath} exists and is not empty.")
-LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1]
-LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 2 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 3 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
 
   | Name  | Type      | Params
 ------------------------------------
@@ -39,259 +43,499 @@ LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1]
 915.704   Total estimated model params size (MB)
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/data_connector.py:438: PossibleUserWarning: The dataloader, val_dataloader, does not have many workers which may be a bottleneck. Consider increasing the value of the `num_workers` argument` (try 128 which is the number of cpus on this machine) in the `DataLoader` init to improve performance.
   rank_zero_warn(
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:303: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/protein-frame-flow/data/datasets.py:304: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
   feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 4. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:252: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  scaffold_mask = torch.tensor(scaffold_mask)
+/home/psh/protein-frame-flow/data/datasets.py:275: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
+/home/psh/protein-frame-flow/data/datasets.py:276: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 9. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:212: UserWarning: You called `self.log('train/batch_size', ...)` in your `training_step` but the value needs to be floating point. Converting it to torch.float32.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 2. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 4. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 5. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 3. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 7. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 9. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 8. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 12. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 6. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 3. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 11. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 7. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 19. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 14. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 10. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 16. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 12. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 21. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 20. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 18. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/total_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 17. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/r3_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/distogram_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/auxiliary_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/dist_mat_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/orientaion_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bb_loop_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/sc_loop_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/local_dist_mat_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/all_atom_clash_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/within_clash_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bond_length_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/ca_c_n_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/c_n_ca_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/violation_loss', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/total_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/total_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/total_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/r3_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/r3_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/r3_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/distogram_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/distogram_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/distogram_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/auxiliary_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/auxiliary_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/auxiliary_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/dist_mat_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/dist_mat_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/dist_mat_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/orientaion_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/orientaion_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/orientaion_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bb_loop_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bb_loop_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bb_loop_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/sc_loop_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/sc_loop_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/sc_loop_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/local_dist_mat_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/local_dist_mat_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/local_dist_mat_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/all_atom_clash_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/all_atom_clash_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/all_atom_clash_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/within_clash_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/within_clash_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/within_clash_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bond_length_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bond_length_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bond_length_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/ca_c_n_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/ca_c_n_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/ca_c_n_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/c_n_ca_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/c_n_ca_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/c_n_ca_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/violation_loss t=[0.25,0.50)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/violation_loss t=[0.50,0.75)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/violation_loss t=[0.75,1.00)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/batch_size', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/total_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/r3_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/distogram_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/auxiliary_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/dist_mat_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/orientaion_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bb_loop_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/sc_loop_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/local_dist_mat_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/all_atom_clash_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/within_clash_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/bond_length_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/ca_c_n_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/c_n_ca_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/violation_loss t=[0.00,0.25)', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/connectors/logger_connector/result.py:433: PossibleUserWarning: It is recommended to use `self.log('train/epoch_time_minutes', ..., sync_dist=True)` when logging on epoch level in distributed setting to accumulate the metric across devices.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 10. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 19. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 13. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 14. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
-  warning_cache.warn(
-/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 16. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 8. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
 /home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 15. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
   warning_cache.warn(
+/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/data.py:76: UserWarning: Trying to infer the `batch_size` from an ambiguous collection. The batch size we found is 13. To avoid any miscalculations, use `self.log(..., batch_size=batch_size)`.
+  warning_cache.warn(
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 111, in main
+    exp.train()
+  File "/home/psh/protein-frame-flow/experiments/train_se3_flows.py", line 101, in train
+    trainer.fit(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 532, in fit
+    call._call_and_handle_interrupt(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/call.py", line 42, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/strategies/launchers/subprocess_script.py", line 93, in launch
+    return function(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 571, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 980, in _run
+    results = self._run_stage()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/trainer/trainer.py", line 1023, in _run_stage
+    self.fit_loop.run()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 202, in run
+    self.advance()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fit_loop.py", line 355, in advance
+    self.epoch_loop.run(self._data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 133, in run
+    self.advance(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/training_epoch_loop.py", line 190, in advance
+    batch = next(data_fetcher)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 137, in __next__
+    self._fetch_next_batch(self.dataloader_iter)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/loops/fetchers.py", line 151, in _fetch_next_batch
+    batch = next(iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 285, in __next__
+    out = next(self._iterator)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/pytorch_lightning/utilities/combined_loader.py", line 65, in __next__
+    out[i] = next(self.iterators[i])
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
+    data = self._next_data()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1346, in _next_data
+    return self._process_data(data)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1372, in _process_data
+    data.reraise()
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/_utils.py", line 705, in reraise
+    raise exception
+RuntimeError: Caught RuntimeError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 308, in _worker_loop
+    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/psh/protein-frame-flow/data/datasets.py", line 322, in __getitem__
+    feats['crop_idx'] = crop_general_protein(
+  File "/home/psh/protein-frame-flow/data/motif_index.py", line 625, in crop_general_protein
+    distance_vector, _ = torch.min(distance_vectors, dim=0)
+RuntimeError: stack expects a non-empty TensorList
+
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: 
+wandb: Run history:
+wandb:                                        epoch ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                                     lr-AdamW ███████████▇▇▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▄▄▄▄▃▃▃▂▂▂▁▁
+wandb: train/all_atom_clash_loss t=[0.00,0.25)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/all_atom_clash_loss t=[0.25,0.50)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/all_atom_clash_loss t=[0.50,0.75)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/all_atom_clash_loss t=[0.75,1.00)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:               train/all_atom_clash_loss_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:      train/auxiliary_loss t=[0.00,0.25)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:      train/auxiliary_loss t=[0.25,0.50)_step ▅▆▄▄█▄▃▂█▄▄▂▂▄▃▄▂▂▂▃▃▄▂▂▂▂▂▂▂▂▁▁▂▂▁▂▂▂▁▂
+wandb:      train/auxiliary_loss t=[0.50,0.75)_step ▅▃▃▃█▂▂▁█▁▂▂▁▂▁▅▂▁▁▂▁▁▂▁▁▁▁▁▁▁▁▃▁▁▁▁▁▁▁▁
+wandb:      train/auxiliary_loss t=[0.75,1.00)_step ██████▃███▄█▃▃▁██▁▂▇▂▁▆▁▃▃▂▃▂▁▁▂▂▂▂▂▃▂▃▃
+wandb:                    train/auxiliary_loss_step █▅▁▇▇▅▄▇█▇▅▇▃▄▃▇▄▂▁▅▂▃▂▂▂▂▂▁▂▂▁▃▂▃▂▁▃▁▅▂
+wandb:                        train/batch_size_step ▃▁▁▁▃▂▁▁▂▂▁▁▃▃▁▂▃▁▁▇▃▁▁▇▃▁▁▃▁▂▁▁▃▁█▁▁▁▁▂
+wandb:        train/bb_loop_loss t=[0.00,0.25)_step ▃▄▃▃▄▂▃▄█▄▃▂▅▁▃▃▃▃▃▅▂▂▁▂▂▄▂▂▂▂▄▁▁▃▃▃▂▃▂▂
+wandb:        train/bb_loop_loss t=[0.25,0.50)_step ▆▄▆▅▅▄▄▃█▅▃▃▃▃▂▅▂▃▂▄▃▅▅▃▂▂▃▃▃▃▂▂▂▂▁▂▄▂▂▃
+wandb:        train/bb_loop_loss t=[0.50,0.75)_step ▅▄▃▄▄▂▃▂█▁▂▂▂▂▂▆▁▂▂▃▁▁▂▁▁▂▂▁▁▁▁▅▁▁▂▁▂▁▁▁
+wandb:        train/bb_loop_loss t=[0.75,1.00)_step ▄█▂▇▆▅▂▅▅▅▁▂▂▂▁▇▂▁▂▄▁▁▂▁▂▄▂▂▂▂▁▂▂▁▂▂▂▂▁▂
+wandb:                      train/bb_loop_loss_step ▆█▃▇▅▄▃▇▇▇▂▃▂▃▁▇▂▂▂▅▂▃▂▂▁▂▁▂▁▂▃▂▁▂▂▂▂▃▂▂
+wandb:    train/bond_length_loss t=[0.00,0.25)_step ▂▅▆▇█▅▃▂▂▂▅▂▆▃▃▄▃▄▂▁▂▃▃▁▃▂▃▁▄▂▂▂▂▃▁▂▄▁▁▂
+wandb:    train/bond_length_loss t=[0.25,0.50)_step ▂▇▇▄██▂▁▁▂▄▁▁▃▄▃▃▅▂▁▃▂▄▁▅▁▁▁▄▂▂▃▃▂▁▃▅▅▂▄
+wandb:    train/bond_length_loss t=[0.50,0.75)_step ▂▂▆▃▄▄▂▁▁█▅▂▁▃▃▂▃▄▂▁▃▄▄▁▆▁▄▁▄▆▃▂▄▃▂▄▂▄▂▁
+wandb:    train/bond_length_loss t=[0.75,1.00)_step ▂▄▆▃▅▄▂▂▂▂▄▂▁▃▅▂▃▄▂▁▄▅▄▁▅█▇▃▅▆▂▄▃▄▃▁▂▄▅▄
+wandb:                  train/bond_length_loss_step ▁▅█▂▅▄▁▂▁▁▂▂▁▂▂▂▂▄▂▁▂▁▃▁▃▁▁▁▂▃▃▂▂▂▁▂▁▁▂▂
+wandb:         train/c_n_ca_loss t=[0.00,0.25)_step ▅▄▅▅▄▃▂▂▁▂▅▅▅▅▅▅▄▅▂▁▄▄▆▁█▂▇▁▇▇▆▃▅▅▂▄█▁▂▄
+wandb:         train/c_n_ca_loss t=[0.25,0.50)_step ▂▅▅▂▅▄▂▁▁▂▅▁▁▃▅▄▅▅▃▁▄▂▇▁█▂▂▁▅▃▄▄▅▅▂▆▇█▂▅
+wandb:         train/c_n_ca_loss t=[0.50,0.75)_step ▂▂▆▂▅▂▂▁▁▇▅▂▁▃▄▃▅▅▁▁▄▅▄▁▇▁▄▁▅█▄▃▅▃▂▅▂▃▃▁
+wandb:         train/c_n_ca_loss t=[0.75,1.00)_step ▂▄█▂▄▃▂▁▂▂▆▃▁▃▆▃▃▅▁▁▄▅▂▁▄█▃▂▄▃▂▂▂▂▂▁▁▃▃▃
+wandb:                       train/c_n_ca_loss_step ▂▄▆▂▅▄▂▁▁▂▅▄▁▃▅▃▄▆▃▁▄▂▇▁█▂▂▁▅▆▆▃▅▂▂▅▁▂▂▄
+wandb:         train/ca_c_n_loss t=[0.00,0.25)_step ▅▄▅▅▅▄▂▂▁▂▅▅▅▅▅▆▄▅▃▁▅▅▇▁█▂█▁▇█▆▄▅▆▂▅█▁▂▅
+wandb:         train/ca_c_n_loss t=[0.25,0.50)_step ▂▅▆▂▅▄▂▁▁▂▅▁▁▃▆▄▅▅▃▁▄▂▇▁█▂▂▁▅▃▄▄▅▅▂▅▇▇▂▄
+wandb:         train/ca_c_n_loss t=[0.50,0.75)_step ▂▂▆▂▆▂▂▁▁█▆▃▁▃▅▃▅▅▂▁▄▄▅▁█▂▄▁▅█▄▄▆▄▂▅▂▄▂▁
+wandb:         train/ca_c_n_loss t=[0.75,1.00)_step ▂▄▇▂▅▄▂▁▁▂▅▃▁▃▆▃▄▅▁▁▄▅▃▁▅█▄▃▄▅▂▃▂▂▂▁▁▄▄▃
+wandb:                       train/ca_c_n_loss_step ▂▄▅▂▅▄▂▁▁▂▄▄▁▃▅▃▄▅▃▁▄▂▇▁█▂▂▁▅▇▆▃▅▃▂▅▂▁▃▄
+wandb:       train/dist_mat_loss t=[0.00,0.25)_step █▄▄▃▆▃▃▃█▄▄▅▅▄▅▂▅▃▃▇▅▃▃▂▄▃▆▂▃▄▅▁▃▄▂▄▃▂▂▃
+wandb:       train/dist_mat_loss t=[0.25,0.50)_step ▄▆▄▄▇▄▄▂█▄▄▂▂▄▄▅▃▂▂▅▃▄▃▂▂▂▂▂▂▂▂▂▂▂▁▂▄▂▂▂
+wandb:       train/dist_mat_loss t=[0.50,0.75)_step ▄▃▃▃▇▂▂▁█▂▂▂▁▂▁▅▂▂▁▃▂▁▃▁▂▁▁▁▁▁▁▄▁▁▁▁▁▁▁▁
+wandb:       train/dist_mat_loss t=[0.75,1.00)_step ▅▇▆▄▅▃▃▃█▃▄▂▁▂▂▃▂▂▂▃▂▂▁▁▂▃▂▁▁▁▁▁▁▁▂▂▂▁▁▁
+wandb:                     train/dist_mat_loss_step ▅▅▃▄▆▃▃▃█▃▄▃▂▂▃▄▃▂▂▄▂▃▂▁▂▂▁▂▁▂▄▁▂▁▂▂▁▂▁▂
+wandb:      train/distogram_loss t=[0.00,0.25)_step █▄▅▄▅▃▃▃▃▂▃▃▃▂▂▂▃▂▂▂▂▂▁▁▂▂▂▂▂▂▂▁▁▂▁▂▁▂▁▂
+wandb:      train/distogram_loss t=[0.25,0.50)_step █▄▂▃▄▂▃▂▃▂▃▂▂▂▃▂▂▂▂▂▂▂▁▁▂▂▂▁▂▁▁▂▁▂▁▂▁▁▁▂
+wandb:      train/distogram_loss t=[0.50,0.75)_step █▄▂▃▄▃▃▂▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▁▁▂▁▃▁▂▁▂▁▂▁▁
+wandb:      train/distogram_loss t=[0.75,1.00)_step █▄▃▃▄▂▃▂▃▂▃▂▂▂▃▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂▂▁▂▁▂▂▂
+wandb:                    train/distogram_loss_step █▄▄▃▄▂▃▂▃▂▃▂▂▂▃▂▂▂▂▂▂▂▁▁▂▂▂▁▁▂▂▂▁▂▁▂▁▂▂▂
+wandb: train/local_dist_mat_loss t=[0.00,0.25)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/local_dist_mat_loss t=[0.25,0.50)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/local_dist_mat_loss t=[0.50,0.75)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: train/local_dist_mat_loss t=[0.75,1.00)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:               train/local_dist_mat_loss_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:     train/orientaion_loss t=[0.00,0.25)_step ▄▃▃▂▄▂▂▃█▂▂▂▃▂▃▂▃▂▂▄▃▂▁▁▂▂▂▂▂▁▃▁▁▂▂▂▂▂▁▂
+wandb:     train/orientaion_loss t=[0.25,0.50)_step ▅▆▄▄█▄▃▂█▄▃▂▂▄▂▄▂▂▂▃▃▄▂▂▂▂▂▂▂▂▁▁▂▁▁▂▂▂▁▂
+wandb:     train/orientaion_loss t=[0.50,0.75)_step ▄▃▃▂▇▂▂▁█▁▂▂▁▂▁▅▂▁▁▂▁▁▂▁▁▁▁▁▁▁▁▃▁▁▁▁▁▁▁▁
+wandb:     train/orientaion_loss t=[0.75,1.00)_step ▂▆▂▄█▂▁▂▂▂▁▂▁▁▁▄▂▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                   train/orientaion_loss_step ▃█▂▅▇▂▁▄▄▄▂▃▁▂▁▄▂▁▁▂▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▂▁
+wandb:             train/r3_loss t=[0.00,0.25)_step █▆▆▅█▄▃▃▃▃▅▅▆▄▅▄▅▄▂▁▄▃▃▁▄▂▅▁▄▃▅▂▃▄▂▄▄▂▂▃
+wandb:             train/r3_loss t=[0.25,0.50)_step █▆▅▄▇▃▄▂▃▂▃▁▁▂▃▃▂▂▂▁▂▃▂▂▂▂▁▁▂▂▁▁▂▁▂▁▂▁▂▂
+wandb:             train/r3_loss t=[0.50,0.75)_step █▆▄▃▇▂▂▂▄▁▂▃▁▂▂▄▂▁▂▁▂▁▃▂▁▂▁▂▁▁▁▃▁▂▂▁▂▁▂▂
+wandb:             train/r3_loss t=[0.75,1.00)_step ▄▇▃▅█▄▂▄▂▃▂▃▂▂▁▄▃▁▂▂▁▁▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂
+wandb:                           train/r3_loss_step ▇█▃▆█▄▃▆▃▅▃▆▂▃▂▅▃▂▁▂▂▂▂▂▁▂▁▁▁▂▃▃▁▃▂▂▃▁▅▂
+wandb:        train/sc_loop_loss t=[0.00,0.25)_step ▃▄▃▃▄▂▄▃█▄▃▃▅▁▄▃▃▃▃▅▂▂▁▃▂▃▂▂▃▂▄▂▁▃▂▃▂▃▂▂
+wandb:        train/sc_loop_loss t=[0.25,0.50)_step ▆▄▆▅▄▃▄▃█▅▃▃▃▃▂▅▃▃▂▃▃▄▅▃▂▃▂▃▂▃▂▂▂▂▁▂▄▂▂▃
+wandb:        train/sc_loop_loss t=[0.50,0.75)_step ▅▄▃▃▃▂▂▁█▁▂▂▂▂▂▆▂▂▁▂▁▁▂▁▂▂▂▂▁▁▁▅▁▁▁▁▂▁▁▂
+wandb:        train/sc_loop_loss t=[0.75,1.00)_step ▄█▂█▆▆▂▅▅▆▁▃▃▂▁▇▃▁▂▃▁▁▃▂▂▃▃▃▂▃▂▂▂▂▂▂▃▃▂▂
+wandb:                      train/sc_loop_loss_step ▆█▃▇▅▅▃▇▇█▂▅▂▃▂▆▃▂▂▄▂▂▂▂▁▂▁▂▁▂▃▃▁▃▂▂▃▂▄▂
+wandb:          train/total_loss t=[0.00,0.25)_step █▆▆▅█▄▃▃▃▃▅▅▆▄▅▃▅▄▂▁▄▃▃▁▃▂▅▁▃▃▄▂▂▄▂▄▃▂▁▃
+wandb:          train/total_loss t=[0.25,0.50)_step ▅▆▄▄█▄▃▂█▄▄▂▂▄▃▅▂▂▂▃▃▄▂▂▂▂▂▂▂▂▁▁▂▁▁▂▂▂▁▂
+wandb:          train/total_loss t=[0.50,0.75)_step ▅▃▃▃█▂▂▁█▁▂▂▁▂▁▅▂▁▁▂▁▁▂▁▁▁▁▁▁▁▁▄▁▁▁▁▁▁▁▁
+wandb:          train/total_loss t=[0.75,1.00)_step ▇█▇▇█▇▂▇▆▇▃▇▃▃▁▇▇▁▂▅▂▁▅▁▃▃▂▂▂▂▁▂▂▂▂▂▃▂▃▂
+wandb:                        train/total_loss_step █▅▁▇▇▅▄▇▇▇▅▇▃▄▃▇▄▂▁▅▂▃▂▂▂▂▂▁▂▂▁▃▂▃▂▁▃▁▅▂
+wandb:      train/violation_loss t=[0.00,0.25)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:      train/violation_loss t=[0.25,0.50)_step ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:      train/violation_loss t=[0.50,0.75)_step ▂▂▆▃▅▃▂▁▁█▆▂▁▃▄▂▄▄▂▁▄▄▄▁▇▂▄▁▄▇▄▃▄▃▂▄▂▄▂▁
+wandb:      train/violation_loss t=[0.75,1.00)_step ▆▄▅▄█▃▂▂▂▄▄▄▂▃▄▄▄▄▁▁▄▃▄▁▅█▇▄▅▇▂▅▃▄▁▁▂▄▄▄
+wandb:                    train/violation_loss_step ▅▃▁▄▄▂▃▄▂▄▄▄▂▄▄▃▄▁▁▃▃▁▁▂▂▁▁▁▄▅▁▅▂▅▂▃▃▁█▃
+wandb:   train/within_clash_loss t=[0.00,0.25)_step ▃▅█▅▆▅▄▃▃▂▂▂▃▃▃▂▂▂▂▁▁▁▂▂▂▂▁▂▃▁▂▃▁▄▂▁▄▃▁▂
+wandb:   train/within_clash_loss t=[0.25,0.50)_step ▆▆▇▅▅█▃▂▂▂▂▂▂▂▃▂▂▃▂▂▂▃▂▂▂▁▂▂▂▁▂▃▂▁▃▂▁▁▂▃
+wandb:   train/within_clash_loss t=[0.50,0.75)_step █▅▅▃▅▃▂▂▄▂▂▃▂▂▂▄▃▂▂▁▂▂▃▂▂▂▁▁▁▂▂▃▁▃▂▁▃▂▃▂
+wandb:   train/within_clash_loss t=[0.75,1.00)_step █▄▂▅█▂▄▄▃▆▂▅▄▃▂▆▅▂▂▂▃▁▅▃▄▄▅▄▄▆▃▅▃▄▂▂▃▄▄▃
+wandb:                 train/within_clash_loss_step ▃▄█▂▃▄▂▃▂▂▂▂▁▂▂▂▂▂▂▂▁▂▂▂▁▁▁▁▁▂▂▂▁▂▂▁▂▃▂▂
+wandb:                          trainer/global_step ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇███
+wandb: 
+wandb: Run summary:
+wandb:                                        epoch 0
+wandb:                                     lr-AdamW 0.001
+wandb: train/all_atom_clash_loss t=[0.00,0.25)_step 0.0
+wandb: train/all_atom_clash_loss t=[0.25,0.50)_step 0.0
+wandb: train/all_atom_clash_loss t=[0.50,0.75)_step 0.0
+wandb: train/all_atom_clash_loss t=[0.75,1.00)_step 0.0
+wandb:               train/all_atom_clash_loss_step 0.0
+wandb:      train/auxiliary_loss t=[0.00,0.25)_step 0.0
+wandb:      train/auxiliary_loss t=[0.25,0.50)_step 1.71947
+wandb:      train/auxiliary_loss t=[0.50,0.75)_step 1.9838
+wandb:      train/auxiliary_loss t=[0.75,1.00)_step 9.63295
+wandb:                    train/auxiliary_loss_step 0.85974
+wandb:                        train/batch_size_step 2.0
+wandb:        train/bb_loop_loss t=[0.00,0.25)_step 0.58126
+wandb:        train/bb_loop_loss t=[0.25,0.50)_step 0.23205
+wandb:        train/bb_loop_loss t=[0.50,0.75)_step 0.2621
+wandb:        train/bb_loop_loss t=[0.75,1.00)_step 0.51093
+wandb:                      train/bb_loop_loss_step 0.40665
+wandb:    train/bond_length_loss t=[0.00,0.25)_step 1.9222
+wandb:    train/bond_length_loss t=[0.25,0.50)_step 0.93827
+wandb:    train/bond_length_loss t=[0.50,0.75)_step 1.04009
+wandb:    train/bond_length_loss t=[0.75,1.00)_step 0.73066
+wandb:                  train/bond_length_loss_step 1.43024
+wandb:         train/c_n_ca_loss t=[0.00,0.25)_step 0.3418
+wandb:         train/c_n_ca_loss t=[0.25,0.50)_step 0.31254
+wandb:         train/c_n_ca_loss t=[0.50,0.75)_step 0.30052
+wandb:         train/c_n_ca_loss t=[0.75,1.00)_step 0.10992
+wandb:                       train/c_n_ca_loss_step 0.32717
+wandb:         train/ca_c_n_loss t=[0.00,0.25)_step 0.39949
+wandb:         train/ca_c_n_loss t=[0.25,0.50)_step 0.36146
+wandb:         train/ca_c_n_loss t=[0.50,0.75)_step 0.33848
+wandb:         train/ca_c_n_loss t=[0.75,1.00)_step 0.17834
+wandb:                       train/ca_c_n_loss_step 0.38048
+wandb:       train/dist_mat_loss t=[0.00,0.25)_step 1.25497
+wandb:       train/dist_mat_loss t=[0.25,0.50)_step 0.41117
+wandb:       train/dist_mat_loss t=[0.50,0.75)_step 0.46752
+wandb:       train/dist_mat_loss t=[0.75,1.00)_step 0.32598
+wandb:                     train/dist_mat_loss_step 0.83307
+wandb:      train/distogram_loss t=[0.00,0.25)_step 4.38531
+wandb:      train/distogram_loss t=[0.25,0.50)_step 4.38531
+wandb:      train/distogram_loss t=[0.50,0.75)_step 4.05991
+wandb:      train/distogram_loss t=[0.75,1.00)_step 4.51579
+wandb:                    train/distogram_loss_step 4.38531
+wandb: train/local_dist_mat_loss t=[0.00,0.25)_step 0.0
+wandb: train/local_dist_mat_loss t=[0.25,0.50)_step 0.0
+wandb: train/local_dist_mat_loss t=[0.50,0.75)_step 0.0
+wandb: train/local_dist_mat_loss t=[0.75,1.00)_step 0.0
+wandb:               train/local_dist_mat_loss_step 0.0
+wandb:     train/orientaion_loss t=[0.00,0.25)_step 4.10156
+wandb:     train/orientaion_loss t=[0.25,0.50)_step 0.59614
+wandb:     train/orientaion_loss t=[0.50,0.75)_step 0.6465
+wandb:     train/orientaion_loss t=[0.75,1.00)_step 4.4081
+wandb:                   train/orientaion_loss_step 2.34885
+wandb:             train/r3_loss t=[0.00,0.25)_step 1.51926
+wandb:             train/r3_loss t=[0.25,0.50)_step 0.84142
+wandb:             train/r3_loss t=[0.50,0.75)_step 1.01818
+wandb:             train/r3_loss t=[0.75,1.00)_step 2.82159
+wandb:                           train/r3_loss_step 1.18034
+wandb:        train/sc_loop_loss t=[0.00,0.25)_step 0.60496
+wandb:        train/sc_loop_loss t=[0.25,0.50)_step 0.3116
+wandb:        train/sc_loop_loss t=[0.50,0.75)_step 0.3689
+wandb:        train/sc_loop_loss t=[0.75,1.00)_step 0.94119
+wandb:                      train/sc_loop_loss_step 0.45828
+wandb:          train/total_loss t=[0.00,0.25)_step 1.73853
+wandb:          train/total_loss t=[0.25,0.50)_step 2.78016
+wandb:          train/total_loss t=[0.50,0.75)_step 3.37289
+wandb:          train/total_loss t=[0.75,1.00)_step 13.02104
+wandb:                        train/total_loss_step 2.25934
+wandb:      train/violation_loss t=[0.00,0.25)_step 0.0
+wandb:      train/violation_loss t=[0.25,0.50)_step 0.0
+wandb:      train/violation_loss t=[0.50,0.75)_step 0.16791
+wandb:      train/violation_loss t=[0.75,1.00)_step 0.3407
+wandb:                    train/violation_loss_step 0.0
+wandb:   train/within_clash_loss t=[0.00,0.25)_step 19.9033
+wandb:   train/within_clash_loss t=[0.25,0.50)_step 14.63612
+wandb:   train/within_clash_loss t=[0.50,0.75)_step 15.34084
+wandb:   train/within_clash_loss t=[0.75,1.00)_step 23.88123
+wandb:                 train/within_clash_loss_step 17.26971
+wandb:                          trainer/global_step 485
+wandb: 
+wandb: 🚀 View run CDRFlow_v2.4.0_general_stage1 at: https://wandb.ai/cwp2001-seoul-national-university/v2.4.0/runs/lqz2ho7j
+wandb: ️⚡ View job at https://wandb.ai/cwp2001-seoul-national-university/v2.4.0/jobs/QXJ0aWZhY3RDb2xsZWN0aW9uOjgzMzE0MTU2Mw==/version_details/v2
+wandb: Synced 6 W&B file(s), 0 media file(s), 2 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260121_020458-lqz2ho7j/logs
+W0121 02:21:35.063000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 3763273 closing signal SIGTERM
+W0121 02:21:35.063000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 3763274 closing signal SIGTERM
+W0121 02:21:35.064000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:851] Sending process 3763275 closing signal SIGTERM
+W0121 02:22:05.064000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:868] Unable to shutdown process 3763273 via Signals.SIGTERM, forcefully exiting via Signals.SIGKILL
+W0121 02:22:05.286000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:868] Unable to shutdown process 3763274 via Signals.SIGTERM, forcefully exiting via Signals.SIGKILL
+W0121 02:22:05.494000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:868] Unable to shutdown process 3763275 via Signals.SIGTERM, forcefully exiting via Signals.SIGKILL
+E0121 02:22:05.786000 139886093408064 torch/distributed/elastic/multiprocessing/api.py:826] failed (exitcode: 1) local_rank: 0 (pid: 3763272) of binary: /home/psh/mambaforge/envs/fm/bin/python3.10
+Traceback (most recent call last):
+  File "/home/psh/mambaforge/envs/fm/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 347, in wrapper
+    return f(*args, **kwargs)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/run.py", line 879, in main
+    run(args)
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/run.py", line 870, in run
+    elastic_launch(
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 132, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/home/psh/mambaforge/envs/fm/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 263, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+/home/psh/protein-frame-flow/experiments/train_se3_flows.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-01-21_02:21:35
+  host      : gpu05.localdomain
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 3763272)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

@@ -1,5 +1,6 @@
 import abc
 import numpy as np
+import os
 import pandas as pd
 import logging
 import torch
@@ -13,33 +14,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import load_general_mask, crop_antigen, crop_general_protein, provide_anchor
-
-# def _rog_filter(df, quantile):
-#     y_quant = pd.pivot_table(
-#         df,
-#         values='radius_gyration', 
-#         index='modeled_seq_len',
-#         aggfunc=lambda x: np.quantile(x, quantile)
-#     )
-#     x_quant = y_quant.index.to_numpy()
-#     y_quant = y_quant.radius_gyration.to_numpy()
-
-#     # Fit polynomial regressor
-#     poly = PolynomialFeatures(degree=4, include_bias=True)
-#     poly_features = poly.fit_transform(x_quant[:, None])
-#     poly_reg_model = LinearRegression()
-#     poly_reg_model.fit(poly_features, y_quant)
-
-#     # Calculate cutoff for all sequence lengths
-#     max_len = df.modeled_seq_len.max()
-#     pred_poly_features = poly.fit_transform(np.arange(max_len)[:, None])
-#     # Add a little more.
-#     pred_y = poly_reg_model.predict(pred_poly_features) + 0.1
-
-#     row_rog_cutoffs = df.modeled_seq_len.map(lambda x: pred_y[x-1])
-#     return df[df.radius_gyration < row_rog_cutoffs]
-
+from data.motif_index import load_antibody_mask, load_general_mask, crop_antigen, crop_general_protein, provide_anchor
 
 def _length_filter(data_csv, min_res, max_res):
     return data_csv[
@@ -47,6 +22,38 @@ def _length_filter(data_csv, min_res, max_res):
         & (data_csv.seq_len <= max_res)
     ]
 
+def _chain_num_filter(data_csv, max_chain):
+    return data_csv[data_csv.num_chains <= max_chain]
+
+def _mask_file_filter(data_csv, max_interface_ratio):
+    def check_ratio(row):
+        file_path = row["mask_info_file"]
+        seq_len = row["seq_len"]
+        
+        # seq_len이 0이면 계산 불가하므로 False 반환 (데이터 오류)
+        if seq_len == 0:
+            return False
+
+        # 파일 경로가 실제로 존재하는지 확인 (선택 사항)
+        if not os.path.exists(file_path):
+            return False
+            
+        with open(file_path, 'r') as f:
+            mask_info = json.load(f)
+        
+        total_elements = 0
+        for v in mask_info.values():
+            # v: 이중 리스트
+            for inner in v:
+                total_elements += len(inner)
+        
+        ratio = total_elements / seq_len
+        
+        # max_interface_ratio보다 작아야 포함
+        return ratio < max_interface_ratio
+
+    mask = data_csv.apply(check_ratio, axis=1)
+    return data_csv[mask]
 
 def _process_csv_row(processed_file_path):
     processed_feats = du.read_pkl(processed_file_path)
@@ -196,6 +203,7 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row, idx):
         path = csv_row['processed_path']
+        complex_id = csv_row['pdb_name']
         processed_row = _process_csv_row(path)
 
         if csv_row['mode'] == 'ab':
@@ -204,15 +212,30 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            processed_row['scaffold_idx'] = scaffold_idx
-
+            h, l = complex_id.split('_')[1:3]
+            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h), du.CHAIN_TO_INT.get(l)]
+            scaffold_mask = load_antibody_mask(
+                scaffold_idx=scaffold_idx,
+                chain_index=processed_row['chain_index'],
+                residue_index=processed_row['residue_index'],
+                ab_chains=processed_row['selected_chains'],
+                pseudo_beta=processed_row['pseudo_beta']
+            )
         if csv_row['mode'] == 'nanobody':
             scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            processed_row['scaffold_idx'] = scaffold_idx
+            h = complex_id.split('_')[1]
+            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h)]
+            scaffold_mask = load_antibody_mask(
+                scaffold_idx=scaffold_idx,
+                chain_index=processed_row['chain_index'],
+                residue_index=processed_row['residue_index'],
+                ab_chains=processed_row['selected_chains'],
+                pseudo_beta=processed_row['pseudo_beta']
+            )
 
         if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
             mask_info_file = csv_row['mask_info_file']
@@ -227,46 +250,14 @@ class BaseDataset(Dataset):
                 seed=self.current_epoch + idx
                 )
             scaffold_mask = torch.tensor(scaffold_mask)
-            processed_row['scaffold_mask'] = scaffold_mask
-            processed_row['selected_chain'] = selected_chain
+            processed_row['selected_chains'] = [selected_chain]
 
+        processed_row['loop_mask'] = scaffold_mask
         processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
 
         return processed_row
     
-    def _sample_scaffold_mask(self, batch, rng):
-        aatype = batch['aatype']
-        mode = batch['mode']
-        num_res = aatype.shape[0]
-
-        if 'scaffold_mask' in batch:
-            return batch['scaffold_mask'] * batch['res_mask']
-
-        else:
-            scaffold_idx = batch['scaffold_idx']
-            scaffold_mask = torch.zeros(num_res)
-
-            if mode in ['ab', 'nanobody']:
-                cdr_indices = []
-                for scf, idx in scaffold_idx.items():
-                    cdr_indices.append(idx)
-                cdr_indices = sorted(cdr_indices)
-                for i in range(len(cdr_indices)//2):
-                    scaffold_mask[cdr_indices[2*i]:cdr_indices[2*i+1]+1] = 1.0
-
-            return scaffold_mask * batch['res_mask']
-
-    
-    def setup_inpainting(self, feats, rng):
-        loop_mask = self._sample_scaffold_mask(feats, rng)
-        if 'plddt_mask' in feats:
-            loop_mask = loop_mask * feats['plddt_mask']
-        if torch.sum(loop_mask) < 1:
-            # Should only happen rarely.
-            loop_mask = torch.ones_like(loop_mask)
-        feats['loop_mask'] = loop_mask
-
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row = self.csv.iloc[row_idx]
@@ -284,9 +275,6 @@ class BaseDataset(Dataset):
             feats['rotmats_1'] = torch.tensor(rigids_1.get_rots().get_rot_mats(), device=rigids_1.device)
             feats['trans_1'] = torch.tensor(rigids_1.get_trans(), device=rigids_1.device)
 
-            rng = self._rng if self.is_training else np.random.default_rng(seed=123)
-            self.setup_inpainting(feats, rng)
-
             # modify loop mask (if it is terminal mask, exclude end residue to provide an anchor)
             feats['loop_mask'] = provide_anchor(
                 feats['loop_mask'], 
@@ -295,22 +283,23 @@ class BaseDataset(Dataset):
                 feats['mode']
                 ).to(torch.long)
             
+            if (feats['loop_mask'] == 0).all():
+                print(csv_row['mask_info_file'])
+
             # make diffuse_mask
             # if sample is monomer -> diffuse_mask = loop_mask
             # if sample is polymer -> diffuse_mask is whole chains which have masked loops
              
             chain_len_list = [len(seq) for seq in feats['chain_seq_list']]
+
             if len(chain_len_list) == 1:
                 diffuse_mask = feats['loop_mask']
             else:
-                asym_id = []
-                for i, chain_len in enumerate(chain_len_list):
-                    for _ in range(chain_len):
-                        asym_id.append(i)
-                asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
-                masked_chain = asym_id[feats['loop_mask'] == 1].unique()
-                diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
-
+                selected_chains_tensor = torch.tensor(feats['selected_chains'], device=feats['chain_index'].device)         
+                is_selected_chain = torch.isin(feats['chain_index'], selected_chains_tensor)
+                is_loop = (feats['loop_mask'] == 1)
+                diffuse_mask = (is_selected_chain | is_loop).to(torch.long)
+            
             feats['diffuse_mask'] = diffuse_mask
 
             # create crop_idx for cropping 
@@ -346,19 +335,6 @@ class BaseDataset(Dataset):
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
 
         return feats
-
-
-class ScopeDataset(BaseDataset):
-
-    def _filter_metadata(self, raw_csv):
-        filter_cfg = self.dataset_cfg.filter
-        data_csv = _length_filter(
-            raw_csv,
-            filter_cfg.min_num_res,
-            filter_cfg.max_num_res
-        )
-        data_csv['oligomeric_detail'] = 'monomeric'
-        return data_csv
 
 
 class PdbDataset(BaseDataset):
@@ -406,13 +382,23 @@ class PdbDataset(BaseDataset):
     def set_current_epoch(self, epoch):
         self.current_epoch = epoch
 
-    def _filter_metadata(self, raw_csv):
+    def _filter_metadata(self, data_csv):
         """Filter metadata."""
         filter_cfg = self.dataset_cfg.filter
-        data_csv = raw_csv
 
-        # if self._is_training:
         data_csv = _length_filter(
-            data_csv, filter_cfg.min_num_res, filter_cfg.max_num_res)
-
+            data_csv, 
+            filter_cfg.min_num_res, 
+            filter_cfg.max_num_res
+            )
+        data_csv = _chain_num_filter(
+            data_csv,
+            filter_cfg.max_chain_num
+        )
+        if "mask_info_file" in data_csv:
+            data_csv = _mask_file_filter(
+                data_csv,
+                filter_cfg.max_interface_ratio
+            )
+            
         return data_csv

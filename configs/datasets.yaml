@@ -10,43 +10,38 @@ shared:
   max_motif_percent: 1
 
   # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
-  mode: ab
-  loop_dir: /home/psh/data/loop_ppi/contact_index_7_to_24_tol5_wo_edge
-  
-  # masking scheduling 
-  init_masking_prob: 0.3 
-  masking_increase_ratio: 0.02
+  mode: general
 
-scope_dataset:
-  seed: ${shared.seed}
-  csv_path: ./metadata/scope_metadata.csv
-  max_cache_size: ${shared.max_cache_size}
-  cache_num_res: 0
-  add_plddt_mask: False
-  max_eval_length: ${shared.max_eval_length}
-  inpainting_percent: 1.0
+# scope_dataset:
+#   seed: ${shared.seed}
+#   csv_path: ./metadata/scope_metadata.csv
+#   max_cache_size: ${shared.max_cache_size}
+#   cache_num_res: 0
+#   add_plddt_mask: False
+#   max_eval_length: ${shared.max_eval_length}
+#   inpainting_percent: 1.0
 
-  # Eval parameters
-  samples_per_eval_length: ${shared.samples_per_eval_length}
-  num_eval_lengths: ${shared.num_eval_lengths}
+#   # Eval parameters
+#   samples_per_eval_length: ${shared.samples_per_eval_length}
+#   num_eval_lengths: ${shared.num_eval_lengths}
 
-  # Filtering
-  filter:
-    max_num_res: 200
-    min_num_res: 60
+#   # Filtering
+#   filter:
+#     max_num_res: 200
+#     min_num_res: 60
 
-  # Scaffolding
-  min_motif_percent: ${shared.min_motif_percent}
-  max_motif_percent: ${shared.max_motif_percent} 
+#   # Scaffolding
+#   min_motif_percent: ${shared.min_motif_percent}
+#   max_motif_percent: ${shared.max_motif_percent} 
 
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/train/merged_metadata_wt_nano.csv
-  valid_csv_path: /home/psh/data/valid/meta/metadata.csv
+  train_csv_path: /home/psh/data/general_v2/meta/metadata_train.csv
+  valid_csv_path: /home/psh/data/general_v2/meta/metadata_valid.csv
 
-  train_cluster_path: /home/psh/data/train/wantigen_70_loop_final_train.json
-  valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
+  train_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
+  valid_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
 
 
   max_cache_size: ${shared.max_cache_size}
@@ -65,12 +60,14 @@ pdb_dataset:
   ab_threshold: 40
   general_threshold: 40
   ab_max_num_res: 350
-  general_max_num_res: 256
+  general_max_num_res: 350
   
   # Filtering
   filter:
     max_num_res: 2000
     min_num_res: 100
+    max_chain_num: 50
+    max_interface_ratio: 0.8
     max_coil_percent: 1.0
     rog_quantile: 1.0
     # oligomeric: ['monomeric', 'heteromer']

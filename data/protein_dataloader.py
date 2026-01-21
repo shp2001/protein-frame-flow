@@ -38,7 +38,7 @@ class ProteinData(LightningDataModule):
         cropped_batch = []
         for i, feat in enumerate(batch):
             cropped_feat = {}
-            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
+            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'mode', 'selected_chains']
             for key in feat.keys():
                 if key not in not_crop_key:
                     cropped_feat[key] = feat[key][feat['crop_idx']]
@@ -106,16 +106,16 @@ class ProteinData(LightningDataModule):
         cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
         
         # get interface index 
-        if cropped_batch['mode'] not in ["monomer", "polymer"]:
-            cdr_residues, neighbor_indices, anchor_residues = au.get_cdr_and_neighbors(
-                cropped_batch['atom14_gt_positions'],
-                cropped_batch['atom14_gt_exists'],
-                cropped_batch['loop_mask'][0],
-                cropped_batch['mode']
-            )
-            cropped_batch['cdr_residues'] = cdr_residues
-            cropped_batch['neighbor_indices'] = neighbor_indices
-            cropped_batch['anchor_residues'] = anchor_residues
+        # if cropped_batch['mode'] not in ["monomer", "polymer"]:
+        #     cdr_residues, neighbor_indices, anchor_residues = au.get_cdr_and_neighbors(
+        #         cropped_batch['atom14_gt_positions'],
+        #         cropped_batch['atom14_gt_exists'],
+        #         cropped_batch['loop_mask'][0],
+        #         cropped_batch['mode']
+        #     )
+        #     cropped_batch['cdr_residues'] = cdr_residues
+        #     cropped_batch['neighbor_indices'] = neighbor_indices
+        #     cropped_batch['anchor_residues'] = anchor_residues
 
         # create atom diffuse_mask 
         atom_diffuse_mask = cropped_batch['atom14_gt_exists'].clone() # (B, L, 14)
@@ -208,14 +208,14 @@ class LengthBatcher:
             )
             if len(monomer_df) > cluster_sample.shape[0]:
                 monomer_sample = monomer_sample.sample(
-                    len(cluster_sample), random_state=random_seed, replace=False
+                    len(cluster_sample)//2, random_state=random_seed, replace=False
                 )
                 cluster_sample = pd.concat([cluster_sample, monomer_sample])
                  
             # stage 2
-            general_df = self._data_csv[self._data_csv['mode'] == 'general'] 
+            general_df = self._data_csv[self._data_csv['mode'] == 'loop_ppi'] 
             if len(general_df) > cluster_sample.shape[0]: 
-                general_sample = self._data_csv[self._data_csv['mode'] == 'general'].sample(
+                general_sample = self._data_csv[self._data_csv['mode'] == 'loop_ppi'].sample(
                     cluster_sample.shape[0], random_state=random_seed, replace=False
                 )
                 cluster_sample = pd.concat([cluster_sample, general_sample])
@@ -246,7 +246,7 @@ class LengthBatcher:
             seq_len = row['seq_len']
             if row['mode'] in ['ab', 'nanobody'] and seq_len > self._sampler_cfg.ab_max_num_res:
                 seq_len = self._sampler_cfg.ab_max_num_res
-            elif row['mode'] in ['general', 'polymer', 'monomer'] and seq_len > self._sampler_cfg.general_max_num_res:
+            elif row['mode'] in ['loop_ppi', 'polymer', 'monomer'] and seq_len > self._sampler_cfg.general_max_num_res:
                 seq_len = self._sampler_cfg.general_max_num_res
  
             max_batch_size = max(1, min(

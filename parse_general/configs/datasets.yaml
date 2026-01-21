@@ -10,7 +10,7 @@ shared:
   max_motif_percent: 1
 
   # General Loop PPI dataset or Antibody Dataset or Nanobody Dataset
-  masking_dir: /home/psh/data/general/masking_index
+  masking_dir: /home/psh/data/general_v2/mask_index
   
 
 scope_dataset:
