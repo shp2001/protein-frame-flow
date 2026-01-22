@@ -324,7 +324,6 @@ class BaseDataset(Dataset):
                     loop_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.general_max_num_res,
-                    seq_list=feats['chain_seq_list'],
                     )
 
         else:

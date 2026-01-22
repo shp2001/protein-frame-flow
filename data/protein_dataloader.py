@@ -136,11 +136,12 @@ class ProteinData(LightningDataModule):
                 metadata_csv=self._train_dataset.csv,
                 rank=rank,
                 num_replicas=num_replicas,
+                drop_last=True,
             ),
             num_workers=self.loader_cfg.num_workers,
-            prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
-            pin_memory=False,
-            persistent_workers=True if self.loader_cfg.num_workers > 0 else False,
+            prefetch_factor=2,
+            pin_memory=True,
+            persistent_workers=True,
             collate_fn=self.collate_fn,
         )
 
@@ -159,11 +160,10 @@ class ProteinData(LightningDataModule):
             self._predict_dataset,
             sampler=DistributedSampler(self._predict_dataset, shuffle=False),
             num_workers=self.loader_cfg.num_workers,
-            prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
+            prefetch_factor=2,
             persistent_workers=True,
             collate_fn=self.collate_fn,
         )
-
 
 class LengthBatcher:
     def __init__(self, 
@@ -173,7 +173,8 @@ class LengthBatcher:
                  seed=123, 
                  shuffle=True,
                  num_replicas=None,
-                 rank=None):
+                 rank=None,
+                 drop_last=False):
         super().__init__()
         self._log = logging.getLogger(__name__)
 
@@ -192,6 +193,7 @@ class LengthBatcher:
         self.seed = seed
         self.shuffle = shuffle
         self.epoch = 0
+        self.drop_last = drop_last
         self.max_batch_size = self._sampler_cfg.max_batch_size
         
 
@@ -233,6 +235,14 @@ class LengthBatcher:
             new_order = torch.randperm(len(indices), generator=rng).tolist()
             indices = [indices[i] for i in new_order]
 
+        # --- [변경 3: drop_last 로직 추가] ---
+        # GPU 개수로 딱 나누어 떨어지게 전체 길이를 잘라냅니다.
+        if self.drop_last and len(indices) % self.num_replicas != 0:
+            num_samples = len(indices) // self.num_replicas * self.num_replicas
+            indices = indices[:num_samples]
+            
+        # ----------------------------------
+
         # rank 별로 분할 
         if len(self._data_csv) > self.num_replicas:
             replica_csv = self._data_csv.iloc[indices[self.rank::self.num_replicas]]
@@ -263,7 +273,6 @@ class LengthBatcher:
 
     def _create_batches(self):
         # Make sure all replicas have the same number of batches Otherwise leads to bugs.
-        # See bugs with shuffling https://github.com/Lightning-AI/lightning/issues/10947
         self.sample_order = []
         self.sample_order.extend(self._replica_epoch_batches())
 

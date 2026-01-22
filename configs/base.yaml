@@ -12,7 +12,7 @@ data:
   dataset: pdb
 
   loader:
-    num_workers: 6
+    num_workers: 4
     prefetch_factor: 10
 
   hotspot:
@@ -102,7 +102,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 4
-  warm_start: null
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1/2026-01-22_01-23-36/last.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -183,7 +183,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/h3_trans_loss
+    monitor: valid/trans_loop_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

@@ -74,10 +74,10 @@ class Experiment:
             log.info(f"Loading weights from checkpoint: {self._exp_cfg.warm_start}")
             # Load the model with weights from the checkpoint.
             # The optimizer and scheduler will be re-initialized from scratch.
-            self._module = FlowModule.load_from_checkpoint(
-                checkpoint_path=self._exp_cfg.warm_start,
-                cfg=self._cfg,
-            )
+            # self._module = FlowModule.load_from_checkpoint(
+            #     checkpoint_path=self._exp_cfg.warm_start,
+            #     cfg=self._cfg,
+            # )
         else:
             log.info("No warm start checkpoint found. Training from scratch.")
 
@@ -93,15 +93,15 @@ class Experiment:
             gradient_clip_val=1.0
         )
 
-        # trainer.fit(
-        #     model=self._module,
-        #     datamodule=self._datamodule,
-        #     ckpt_path=self._exp_cfg.warm_start,
-        # )
         trainer.fit(
             model=self._module,
             datamodule=self._datamodule,
+            ckpt_path=self._exp_cfg.warm_start,
         )
+        # trainer.fit(
+        #     model=self._module,
+        #     datamodule=self._datamodule,
+        # )
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="base.yaml")

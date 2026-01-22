@@ -255,7 +255,6 @@ def collate_fn(batch):
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
                 max_len=350,
-                seq_list=feat['chain_seq_list']
                 )
 
         not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'processed_path', 'sample_id', 'mode', 'selected_chains']

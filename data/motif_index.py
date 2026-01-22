@@ -76,10 +76,6 @@ def cdr_indices(chothia_pdb_file, cdr, offset_heavy=True):
         chothia_range[1],
     ) - 1
 
-    if len(get_pdb_chain_seq(chothia_pdb_file, chain_id=chain_id)) != len(residue_id_nums):
-        print('ERROR in PDB file ' + chothia_pdb_file)
-        print('residue id len', len(residue_id_nums))
-
     if chain == light_chain and offset_heavy:
         heavy_seq_len = len(get_pdb_chain_seq(chothia_pdb_file, chain_id=heavy_chain.id))
         cdr_start += heavy_seq_len
@@ -588,48 +584,42 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, includ
 
 ######################## crop_general_protein ########################
 def crop_general_protein(
-        trans_1, 
-        loop_mask,
-        nan_mask, 
-        max_len, 
-        seq_list
-        ):  
-    chain_len_list = [len(seq) for seq in seq_list]
-    L = sum(chain_len_list)
-    residue_indices = None
-    num_loop_residues = torch.sum(loop_mask).item()
+    trans_1, 
+    loop_mask,
+    nan_mask, 
+    max_len,
+    ):  
+    
+    loop_bool = loop_mask.bool()
+    nan_bool = nan_mask.bool()
+
+    num_loop_residues = loop_mask.sum().item()
 
     if num_loop_residues <= 10:
         ratio = 0.5
     elif num_loop_residues >= 60:
         ratio = 1.0
     else:
-        ratio = 0.5 + (num_loop_residues - 10) * (0.5 / 50)
+        ratio = 0.5 + (num_loop_residues - 10) * 0.01
 
-    # 3. 새로운 max_len 결정 (정수형 변환)
-    max_len = int(max_len * ratio)        
-    if torch.sum(nan_mask) <= max_len:
-        residue_indices = [i for i in range(L) if nan_mask[i]==1]
-
+    target_len = int(max_len * ratio)        
+    
+    valid_count = nan_mask.sum().item()
+    
+    if valid_count <= target_len:
+        return torch.nonzero(nan_mask, as_tuple=True)[0].tolist()
     else:
-        distance_map = get_distance_map(trans_1)
-        distance_vectors = []
+        distance_map = get_distance_map(trans_1) # (L, L)
+        valid_loop_indices = torch.nonzero(loop_bool & nan_bool, as_tuple=True)[0]
+
+        valid_distances = distance_map[valid_loop_indices] 
+        min_dist_to_loop, _ = torch.min(valid_distances, dim=0)
+        _, top_indices = torch.topk(min_dist_to_loop, target_len, largest=False)
+        combined_indices = torch.cat([top_indices, valid_loop_indices]).unique()
+        combined_indices = torch.sort(combined_indices)[0]
         
-        loop_indices = (
-            (loop_mask == 1) & (nan_mask == 1)
-        ).nonzero(as_tuple=True)[0].tolist()
-
-        for i in loop_indices:
-            distance_vectors.append(distance_map[i])
-
-        if distance_vectors == []:
-            print()
-        distance_vectors = torch.stack(distance_vectors)
-        distance_vector, _ = torch.min(distance_vectors, dim=0)
-        values, indices = torch.topk(distance_vector, max_len, largest=False)
-
-        residue_indices = sorted(list((set(indices.tolist() + loop_indices))))
-        residue_indices = [i for i in residue_indices if nan_mask[i] == 1]
+        final_mask = nan_bool[combined_indices]
+        residue_indices = combined_indices[final_mask].tolist()
 
     return residue_indices
 

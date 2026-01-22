@@ -1,13 +1,12 @@
 #!/bin/bash
-#SBATCH -J v2.4.0_general_stage1
-#SBATCH -p gpu
-#SBATCH --gres=gpu:A6000:4
-#SBATCH --mem=240g
-#SBATCH -c 32
-#SBATCH -w gpu05
-#SBATCH -o /home/psh/protein-frame-flow/experiments/logs/train_fm.log
-#SBATCH -e /home/psh/protein-frame-flow/experiments/logs/train_fm.err
-
+#SBATCH -J v2.4.0
+#SBATCH -p h100
+#SBATCH -c 40
+#SBATCH -w node02
+#SBATCH --gres=gpu:h100:4
+#SBATCH --mem=320G 
+#SBATCH --error=/home/psh/logs/v2.4.0.err
+#SBATCH --out=/home/psh/logs/v2.4.0.out
 
 echo "Running train_abb3.py"
 echo $CUDA_VISIBLE_DEVICES  # 여러 개 나와야 함
