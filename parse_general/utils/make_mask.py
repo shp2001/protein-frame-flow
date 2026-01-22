@@ -169,6 +169,9 @@ def process_row(row):
         chain_index = data['chain_index']     
         atom_positions = data['atom_positions']
         atom_mask = data['atom_mask']
+        aatype = data['aatype']
+        res_mask = data['bb_mask']
+        res_mask[aatype == 20] = 0
         
         result_json = {} 
         unique_chains = np.unique(chain_index)
@@ -181,16 +184,24 @@ def process_row(row):
             coords = get_cb_or_ca(atom_positions, atom_mask)
             dists = cdist(coords, coords)
             
-            # 같은 체인 간의 거리는 무한대로 설정 (Interface만 보기 위함)
+            # 1. 같은 체인 간의 거리는 무한대로 설정 (Interface만 보기 위함)
             c_matrix = chain_index[:, None] == chain_index[None, :]
             dists[c_matrix] = np.inf
+            
+            # 2. res_mask가 0인(유효하지 않은) 잔기와의 거리도 무한대로 설정하여 Interface 후보에서 제외
+            # (행/열 모두 마스킹 처리)
+            invalid_mask = (res_mask == 0)
+            dists[invalid_mask, :] = np.inf
+            dists[:, invalid_mask] = np.inf
             
             min_dists = np.min(dists, axis=1)
             interface_mask_all = min_dists < 8.0
 
         if mode == 'polymer':
             for c_idx in unique_chains:
-                chain_residues_mask = (chain_index == c_idx)
+                # res_mask == 1 인 것만 유효한 체인 잔기로 간주하여 선택
+                chain_residues_mask = (chain_index == c_idx) & (res_mask == 1)
+                
                 if not np.any(chain_residues_mask): continue
 
                 chain_res_ids = residue_index[chain_residues_mask]
@@ -199,6 +210,7 @@ def process_row(row):
                 chain_start_res = np.min(chain_res_ids)
                 chain_end_res = np.max(chain_res_ids)
                 
+                # Interface이면서 유효한 잔기 선택
                 c_mask = chain_residues_mask & interface_mask_all
                 raw_res_ids = residue_index[c_mask]
                 
@@ -213,14 +225,14 @@ def process_row(row):
                 if final_blocks:
                     c_str = int_to_chain_str(int(c_idx))
                     result_json[c_str] = final_blocks
-
         elif mode == 'monomer':
             traj = create_mdtraj_obj(data)
             dssp = md.compute_dssp(traj, simplified=True)[0] 
             loop_mask_all = (dssp == 'C')
             
             for c_idx in unique_chains:
-                chain_residues_mask = (chain_index == c_idx)
+                # res_mask 체크 추가
+                chain_residues_mask = (chain_index == c_idx) & (res_mask == 1)
                 if not np.any(chain_residues_mask): continue
 
                 chain_res_ids = residue_index[chain_residues_mask]
@@ -229,6 +241,7 @@ def process_row(row):
                 chain_start_res = np.min(chain_res_ids)
                 chain_end_res = np.max(chain_res_ids)
                 
+                # Loop 이면서 res_mask가 1인 것만
                 c_mask = chain_residues_mask & loop_mask_all
                 raw_res_ids = residue_index[c_mask]
                 
@@ -251,7 +264,8 @@ def process_row(row):
             loop_mask_all = (dssp == 'C')
 
             for c_idx in unique_chains:
-                chain_residues_mask = (chain_index == c_idx)
+                # res_mask 체크 추가
+                chain_residues_mask = (chain_index == c_idx) & (res_mask == 1)
                 if not np.any(chain_residues_mask): continue
 
                 chain_res_ids = residue_index[chain_residues_mask]
@@ -259,7 +273,7 @@ def process_row(row):
                 chain_start_res = np.min(chain_res_ids)
                 chain_end_res = np.max(chain_res_ids)
 
-                # 2. Loop Residue 추출 및 블록화 (Gap Filling 수행)
+                # 2. Loop Residue 추출 (res_mask가 1인 것만 포함됨)
                 c_loop_mask = chain_residues_mask & loop_mask_all
                 raw_loop_ids = residue_index[c_loop_mask]
                 
@@ -269,6 +283,7 @@ def process_row(row):
                     max_gap=4
                 )
 
+                # 3. Interface 체크 (res_mask가 이미 고려된 interface_mask_all 사용)
                 c_interface_mask = chain_residues_mask & interface_mask_all
                 interface_res_ids_set = set(residue_index[c_interface_mask])
 
@@ -284,9 +299,9 @@ def process_row(row):
                     result_json[c_str] = final_blocks
 
         # JSON 저장
-        if 'mask_info_file' in row and pd.notna(row['mask_info_file']):
+        if 'mask_info_file' in row:
             save_path = row['mask_info_file']
-            
+  
             if result_json:
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
@@ -331,7 +346,6 @@ def process_metadata(metadata_path, num_processes):
     error_count = 0
     for res in results:
         if res is not None:
-            print(res)
             error_count += 1
             
     print(f"Finished. Total: {total_files}, Errors: {error_count}")
@@ -339,7 +353,7 @@ def process_metadata(metadata_path, num_processes):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--metadata_path', type=str, default='/home/psh/data/loop_ppi/meta/metadata.csv')
+    parser.add_argument('--metadata_path', type=str, default='/home/psh/data/general_v2/meta/metadata.csv')
     parser.add_argument('--num_processes', type=int, default=60, help='Number of parallel processes')
     args = parser.parse_args()
     
