@@ -367,10 +367,10 @@ class PdbDataset(BaseDataset):
         self._max_cluster = len(self._pdb_to_cluster.values())
         self._missing_pdbs = 0
         def cluster_lookup(pdb):
-            if pdb not in list(self._pdb_to_cluster.keys()):
-                self._pdb_to_cluster[pdb] = self._max_cluster + 1
-                self._max_cluster += 1
-                self._missing_pdbs += 1
+            # if pdb not in list(self._pdb_to_cluster.keys()):
+            #     self._pdb_to_cluster[pdb] = self._max_cluster + 1
+            #     self._max_cluster += 1
+            #     self._missing_pdbs += 1
             return self._pdb_to_cluster[pdb]
         metadata_csv['cluster'] = metadata_csv['pdb_name'].map(cluster_lookup)
         self._create_split(metadata_csv)
