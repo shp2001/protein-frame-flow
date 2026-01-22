@@ -26,7 +26,14 @@ def _chain_num_filter(data_csv, max_chain):
     return data_csv[data_csv.num_chains <= max_chain]
 
 def _mask_file_filter(data_csv, max_interface_ratio):
+    '''
+    ab, nanobody는 cdr index가 있으니 검증 패스 
+    '''
     def check_ratio(row):
+
+        if row['mode'] in ['ab', 'nanobody']:
+            return True 
+        
         file_path = row["mask_info_file"]
         seq_len = row["seq_len"]
         
