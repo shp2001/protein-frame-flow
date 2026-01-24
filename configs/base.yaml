@@ -18,9 +18,9 @@ data:
   hotspot:
     threshold: 8
     hotspot_noise:
-      masking_ratio: 0.2
-      false_hotspot_ratio: 0.2
-      noise_range: 4
+      masking_ratio: 0.3
+      false_hotspot_ratio: 0.3
+      noise_range: 6
 
   sampler:
     # Setting for 48GB GPUs
@@ -102,7 +102,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 4
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1/2026-01-22_01-23-36/last.ckpt
+  warm_start: null
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -167,9 +167,9 @@ experiment:
     project: v2.4.0
   optimizer:
     warmup_steps: 0
-    decay_steps: 250_000
-    min_lr: 1e-4
-    max_lr: 1e-3
+    decay_steps: 500_000
+    min_lr: 2e-4
+    max_lr: 5e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

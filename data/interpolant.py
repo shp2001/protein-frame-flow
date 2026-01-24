@@ -10,8 +10,6 @@ def _centered_gaussian(num_batch, num_res, device):
 def _r_diffuse_mask(r_t, r_1, atom_diffuse_mask):
     return r_t * atom_diffuse_mask[..., None] + r_1 * (1 - atom_diffuse_mask[..., None])
 
-import torch
-
 def axis_angle_to_matrix_batched(axis, angle):
     """
     Rodrigues' rotation formula (Batched)
@@ -42,10 +40,25 @@ def axis_angle_to_matrix_batched(axis, angle):
     R = I + sin_a * K + (1 - cos_a) * torch.matmul(K, K)
     return R
 
-def apply_global_rigid_transform(trans, diffuse_mask, translation_scale=2.0, rotation_scale=0.3):
+def apply_global_rigid_transform(
+        trans, 
+        selected_chains, 
+        chain_index, 
+        translation_scale=2.0, 
+        rotation_scale=0.3
+    ):
     """
-    trans: shape (B, L, 3)
-    diffuse_mask: shape (B, L) or (L,)
+    특정 Chain들(selected_chains)만 선택하여 Global Rigid Transform을 적용합니다.
+    
+    Args:
+        trans: (B, L, 3) - 전체 좌표 텐서
+        selected_chains: list[int] or Tensor - 변환을 적용할 Chain ID 목록 (예: Antibody chain IDs)
+        chain_index: (L,) or (B, L) - 각 Residue가 속한 Chain ID
+        translation_scale: float - 이동 노이즈 스케일 (Angstrom)
+        rotation_scale: float - 회전 노이즈 스케일 (Radian)
+        
+    Returns:
+        new_coords: (B, L, 3) - 변환이 적용된 전체 좌표
     """
     coords = trans # (B, L, 3)
     B, L, _ = coords.shape
@@ -53,22 +66,34 @@ def apply_global_rigid_transform(trans, diffuse_mask, translation_scale=2.0, rot
     dtype = coords.dtype
 
     # ---------------------------
-    # 1) Mask Preparation (Broadcasting)
+    # 1) Mask Preparation (Chain Selection)
     # ---------------------------
-    if diffuse_mask.dim() == 1:
-        mask_bool = diffuse_mask.view(1, L, 1).expand(B, L, 1).bool()
+    # selected_chains가 리스트라면 텐서로 변환
+    if not isinstance(selected_chains, torch.Tensor):
+        target_chains = torch.tensor(selected_chains, device=device)
     else:
-        mask_bool = diffuse_mask.view(B, L, 1).bool()
+        target_chains = selected_chains.to(device)
 
+    # chain_index 처리: (L,) -> (B, L) 확장
+    if chain_index.dim() == 1:
+        chain_index_batch = chain_index.view(1, L).expand(B, L)
+    else:
+        chain_index_batch = chain_index
+
+    # 핵심 로직: chain_index가 target_chains에 포함되는지 확인
+    # torch.isin: chain_index_batch의 원소가 target_chains에 있으면 True
+    # (B, L) -> (B, L, 1)
+    mask_bool = torch.isin(chain_index_batch, target_chains).unsqueeze(-1)
     mask_float = mask_bool.float()
 
     # ---------------------------
-    # 2) Center of Mass (Batch-wise)
+    # 2) Center of Mass (Target Chains Only)
     # ---------------------------
-    # (B, L, 3) * (B, L, 1) -> sum -> (B, 3)
+    # 선택된 Chain들의 무게 중심 계산
+    # (B, L, 3) * (B, L, 1) -> (B, L, 3) -> sum(dim=1) -> (B, 3)
     masked_sum = (coords * mask_float).sum(dim=1)
     mask_count = mask_float.sum(dim=1) # (B, 1)
-    mask_count = torch.clamp(mask_count, min=1.0) # 0 나누기 방지
+    mask_count = torch.clamp(mask_count, min=1.0) # 0으로 나누기 방지
     
     center = masked_sum / mask_count
     center = center.view(B, 1, 3) # (B, 1, 3)
@@ -77,36 +102,43 @@ def apply_global_rigid_transform(trans, diffuse_mask, translation_scale=2.0, rot
     # 3) Batch Random Rotation & Translation
     # ---------------------------
     if rotation_scale > 1e-6:
-        # Axis: (B, 3)
+        # Axis: (B, 3) - 랜덤 회전축 (단위 벡터)
         rand_axis = torch.randn(B, 3, device=device, dtype=dtype)
         rand_axis = rand_axis / (torch.norm(rand_axis, dim=1, keepdim=True) + 1e-6)
         
-        # Angle: (B, 1)
+        # Angle: (B, 1) - 랜덤 회전각 (-scale ~ +scale)
         rand_angle = (torch.rand(B, 1, device=device, dtype=dtype) * 2 - 1) * rotation_scale
         
+        # 사전에 정의된 함수 사용
         R = axis_angle_to_matrix_batched(rand_axis, rand_angle) # (B, 3, 3)
     else:
         R = torch.eye(3, device=device, dtype=dtype).unsqueeze(0).expand(B, 3, 3)
 
+    # Translation 벡터 생성
     t = torch.randn(B, 3, device=device, dtype=dtype) * translation_scale
     t = t.view(B, 1, 3)
 
     # ---------------------------
     # 4) Apply Transform
     # ---------------------------
-    # R^T (Transpose for multiplying on the right)
+    # R^T (좌표 벡터를 행 벡터로 가정하므로 R을 전치하여 곱함)
     R_T = R.transpose(1, 2) # (B, 3, 3)
     
-    # Effective Translation: t_eff = C - C@R^T + t
-    # center: (B, 1, 3)
+    # Effective Translation 계산: t_eff = C - C@R^T + t
+    # (회전 후 원래 중심 위치로 복귀 + 추가 이동)
     center_rotated = torch.matmul(center, R_T)
     t_effective = center - center_rotated + t # (B, 1, 3)
     
-    # 전체 좌표 변환: (B, L, 3) @ (B, 3, 3) + (B, 1, 3)
+    # 전체 좌표 변환 (Broadcasting 이용)
+    # (B, L, 3) @ (B, 3, 3) + (B, 1, 3)
     rotated_all = torch.matmul(coords, R_T)
     transformed_all = rotated_all + t_effective
 
-    # mask_bool: (B, L, 1) -> 자동으로 (B, L, 3)으로 브로드캐스팅되어 조건 적용
+    # ---------------------------
+    # 5) Update Only Selected Chains
+    # ---------------------------
+    # mask_bool이 True인 곳(Target Chains)만 변환된 좌표를 적용
+    # False인 곳(나머지)은 원래 좌표 유지
     new_coords = torch.where(mask_bool, transformed_all, coords)
 
     return new_coords

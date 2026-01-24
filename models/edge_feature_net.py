@@ -157,7 +157,9 @@ class EdgeFeatureNet(nn.Module):
             trans_template, 
             rotmats_template,   
             diffuse_mask,
-            loop_mask, 
+            loop_mask,
+            selected_chains,
+            chain_index, 
             asym_id: torch.Tensor,
             residue_index: torch.Tensor,
             entity_id: torch.Tensor,
@@ -200,8 +202,9 @@ class EdgeFeatureNet(nn.Module):
 
             if self._cfg.contact_map_off_diag.perturb:
                 trans_template = apply_global_rigid_transform(
-                    trans_template,
-                    diffuse_mask,
+                    trans=trans_template,
+                    selected_chains=selected_chains,
+                    chain_index=chain_index,
                     translation_scale=self._cfg.contact_map_off_diag.trans_scale,
                     rotation_scale=self._cfg.contact_map_off_diag.rot_scale
                 )

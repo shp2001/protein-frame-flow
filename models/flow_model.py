@@ -93,6 +93,8 @@ class FlowModel(nn.Module):
         ag_hotspot = input_feats['ag_hotspot'][0].unsqueeze(0)
         trans_1 = input_feats['trans_1'][0].unsqueeze(0)
         rotmats_1 = input_feats['rotmats_1'][0].unsqueeze(0)
+        chain_index = input_feats['chain_index'][0].unsqueeze(0)
+        selected_chains = input_feats['selected_chains']
         asym_id = input_feats['asym_id'][0].unsqueeze(0)
         residue_index = input_feats['residue_index'][0].unsqueeze(0)
         entity_id = input_feats['entity_id'][0].unsqueeze(0)
@@ -121,6 +123,8 @@ class FlowModel(nn.Module):
             rotmats_1,
             diffuse_mask,
             loop_mask,
+            selected_chains,
+            chain_index,
             asym_id,
             residue_index,
             entity_id,
