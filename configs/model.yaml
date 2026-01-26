@@ -2,7 +2,7 @@ model:
   c_s: 384
   c_token: 768
   c_z: 128
-  train_confidence: False
+  train_confidence: True
   symmetric: False
   
   node_features:
@@ -36,8 +36,8 @@ model:
     contact_map_off_diag:
       threshold: 20
       perturb: True
-      trans_scale: 2.0
-      rot_scale: 0.3
+      trans_scale: 4.0
+      rot_scale: 0.5
       
     embed_ref_pos: True
     embed_loop_mask: True

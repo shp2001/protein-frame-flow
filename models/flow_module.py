@@ -187,6 +187,7 @@ class FlowModule(LightningModule):
         alt_atom14_pos = noisy_batch['atom14_alt_gt_positions'].clone()
         gt_pseudo_beta = noisy_batch['pseudo_beta'].clone()
 
+        print("raw_path", noisy_batch['raw_path'])
 
         # Timestep used for normalization.
         t = noisy_batch['t']
@@ -511,7 +512,6 @@ class FlowModule(LightningModule):
         edge_mask = batch['edge_mask']
         loop_mask = batch['loop_mask']
         diffuse_mask = batch['diffuse_mask']
-        hotspot_mask = batch['ag_hotspot']
         raw_path = batch['raw_path']
         pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
@@ -551,7 +551,7 @@ class FlowModule(LightningModule):
         os.makedirs(sample_dir, exist_ok=True)
 
         if not hasattr(self, "confidence_model"):
-            b_factor_alt = loop_mask.cpu().numpy()
+            b_factor_alt = diffuse_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
         else:
             plddt_bins = plddt_pred.shape[-1]
@@ -685,21 +685,20 @@ class FlowModule(LightningModule):
             inter_mask = 1 - (diffuse_mask_i == diffuse_mask_j).float() # 0: intra / 1: inter
 
             # calculate loss 
-            b, N_atom, _ = batch['r_1'].shape
             plddt_loss = self.plddt_loss_module(
                 logits=plddt_pred,
-                pred_coordinate=atom37_traj[-1],
+                pred_coordinate=r3_traj[-1],
                 true_coordinate=batch['r_1'][0],
                 coordinate_mask=coordinate_mask,
-                is_nucleotide=torch.zeros(N_atom, device=plddt_pred.device),
-                is_polymer=torch.ones(N_atom, device=plddt_pred.device),
+                is_nucleotide=torch.zeros(num_atom, device=plddt_pred.device),
+                is_polymer=torch.ones(num_atom, device=plddt_pred.device),
                 rep_atom_mask=rep_atom_mask,
                 atom_diffuse_mask=batch['atom_diffuse_mask']
             )
             batch_metrics.append({"plddt_loss": plddt_loss})
             pae_loss = self.pae_loss_module(
                 logits=pae_pred,
-                pred_coordinate=atom37_traj[-1],
+                pred_coordinate=r3_traj[-1],
                 true_coordinate=batch['r_1'][0],
                 coordinate_mask=coordinate_mask,
                 rep_atom_mask=rep_atom_mask,
@@ -949,6 +948,7 @@ class FlowModule(LightningModule):
             atom37_traj = np.stack(atom37_traj_batch, axis=0) # (B, L, 37, 3)
             atom37_trajs.append(atom37_traj)
         atom_trajs = np.stack(atom37_trajs, axis=1) # (B, N_steps, L, 37, 3)
+        print("atom_trajs", atom_trajs.shape)
 
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []
@@ -1000,7 +1000,7 @@ class FlowModule(LightningModule):
 
 
         else:
-            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factor_alt = loop_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
 
         for i in range(pred_positions.shape[0]):

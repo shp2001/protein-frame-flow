@@ -15,12 +15,10 @@ data:
     num_workers: 6
     prefetch_factor: 10
 
-  hotspot:
-    threshold: 8
-    hotspot_noise:
-      masking_ratio: 0.2
-      false_hotspot_ratio: 0.2
-      noise_range: 4
+  masking_scheduler: 
+    mask_schedule: False
+    init_rate: 1.0
+    masking_increase_ratio: 0.02
 
   sampler:
     # Setting for 48GB GPUs
@@ -101,8 +99,8 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 4
-  warm_start: null
+  num_devices: 2
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.3.2/CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage2/2025-12-05_16-29-09/epoch=45-step=65918_copy.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -127,8 +125,8 @@ experiment:
     # side chain
     use_loop_sc_loss: True
     loop_sc_loss_weight: 0.25
-    use_local_dist_mat_loss: False
-    local_dist_mat_loss_weight: 0.0
+    use_local_dist_mat_loss: True
+    local_dist_mat_loss_weight: 0.5
     # violation_backbone 
     use_bond_loss: True 
     bond_length_loss_weight: 1.0 
@@ -163,13 +161,13 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.4.0_general_stage1
-    project: v2.4.0
+    name: CDRFlow_v2.3.2.1_stage_2_ori_perturb_stage3
+    project: v2.3.2
   optimizer:
     warmup_steps: 0
-    decay_steps: 250_000
+    decay_steps: 270_000
     min_lr: 1e-4
-    max_lr: 1e-3
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping

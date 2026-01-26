@@ -13,11 +13,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-<<<<<<< HEAD
-from data.motif_index import get_relpos_input, crop_antigen, load_antibody_mask, load_general_mask, crop_general_protein, provide_anchor, get_ag_hotspot
-=======
 from data.motif_index import get_relpos_input, crop_antigen, load_loop_file, load_monomer_mask, load_polymer_mask, crop_general_protein, provide_anchor, get_ag_hotspot
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 from data import residue_constants as rc
 
 from itertools import accumulate
@@ -122,6 +118,7 @@ class BaseDataset(Dataset):
     def is_training(self):
         return self._is_training
 
+    
     def __len__(self):
         return len(self._all_sample_ids)
     
@@ -134,10 +131,6 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row):
         path = csv_row['processed_path']
-<<<<<<< HEAD
-        complex_id = csv_row['pdb_name']
-        processed_row = _process_csv_row(path)
-=======
         raw_path = csv_row['raw_path']
         seq_len = csv_row['seq_len']
         
@@ -145,40 +138,12 @@ class BaseDataset(Dataset):
         first_chain_len = None
 
         scaffold_idx = {}
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
         if csv_row['mode'] == 'ab':
             cdr_types = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-<<<<<<< HEAD
-            h, l = complex_id.split('_')[1:3]
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h), du.CHAIN_TO_INT.get(l)]
-            scaffold_mask = load_antibody_mask(
-                scaffold_idx=scaffold_idx,
-                chain_index=processed_row['chain_index'],
-                residue_index=processed_row['residue_index'],
-                ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
-            )
-        if csv_row['mode'] == 'nanobody':
-            scaffold_idx = {}
-            cdr_types = ['h1', 'h2', 'h3']
-            for cdr in cdr_types:
-                scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
-                scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            h = complex_id.split('_')[1]
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h)]
-            scaffold_mask = load_antibody_mask(
-                scaffold_idx=scaffold_idx,
-                chain_index=processed_row['chain_index'],
-                residue_index=processed_row['residue_index'],
-                ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
-            )
-=======
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
         if csv_row['mode'] == 'general':
             loop_info_file = csv_row['loop_info_dir']
@@ -188,23 +153,6 @@ class BaseDataset(Dataset):
         
         if csv_row['mode'] == 'monomer':
             mask_info_file = csv_row['mask_info_file']
-<<<<<<< HEAD
-            scaffold_mask, selected_chain = load_general_mask(
-                mask_info_file=mask_info_file, 
-                residue_index=processed_row['residue_index'],
-                chain_index=processed_row['chain_index'],
-                pseudo_beta=processed_row['pseudo_beta'],
-                threshold_min_dist=8,
-                threshold_max_dist=35,
-                threshold_length=25, 
-                seed=123
-                )
-            scaffold_mask = torch.tensor(scaffold_mask)
-            processed_row['selected_chains'] = [selected_chain]
-
-        processed_row['loop_mask'] = scaffold_mask
-        processed_row['raw_path'] = csv_row['raw_path']
-=======
             loop_start, loop_end = load_monomer_mask(mask_info_file, seq_len, seed=123)
             scaffold_idx[f'loop_start'] = loop_start
             scaffold_idx[f'loop_end'] = loop_end
@@ -227,15 +175,11 @@ class BaseDataset(Dataset):
         processed_row['first_chain_len'] = first_chain_len
         processed_row['raw_path'] = raw_path
         processed_row['processed_path'] = path
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
         processed_row['mode'] = csv_row['mode']
         if use_cache:
             self._cache[path] = processed_row
         
         return processed_row
-<<<<<<< HEAD
-        
-=======
     
     def _sample_scaffold_mask(self, batch, rng):
         trans_1 = batch['trans_1']
@@ -263,7 +207,6 @@ class BaseDataset(Dataset):
             loop_mask = torch.ones_like(loop_mask)
         feats['loop_mask'] = loop_mask
     
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     def __getitem__(self, row_idx):
         # Process data example.
         csv_row, sample_id = self._all_sample_ids[row_idx]
@@ -274,6 +217,9 @@ class BaseDataset(Dataset):
         if self.task == 'hallucination':
             feats['loop_mask'] = torch.ones_like(feats['res_mask']).bool()
         elif self.task == 'inpainting':
+
+            rng = np.random.default_rng(seed=123)
+            self.setup_inpainting(feats, rng)
             feats['loop_mask'] = provide_anchor(
                 feats['loop_mask'], 
                 feats['res_mask'], 
@@ -292,13 +238,15 @@ class BaseDataset(Dataset):
         if len(chain_len_list) == 1:
             diffuse_mask = feats['loop_mask']
         else:
-            selected_chains_tensor = torch.tensor(feats['selected_chains'], device=feats['chain_index'].device)         
-            is_selected_chain = torch.isin(feats['chain_index'], selected_chains_tensor)
-            is_loop = (feats['loop_mask'] == 1)
-            diffuse_mask = (is_selected_chain | is_loop).to(torch.long)
-        
+            asym_id = []
+            for i, chain_len in enumerate(chain_len_list):
+                for _ in range(chain_len):
+                    asym_id.append(i)
+            asym_id = torch.tensor(asym_id, device=feats['loop_mask'].device)
+            masked_chain = asym_id[feats['loop_mask'] == 1].unique()
+            diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
         feats['diffuse_mask'] = diffuse_mask
-
+        
         # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
         feats['sample_id'] = sample_id
@@ -323,9 +271,9 @@ def collate_fn(batch):
                 feat['trans_1'],
                 cdr_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=350,
+                max_len=600,
                 seq_list=feat['chain_seq_list'],
-                crop_ab=True,
+                crop_ab=False,
                 include_ag=include_ag
                 )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
@@ -338,7 +286,7 @@ def collate_fn(batch):
                 seq_list=feat['chain_seq_list']
                 )
 
-        not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'processed_path', 'sample_id', 'mode', 'selected_chains']
+        not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'csv_idx', 'masked_chain', 'first_chain_len', 'raw_path', 'processed_path', 'sample_id', 'mode']
 
         for key in feat.keys():
             if key not in not_crop_key:

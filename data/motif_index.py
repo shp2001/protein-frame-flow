@@ -99,186 +99,8 @@ def get_cdr_range_dict(chothia_pdb_file, heavy_only=False, light_only=False, off
 
     return cdr_range_dict
 
-<<<<<<< HEAD
-def load_antibody_mask(
-    scaffold_idx,
-    chain_index,
-    residue_index,
-    ab_chains,
-    pseudo_beta
-):
-    """
-    Antibody CDR 영역(start ~ end 포함)을 1로 설정하고, 
-    CDR과 가까운 Antigen Interface 영역을 0으로 마스킹합니다.
-    (말단 트리밍 및 길이 필터링 로직 포함)
-    """
-    
-    # 0. Device 및 기초 설정
-    device = pseudo_beta.device
-    L = chain_index.shape[0]
-    scaffold_mask = torch.zeros(L, dtype=torch.float32, device=device)
-    
-    # ab_chains를 Tensor로 변환
-    ab_chains_tensor = torch.tensor(ab_chains, device=device)
-
-    # ---------------------------------------------------------
-    # 1. CDR 영역 설정 (Value = 1)
-    # ---------------------------------------------------------
-    cdr_loops = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
-    all_cdr_indices_list = []
-    
-    for loop in cdr_loops:
-        start_key = f"{loop}_start"
-        end_key = f"{loop}_end"
-        
-        if start_key in scaffold_idx and end_key in scaffold_idx:
-            start = scaffold_idx[start_key]
-            end = scaffold_idx[end_key]
-            loop_indices = torch.arange(start, end + 1, device=device)
-            loop_indices = loop_indices[loop_indices < L]
-            scaffold_mask[loop_indices] = 1.0
-            all_cdr_indices_list.append(loop_indices)
-    
-    all_cdr_indices = torch.cat(all_cdr_indices_list)
-
-    is_ab = torch.isin(chain_index, ab_chains_tensor)
-    ag_indices = torch.nonzero(~is_ab, as_tuple=True)[0] 
-    
-    if ag_indices.numel() == 0:
-        return scaffold_mask
-
-    cdr_coords = pseudo_beta[all_cdr_indices]
-    ag_coords = pseudo_beta[ag_indices]       
-    
-    dists = torch.cdist(cdr_coords, ag_coords) 
-    min_dists = torch.min(dists, dim=0).values 
-    
-    is_contact = min_dists < 8.0
-    raw_interface_indices = ag_indices[is_contact]
-    
-    if raw_interface_indices.numel() == 0:
-        return scaffold_mask
-
-    # ---------------------------------------------------------
-    # 3. Gap Filling & Trimming & Filtering
-    # ---------------------------------------------------------
-    # 3-1. 초기 Interface Mask 생성 (Gap 채우기 전)
-    final_interface_mask = torch.zeros(L, dtype=torch.bool, device=device)
-    final_interface_mask[raw_interface_indices] = True
-    
-    unique_ag_chains = torch.unique(chain_index[raw_interface_indices])
-    
-    for c_id in unique_ag_chains:
-        chain_mask = (chain_index == c_id)
-        
-        # --- [Step A] Gap Filling ---
-        c_interface_bool = final_interface_mask & chain_mask
-        if not c_interface_bool.any():
-            continue
-            
-        c_interface_indices = torch.nonzero(c_interface_bool, as_tuple=True)[0]
-        c_pdb_ids = residue_index[c_interface_indices]
-        sorted_pdbs, sort_idx = torch.sort(c_pdb_ids)
-        
-        if sorted_pdbs.numel() > 1:
-            diffs = sorted_pdbs[1:] - sorted_pdbs[:-1]
-            gap_mask = (diffs > 1) & (diffs < 5)
-            
-            if gap_mask.any():
-                gap_starts = sorted_pdbs[:-1][gap_mask]
-                gap_ends = sorted_pdbs[1:][gap_mask]
-                
-                chain_global_indices = torch.nonzero(chain_mask, as_tuple=True)[0]
-                chain_global_pdbs = residue_index[chain_global_indices]
-                
-                g_s = gap_starts.unsqueeze(1)
-                g_e = gap_ends.unsqueeze(1)
-                c_p = chain_global_pdbs.unsqueeze(0)
-                
-                in_gap_mask = (c_p > g_s) & (c_p < g_e)
-                fill_candidates_mask = in_gap_mask.any(dim=0)
-                
-                fill_indices = chain_global_indices[fill_candidates_mask]
-                final_interface_mask[fill_indices] = True
-
-        # --- [Step B] Trimming & Filtering ---
-        # Gap Filling이 완료된 후, 해당 체인의 마스크를 다시 가져와서 블록 단위로 처리
-        c_interface_bool_updated = final_interface_mask & chain_mask
-        if not c_interface_bool_updated.any():
-            continue
-        
-        # 현재 체인의 확정된 Interface 인덱스들
-        current_indices = torch.nonzero(c_interface_bool_updated, as_tuple=True)[0]
-        current_pdbs = residue_index[current_indices]
-        
-        # PDB ID 기준 정렬 (블록을 나누기 위해)
-        sorted_pdbs, sort_idx = torch.sort(current_pdbs)
-        sorted_indices = current_indices[sort_idx]
-        
-        # 체인의 전체 범위 확인 (N-term, C-term 판별용)
-        chain_global_indices = torch.nonzero(chain_mask, as_tuple=True)[0]
-        chain_global_pdbs = residue_index[chain_global_indices]
-        chain_start_pdb = torch.min(chain_global_pdbs)
-        chain_end_pdb = torch.max(chain_global_pdbs)
-        
-        # 블록 나누기 (PDB ID가 연속되지 않으면 분리)
-        # diff != 1 인 지점이 블록의 경계
-        if sorted_pdbs.numel() > 0:
-            pdb_diffs = sorted_pdbs[1:] - sorted_pdbs[:-1]
-            break_points = torch.nonzero(pdb_diffs != 1, as_tuple=True)[0] + 1
-            
-            # [0, break1, break2, ..., len] 형태의 split 포인트 생성
-            splits = torch.cat([
-                torch.tensor([0], device=device), 
-                break_points, 
-                torch.tensor([sorted_pdbs.numel()], device=device)
-            ])
-            
-            valid_indices_list = []
-            
-            for i in range(len(splits) - 1):
-                start_idx = splits[i]
-                end_idx = splits[i+1]
-                
-                # 하나의 블록
-                block_indices = sorted_indices[start_idx:end_idx]
-                block_pdbs = sorted_pdbs[start_idx:end_idx]
-                
-                # 1. Trimming (N-term)
-                # 블록의 첫 잔기가 체인의 시작 잔기라면 앞 4개 제거
-                if block_pdbs[0] == chain_start_pdb:
-                    block_indices = block_indices[4:]
-                    # block_pdbs = block_pdbs[4:] # (인덱스만 슬라이싱하면 충분)
-                
-                if block_indices.numel() == 0: continue
-
-                # 2. Trimming (C-term)
-                # 블록의 마지막 잔기가 체인의 끝 잔기라면 뒤 4개 제거
-                # (주의: N-term trimming으로 인해 block_pdbs가 바뀌었을 수 있으므로
-                # 원본 sorted_pdbs의 해당 구간 마지막 값을 참조)
-                if sorted_pdbs[end_idx-1] == chain_end_pdb:
-                    block_indices = block_indices[:-4]
-                
-                # 3. Filtering (Length < 4)
-                if block_indices.numel() >= 4:
-                    valid_indices_list.append(block_indices)
-            
-            # 기존 마스크 초기화 후 검증된 인덱스만 다시 활성화
-            # (해당 체인 영역만 False로 밀고 다시 씀)
-            final_interface_mask[current_indices] = False 
-            
-            if valid_indices_list:
-                all_valid_indices = torch.cat(valid_indices_list)
-                final_interface_mask[all_valid_indices] = True
-            else:
-                pass
-
-    scaffold_mask[final_interface_mask] = 1.0
-    return scaffold_mask
-=======
 def load_loop_file(loop_file, seed=None):
     """Gets the index of a given CDR loop"""
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
 
     with open(loop_file, 'r') as file:
         contact_idx_dict = json.load(file)
@@ -295,32 +117,6 @@ def load_loop_file(loop_file, seed=None):
 
 def load_monomer_mask(mask_info_file, seq_len, seed=None):
     with open(mask_info_file, 'r') as file:
-<<<<<<< HEAD
-        mask_info = json.load(file)
-
-    # 2. 인덱스 변환
-    mask_info = convert_mask_info_index(
-        mask_info,
-        residue_index,
-        chain_index
-    )
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed)
-
-    chain_keys = list(mask_info.keys())
-    if not chain_keys:
-        return torch.zeros(len(residue_index))
-
-    # 3. Pivot 및 주변 블록 선택 로직
-    selected_chain = random.choice(chain_keys) # str 형태의 chain id 
-    blocks_in_chain = mask_info[selected_chain]
-
-    raw_pivot_block = random.choice(blocks_in_chain)
-    pivot_block = get_random_contiguous_segment(raw_pivot_block, limit=threshold_length)
-
-    loop_index_set = set(pivot_block)
-=======
         loop_indices = json.load(file)
     
     if seed is not None:
@@ -393,7 +189,6 @@ def load_polymer_mask(mask_info_file, select_num=1, seed=None):
     )
 
     interfaces = [interface_list[i] for i in idx]
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     
     # 5. clipping: 선택된 체인의 범위 안에서만 확장
 
@@ -409,38 +204,7 @@ def load_polymer_mask(mask_info_file, select_num=1, seed=None):
         
         selected_residues_list.append(selected_residues)
 
-<<<<<<< HEAD
-            # Case 1: 블록 전체가 조건 만족 (유지)
-            if (np.min(dists) < threshold_min_dist) and (np.max(dists) < threshold_max_dist):
-                selected_residues = get_random_contiguous_segment(block, limit=threshold_length)
-                loop_index_set.update(selected_residues)
-            
-            # Case 2: 블록 내 일부 잔기만 조건 만족 -> 부분 선택
-            elif np.max(dists) >= threshold_max_dist:
-                
-                max_dist_per_residue = np.max(dists, axis=0) # Shape: (N_target,)
-                valid_relative_indices = np.where(max_dist_per_residue < threshold_max_dist)[0]
-
-                segments = split_into_contiguous_segments(valid_relative_indices)
-
-                for seg_indices in segments:
-                    # [추가된 조건] 세그먼트 길이가 4 미만이면 건너뜀 (제거)
-                    if len(seg_indices) < 4:
-                        continue
-
-                    segment_dists = dists[:, seg_indices]
-                    
-                    if np.min(segment_dists) < threshold_min_dist:
-                        valid_residues = [block[i] for i in seg_indices]
-                        final_residues = get_random_contiguous_segment(valid_residues, limit=threshold_length)
-                        loop_index_set.update(final_residues)
-
-    final_loop_index = sorted(list(loop_index_set))
-    L = len(residue_index)
-    loop_mask = torch.zeros(L) 
-=======
     return [(selected_residues[0], selected_residues[-1]) for selected_residues in selected_residues_list] 
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     
 ######################## crop_antigen ########################
 
@@ -600,18 +364,8 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, includ
     return residue_indices
 
 ######################## crop_general_protein ########################
-<<<<<<< HEAD
-def crop_general_protein(
-        trans_1, 
-        loop_mask,
-        nan_mask, 
-        max_len, 
-        seq_list
-        ):  
-=======
 
 def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):  
->>>>>>> parent of 4266575 (generate loop mask incorporating recetpor interface)
     chain_len_list = [len(seq) for seq in seq_list]
     L = sum(chain_len_list)
     residue_indices = None
@@ -620,6 +374,9 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
     loop_indices = (
         (loop_mask == 1) & (nan_mask == 1)
     ).nonzero(as_tuple=True)[0].tolist()
+    print("nan_mask", nan_mask)
+    print("loop_mask", loop_mask)
+    print("loop_indices", loop_indices)
 
     if torch.sum(loop_mask) < 10:
         max_len = max_len // 2
@@ -640,8 +397,6 @@ def crop_general_protein(trans_1, loop_mask, nan_mask, max_len, seq_list):
         for i in loop_indices:
             distance_vectors.append(distance_map[i])
 
-        if distance_vectors == []:
-            print()
         distance_vectors = torch.stack(distance_vectors)
         distance_vector, _ = torch.min(distance_vectors, dim=0)
         values, indices = torch.topk(distance_vector, max_len, largest=False)
@@ -691,15 +446,7 @@ def get_relpos_input(seq_list):
     
     return asym_id, entity_id, sym_id
 
-def get_ag_hotspot(
-        pseudo_beta, 
-        loop_mask, 
-        diffuse_mask,
-        threshold,            # True Hotspot 기준 거리
-        masking_ratio,        # True Hotspot을 지울(drop) 확률
-        false_hotspot_ratio,  # Candidate 영역에서 False Hotspot을 생성할 확률
-        noise_range        # False Hotspot 후보군 거리 범위 (threshold ~ threshold + noise_range)
-    ):
+def get_ag_hotspot(pseudo_beta, loop_mask, diffuse_mask, threshold=5.0):
     """
     pseudo_beta:   (B, L, 3) 좌표
     loop_mask:     (B, L) 1이면 loop residue
@@ -709,32 +456,22 @@ def get_ag_hotspot(
     B, L, _ = pseudo_beta.shape
     device = pseudo_beta.device
 
-    loop_mask_bool = loop_mask[0].bool()           # (num_loop,)
-    ag_mask_bool   = (diffuse_mask[0] == 0).bool() # (num_ag,)
-    dist_map = torch.cdist(pseudo_beta, pseudo_beta)
-    d = dist_map[:, loop_mask_bool][:, :, ag_mask_bool]
-    min_dist_to_loop = d.min(dim=1).values 
+    # 모든 batch에서 동일하므로 첫 번째 것만 사용
+    loop_mask = loop_mask[0].bool()          # (L,)
+    ag_mask   = (diffuse_mask[0] == 0).bool() # (L,)
 
-    is_true_hotspot = min_dist_to_loop < threshold
-    drop_prob = torch.rand_like(min_dist_to_loop)
-    keep_mask = drop_prob > masking_ratio 
-    processed_true_hotspot = is_true_hotspot & keep_mask
+    # 거리 행렬 (B, L, L)
+    dist_map = torch.cdist(pseudo_beta, pseudo_beta)  # (B, L, L)
 
+    # loop vs antigen 거리만 추출
+    d = dist_map[:, loop_mask][:, :, ag_mask]   # (B, num_loop, num_ag)
 
-    upper_threshold = threshold + noise_range
-    is_candidate_region = (min_dist_to_loop >= threshold) & (min_dist_to_loop < upper_threshold)
-    
-    # Add Mask 생성: false_hotspot_ratio 확률로 True(1)
-    # 독립적인 난수 생성
-    add_prob = torch.rand_like(min_dist_to_loop)
-    select_mask = add_prob < false_hotspot_ratio
-    processed_false_hotspot = is_candidate_region & select_mask
+    # antigen residue별 contact 여부
+    contact = (d < threshold).any(dim=1)        # (B, num_ag)
 
-    final_contact = processed_true_hotspot | processed_false_hotspot
-
-    # 4. 전체 시퀀스 크기로 복원
+    # hotspot 초기화
     hotspot = torch.zeros((B, L), dtype=torch.float, device=device)
-    ag_idx = torch.where(ag_mask_bool)[0]
-    hotspot[:, ag_idx] = final_contact.float()
+    ag_idx = torch.where(ag_mask)[0]
+    hotspot[:, ag_idx] = contact.float()
 
-    return hotspot
+    return hotspot  # (B, L)
