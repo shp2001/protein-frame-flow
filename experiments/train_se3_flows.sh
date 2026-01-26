@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J v2.4.0
+#SBATCH -J CDRFlow_v2.4.0_general_stage1_hotspot_mask_2
 #SBATCH -p h100
 #SBATCH -c 40
 #SBATCH -w node02

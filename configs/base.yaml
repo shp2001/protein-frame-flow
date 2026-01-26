@@ -18,8 +18,8 @@ data:
   hotspot:
     threshold: 8
     hotspot_noise:
-      masking_ratio: 0.3
-      false_hotspot_ratio: 0.3
+      masking_ratio: 1.0
+      false_hotspot_ratio: 0.0
       noise_range: 6
 
   sampler:
@@ -163,7 +163,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.4.0_general_stage1
+    name: CDRFlow_v2.4.0_general_stage1_no_hotspot
     project: v2.4.0
   optimizer:
     warmup_steps: 0
