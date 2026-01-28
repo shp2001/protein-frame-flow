@@ -28,7 +28,7 @@ data:
     max_num_res_squared: 200_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
-    
+
 interpolant:
   min_t: 1e-2
   sample_t_mode: uniform # one of ["uniform", "beta_mixed", "beta_revese_mixed", "logit_normal"]
@@ -101,8 +101,8 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 4
-  warm_start: null
+  num_devices: 1
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1_no_hotspot/2026-01-25_23-08-18/epoch=106-step=287188.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -163,13 +163,13 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.4.0_general_stage1_no_hotspot
+    name: CDRFlow_v2.4.0_loop_ppi
     project: v2.4.0
   optimizer:
     warmup_steps: 0
     decay_steps: 500_000
-    min_lr: 2e-4
-    max_lr: 5e-4
+    min_lr: 1e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -183,7 +183,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/trans_loop_loss
+    monitor: valid/h3_trans_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

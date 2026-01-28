@@ -62,7 +62,6 @@ def cdr_indices(chothia_pdb_file, cdr, offset_heavy=True):
 
     # CDR에 따라 올바른 체인을 선택
     chain = heavy_chain if cdr.startswith('h') else light_chain
-    chain_id = chain.id
 
     residue_id_nums = [res.get_id()[1] for res in chain]
 
@@ -524,6 +523,46 @@ def provide_anchor(diffuse_mask, res_mask, chain_index, mode):
 
     return diffuse_mask
 
+def remask_antigen_mask(
+    loop_mask,
+    chain_index,
+    selected_chains,
+    remask_prob
+):
+    if random.random() < remask_prob:
+        is_antigen = torch.ones_like(chain_index, dtype=torch.bool)
+        for c_id in selected_chains:
+            is_antigen &= (chain_index != c_id)
+
+        loop_mask[is_antigen] = 0                
+    return loop_mask
+
+# def remask_antigen_mask(loop_mask, chain_index, selected_chains, remask_prob):
+#     # [Check 1] 함수 시작 시 마스크 상태 확인
+#     initial_sum = loop_mask.sum().item()
+    
+#     if random.random() < remask_prob:
+#         is_antigen = torch.ones_like(chain_index, dtype=torch.bool)
+#         for c_id in selected_chains:
+#             is_antigen &= (chain_index != c_id)
+
+#         # [Check 2] 항원으로 판별된 영역의 크기 확인
+#         antigen_count = is_antigen.sum().item()
+        
+#         # 실제 마스킹 수행
+#         loop_mask[is_antigen] = 0 
+        
+#         final_sum = loop_mask.sum().item()
+        
+#         print(f"--- [Remask Activation] ---")
+#         print(f"Selected Chains (Antibody): {selected_chains}")
+#         print(f"Antigen residues identified: {antigen_count}")
+#         print(f"Masked bits: {initial_sum} -> {final_sum} (Removed: {initial_sum - final_sum})")
+#     else:
+#         print("--- [Remask Skipped] (Probability check) ---")
+                
+#     return loop_mask
+
 # get alpha carbon distance map with translation vector 
 def get_distance_map(trans_1):
     residue_loc_1 = trans_1.unsqueeze(1)
@@ -533,20 +572,20 @@ def get_distance_map(trans_1):
 
     return distance_map
 
-def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, include_ag=True, mode='ab'): 
+def crop_antigen(trans_1, loop_mask, nan_mask, max_len, seq_list, crop_ab, include_ag=True, mode='ab'): 
     chain_len_list = [len(seq) for seq in seq_list]
 
     if mode == 'ab':
         ab_len = sum(chain_len_list[:2])
         ag_len = sum(chain_len_list[2:])
+        all_anchors = find_anchor(loop_mask, only_h3=False)[:12]
     
     else:
         ab_len = sum(chain_len_list[:1])
         ag_len = sum(chain_len_list[1:])
-
+        all_anchors = find_anchor(loop_mask, only_h3=False)[:6]
+        
     residue_indices = None
-    all_anchors = find_anchor(cdr_mask, only_h3=False)
-
     ab_idx = []
     
     if crop_ab:
@@ -565,7 +604,7 @@ def crop_antigen(trans_1, cdr_mask, nan_mask, max_len, seq_list, crop_ab, includ
         # ag이 max_ag_len 이상인 경우 cropping   
         else:
             distance_map = get_distance_map(trans_1)
-            loop_residues = torch.nonzero(cdr_mask, as_tuple=False).squeeze(-1)
+            loop_residues = torch.nonzero(loop_mask, as_tuple=False).squeeze(-1)
             
             distance_vectors = []
             for i in loop_residues:

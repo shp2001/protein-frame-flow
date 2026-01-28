@@ -529,8 +529,6 @@ def atom_unflatten(flatten, mask):
     return coords_recon.view(B, L, A) if flatten.dim() == 2 else coords_recon
 
 import numpy as np
-
-import numpy as np
 import torch # torch가 사용되는 것으로 가정하고 import를 명시적으로 추가합니다.
 
 def tensor_to_pdb_block_ca(tensor, chain_index, residue_index, model_num=1):

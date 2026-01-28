@@ -14,7 +14,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import load_antibody_mask, load_general_mask, crop_antigen, crop_general_protein, provide_anchor
+from data.motif_index import load_antibody_mask, load_general_mask, crop_antigen, crop_general_protein, provide_anchor, remask_antigen_mask
 
 def _length_filter(data_csv, min_res, max_res):
     return data_csv[
@@ -259,7 +259,15 @@ class BaseDataset(Dataset):
             scaffold_mask = torch.tensor(scaffold_mask)
             processed_row['selected_chains'] = [selected_chain]
 
-        processed_row['loop_mask'] = scaffold_mask
+        if self.is_training:
+            processed_row['loop_mask'] = remask_antigen_mask(
+                loop_mask=scaffold_mask,
+                chain_index=processed_row['chain_index'],
+                selected_chains=processed_row['selected_chains'],
+                remask_prob=self._dataset_cfg.remask_antigen_ratio
+            )
+        else:
+            processed_row['loop_mask'] = scaffold_mask
         processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
 
@@ -289,9 +297,6 @@ class BaseDataset(Dataset):
                 feats['chain_index'],
                 feats['mode']
                 ).to(torch.long)
-            
-            if (feats['loop_mask'] == 0).all():
-                print(csv_row['mask_info_file'])
 
             # make diffuse_mask
             # if sample is monomer -> diffuse_mask = loop_mask
@@ -314,11 +319,11 @@ class BaseDataset(Dataset):
             
             if mode not in ['ab', 'nanobody', 'loop_ppi', 'monomer', 'polymer']:
                 raise ValueError('Mode should be one of [ab, nanobody, loop_ppi, monomer, polymer]')
-
-            if mode == ['ab', 'nanobody']:
+            
+            if mode in ['ab', 'nanobody']:
                 feats['crop_idx'] = crop_antigen(
                     feats['trans_1'],
-                    cdr_mask=feats['loop_mask'],
+                    loop_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.ab_max_num_res,
                     seq_list=feats['chain_seq_list'],
@@ -336,8 +341,6 @@ class BaseDataset(Dataset):
         else:
             raise ValueError(f'Unknown task {self.task}')
         feats['loop_mask'] = feats['loop_mask'].int()
-        
-        # Storing the csv index is helpful for debugging.
         feats['csv_idx'] = torch.ones(1, dtype=torch.long) * row_idx
 
         return feats

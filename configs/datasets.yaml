@@ -37,12 +37,11 @@ shared:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/general_v2/meta/metadata_train.csv
-  valid_csv_path: /home/psh/data/general_v2/meta/metadata_valid.csv
+  train_csv_path: /home/psh/data/train/merged_metadata_w_loop_ppi.csv
+  valid_csv_path: /home/psh/data/valid/meta/metadata.csv
 
-  train_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
-  valid_cluster_path: /home/psh/protein-frame-flow/parse_general/meta/cluster_to_pdb.json
-
+  train_cluster_path: /home/psh/data/train/cluster_ab_loop_ppi.json
+  valid_cluster_path: /home/psh/data/valid/both_wantigen_70_loop_final_val.json
 
   max_cache_size: ${shared.max_cache_size}
   cache_num_res: 10000000
@@ -62,6 +61,9 @@ pdb_dataset:
   ab_max_num_res: 350
   general_max_num_res: 350
   
+  # ratio of samples whose antigen (receptor protein) is masked
+  remask_antigen_ratio: 0.5
+
   # Filtering
   filter:
     max_num_res: 2000

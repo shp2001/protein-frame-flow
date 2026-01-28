@@ -37,7 +37,7 @@ model:
       threshold: 20
       perturb: True
       trans_scale: 6.0
-      rot_scale: 0.5
+      rot_scale: 1.0
       
     embed_ref_pos: True
     embed_loop_mask: True
