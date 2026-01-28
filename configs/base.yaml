@@ -101,7 +101,7 @@ experiment:
   add_modules: False
   debug: False
   seed: 123
-  num_devices: 1
+  num_devices: 4
   warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1_no_hotspot/2026-01-25_23-08-18/epoch=106-step=287188.ckpt
   warm_start_cfg_override: False
   training:

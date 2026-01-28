@@ -101,24 +101,17 @@ def load_antibody_mask(
     chain_index,
     residue_index,
     ab_chains,
-    pseudo_beta
+    pseudo_beta,
+    nan_mask,
 ):
-    """
-    Antibody CDR 영역(start ~ end 포함)을 1로 설정하고, 
-    CDR과 가까운 Antigen Interface 영역을 0으로 마스킹합니다.
-    (말단 트리밍 및 길이 필터링 로직 포함)
-    """
-    
-    # 0. Device 및 기초 설정
     device = pseudo_beta.device
     L = chain_index.shape[0]
     scaffold_mask = torch.zeros(L, dtype=torch.float32, device=device)
-    
-    # ab_chains를 Tensor로 변환
+    nan_bool = nan_mask.bool()  # 유효성 검사용 불리언 마스크
     ab_chains_tensor = torch.tensor(ab_chains, device=device)
 
     # ---------------------------------------------------------
-    # 1. CDR 영역 설정 (Value = 1)
+    # 1. CDR 영역 설정 (Value = 1) - nan_mask 보장
     # ---------------------------------------------------------
     cdr_loops = ['h1', 'h2', 'h3', 'l1', 'l2', 'l3']
     all_cdr_indices_list = []
@@ -131,14 +124,19 @@ def load_antibody_mask(
             start = scaffold_idx[start_key]
             end = scaffold_idx[end_key]
             loop_indices = torch.arange(start, end + 1, device=device)
-            loop_indices = loop_indices[loop_indices < L]
-            scaffold_mask[loop_indices] = 1.0
-            all_cdr_indices_list.append(loop_indices)
-    
-    all_cdr_indices = torch.cat(all_cdr_indices_list)
+            loop_indices = loop_indices[nan_bool[loop_indices]]
+            
+            if loop_indices.numel() > 0:
+                scaffold_mask[loop_indices] = 1.0
+                all_cdr_indices_list.append(loop_indices)
 
+    all_cdr_indices = torch.cat(all_cdr_indices_list)
+    # ---------------------------------------------------------
+    # 2. Antigen Interface 설정 - nan_mask 보장
+    # ---------------------------------------------------------
     is_ab = torch.isin(chain_index, ab_chains_tensor)
-    ag_indices = torch.nonzero(~is_ab, as_tuple=True)[0] 
+    # [보장 2] Antigen 인덱스를 뽑을 때 애초에 nan_mask가 1인 것만 후보로 둠
+    ag_indices = torch.nonzero((~is_ab) & nan_bool, as_tuple=True)[0] 
     
     if ag_indices.numel() == 0:
         return scaffold_mask
@@ -155,10 +153,7 @@ def load_antibody_mask(
     if raw_interface_indices.numel() == 0:
         return scaffold_mask
 
-    # ---------------------------------------------------------
-    # 3. Gap Filling & Trimming & Filtering
-    # ---------------------------------------------------------
-    # 3-1. 초기 Interface Mask 생성 (Gap 채우기 전)
+    # 3. Gap Filling & Trimming (생략 없이 로직 유지)
     final_interface_mask = torch.zeros(L, dtype=torch.bool, device=device)
     final_interface_mask[raw_interface_indices] = True
     
@@ -184,7 +179,8 @@ def load_antibody_mask(
                 gap_starts = sorted_pdbs[:-1][gap_mask]
                 gap_ends = sorted_pdbs[1:][gap_mask]
                 
-                chain_global_indices = torch.nonzero(chain_mask, as_tuple=True)[0]
+                # [보장 3] Gap을 채울 때도 nan_mask가 1인 것만 후보로 사용
+                chain_global_indices = torch.nonzero(chain_mask & nan_bool, as_tuple=True)[0]
                 chain_global_pdbs = residue_index[chain_global_indices]
                 
                 g_s = gap_starts.unsqueeze(1)
@@ -198,32 +194,24 @@ def load_antibody_mask(
                 final_interface_mask[fill_indices] = True
 
         # --- [Step B] Trimming & Filtering ---
-        # Gap Filling이 완료된 후, 해당 체인의 마스크를 다시 가져와서 블록 단위로 처리
         c_interface_bool_updated = final_interface_mask & chain_mask
         if not c_interface_bool_updated.any():
             continue
         
-        # 현재 체인의 확정된 Interface 인덱스들
         current_indices = torch.nonzero(c_interface_bool_updated, as_tuple=True)[0]
-        current_pdbs = residue_index[current_indices]
         
-        # PDB ID 기준 정렬 (블록을 나누기 위해)
+        current_pdbs = residue_index[current_indices]
         sorted_pdbs, sort_idx = torch.sort(current_pdbs)
         sorted_indices = current_indices[sort_idx]
         
-        # 체인의 전체 범위 확인 (N-term, C-term 판별용)
         chain_global_indices = torch.nonzero(chain_mask, as_tuple=True)[0]
         chain_global_pdbs = residue_index[chain_global_indices]
         chain_start_pdb = torch.min(chain_global_pdbs)
         chain_end_pdb = torch.max(chain_global_pdbs)
         
-        # 블록 나누기 (PDB ID가 연속되지 않으면 분리)
-        # diff != 1 인 지점이 블록의 경계
         if sorted_pdbs.numel() > 0:
             pdb_diffs = sorted_pdbs[1:] - sorted_pdbs[:-1]
             break_points = torch.nonzero(pdb_diffs != 1, as_tuple=True)[0] + 1
-            
-            # [0, break1, break2, ..., len] 형태의 split 포인트 생성
             splits = torch.cat([
                 torch.tensor([0], device=device), 
                 break_points, 
@@ -231,46 +219,28 @@ def load_antibody_mask(
             ])
             
             valid_indices_list = []
-            
             for i in range(len(splits) - 1):
-                start_idx = splits[i]
-                end_idx = splits[i+1]
-                
-                # 하나의 블록
+                start_idx, end_idx = splits[i], splits[i+1]
                 block_indices = sorted_indices[start_idx:end_idx]
                 block_pdbs = sorted_pdbs[start_idx:end_idx]
                 
-                # 1. Trimming (N-term)
-                # 블록의 첫 잔기가 체인의 시작 잔기라면 앞 4개 제거
                 if block_pdbs[0] == chain_start_pdb:
                     block_indices = block_indices[4:]
-                    # block_pdbs = block_pdbs[4:] # (인덱스만 슬라이싱하면 충분)
-                
                 if block_indices.numel() == 0: continue
 
-                # 2. Trimming (C-term)
-                # 블록의 마지막 잔기가 체인의 끝 잔기라면 뒤 4개 제거
-                # (주의: N-term trimming으로 인해 block_pdbs가 바뀌었을 수 있으므로
-                # 원본 sorted_pdbs의 해당 구간 마지막 값을 참조)
                 if sorted_pdbs[end_idx-1] == chain_end_pdb:
                     block_indices = block_indices[:-4]
                 
-                # 3. Filtering (Length < 4)
                 if block_indices.numel() >= 4:
                     valid_indices_list.append(block_indices)
             
-            # 기존 마스크 초기화 후 검증된 인덱스만 다시 활성화
-            # (해당 체인 영역만 False로 밀고 다시 씀)
             final_interface_mask[current_indices] = False 
-            
             if valid_indices_list:
                 all_valid_indices = torch.cat(valid_indices_list)
                 final_interface_mask[all_valid_indices] = True
-            else:
-                pass
 
     scaffold_mask[final_interface_mask] = 1.0
-    return scaffold_mask
+    return scaffold_mask * nan_mask
 
 def convert_mask_info_index(mask_info, residue_index, chain_index):
     """
@@ -527,15 +497,21 @@ def remask_antigen_mask(
     loop_mask,
     chain_index,
     selected_chains,
-    remask_prob
+    remask_prob,
+    seed
 ):
-    if random.random() < remask_prob:
-        is_antigen = torch.ones_like(chain_index, dtype=torch.bool)
-        for c_id in selected_chains:
-            is_antigen &= (chain_index != c_id)
+    if seed is not None:
+        random.seed(seed)
 
-        loop_mask[is_antigen] = 0                
-    return loop_mask
+    if random.random() < remask_prob:
+        selected_chains_tensor = torch.tensor(
+            selected_chains, 
+            device=chain_index.device, 
+        )
+        is_selected_chain = torch.isin(chain_index, selected_chains_tensor)
+        new_loop_mask = loop_mask * is_selected_chain.to(loop_mask.dtype)
+        return new_loop_mask
+    return loop_mask.clone()
 
 # def remask_antigen_mask(loop_mask, chain_index, selected_chains, remask_prob):
 #     # [Check 1] 함수 시작 시 마스크 상태 확인

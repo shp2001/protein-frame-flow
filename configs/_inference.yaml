@@ -21,6 +21,7 @@ inference:
 
   # trans rot perturbation 
   perturbation: False 
+  mask_ag: False
 
   interpolant:
     use_prmsd: False

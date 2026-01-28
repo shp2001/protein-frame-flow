@@ -13,7 +13,7 @@ from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json 
 
-from data.motif_index import get_relpos_input, crop_antigen, load_antibody_mask, load_general_mask, crop_general_protein, provide_anchor, get_ag_hotspot
+from data.motif_index import remask_antigen_mask, get_relpos_input, crop_antigen, load_antibody_mask, load_general_mask, crop_general_protein, provide_anchor, get_ag_hotspot
 from data import residue_constants as rc
 
 from itertools import accumulate
@@ -96,7 +96,6 @@ class BaseDataset(Dataset):
         self.task = task
 
         self.n_samples = self._inference_cfg.samples.samples_per_target
-
         self.raw_csv = pd.read_csv(self._inference_cfg.samples.csv_path)
 
         metadata_csv = self.raw_csv
@@ -145,7 +144,8 @@ class BaseDataset(Dataset):
                 chain_index=processed_row['chain_index'],
                 residue_index=processed_row['residue_index'],
                 ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
+                pseudo_beta=processed_row['pseudo_beta'],
+                nan_mask=processed_row['res_mask']
             )
         if csv_row['mode'] == 'nanobody':
             scaffold_idx = {}
@@ -153,14 +153,15 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            h = complex_id.split('_')[1]
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h)]
+            hs = list(complex_id.split('_')[1])
+            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h) for h in hs]
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
                 residue_index=processed_row['residue_index'],
                 ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
+                pseudo_beta=processed_row['pseudo_beta'],
+                nan_mask=processed_row['res_mask']
             )
 
         if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
@@ -178,7 +179,15 @@ class BaseDataset(Dataset):
             scaffold_mask = torch.tensor(scaffold_mask)
             processed_row['selected_chains'] = [selected_chain]
 
-        processed_row['loop_mask'] = scaffold_mask
+        remask_prob = 1.0 if self._inference_cfg.mask_ag else 0.0
+        processed_row['loop_mask'] = remask_antigen_mask(
+            loop_mask=scaffold_mask,
+            chain_index=processed_row['chain_index'],
+            selected_chains=processed_row['selected_chains'],
+            remask_prob=remask_prob,
+            seed=123
+        )
+
         processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
 

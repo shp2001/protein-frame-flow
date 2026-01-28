@@ -226,7 +226,8 @@ class BaseDataset(Dataset):
                 chain_index=processed_row['chain_index'],
                 residue_index=processed_row['residue_index'],
                 ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
+                pseudo_beta=processed_row['pseudo_beta'],
+                nan_mask=processed_row['res_mask'],
             )
         if csv_row['mode'] == 'nanobody':
             scaffold_idx = {}
@@ -234,14 +235,15 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            h = complex_id.split('_')[1]
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h)]
+            hs = list(complex_id.split('_')[1])
+            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h) for h in hs]
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
                 residue_index=processed_row['residue_index'],
                 ab_chains=processed_row['selected_chains'],
-                pseudo_beta=processed_row['pseudo_beta']
+                pseudo_beta=processed_row['pseudo_beta'],
+                nan_mask=processed_row['res_mask'],
             )
 
         if csv_row['mode'] in ['monomer', 'polymer', 'loop_ppi']:
@@ -264,7 +266,8 @@ class BaseDataset(Dataset):
                 loop_mask=scaffold_mask,
                 chain_index=processed_row['chain_index'],
                 selected_chains=processed_row['selected_chains'],
-                remask_prob=self._dataset_cfg.remask_antigen_ratio
+                remask_prob=self._dataset_cfg.remask_antigen_ratio,
+                seed=self.current_epoch + idx
             )
         else:
             processed_row['loop_mask'] = scaffold_mask

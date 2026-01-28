@@ -110,17 +110,7 @@ class ProteinData(LightningDataModule):
         atom_diffuse_mask[..., :3] *= cropped_batch["diffuse_mask"].unsqueeze(-1)
         cropped_batch['atom_diffuse_mask'] = du.atom_flatten(atom_diffuse_mask, cropped_batch['atom14_gt_exists'])
         cropped_batch['r_1'] = du.atom_flatten(cropped_batch['atom14_gt_positions'], cropped_batch['atom14_gt_exists'])
-        
-        ############################
-        r1_len = cropped_batch['r_1'].shape[1]
-        atom_exists_total = cropped_batch['atom14_gt_exists'][0].sum().item()
 
-        print("----------------------")
-        print("raw_path", cropped_batch['raw_path'])
-        print(f"r_1 length (dim 1): {r1_len}")
-        print(f"atom14_gt_exists total sum: {atom_exists_total}")
-        print(f"Difference: {abs(r1_len - atom_exists_total)}")
-        print("----------------------")
         # edge mask 
         cropped_batch["edge_mask"] = cropped_batch['res_mask'][:, None] * cropped_batch['res_mask'][:, :, None]
         return cropped_batch

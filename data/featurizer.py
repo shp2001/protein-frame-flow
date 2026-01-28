@@ -89,7 +89,6 @@ def get_ref_basic_feature(aatype_batch, atom_14_mask_batch, res_indices_batch):
         restype3 = residue_constants.restype_1to3.get(restype1, "UNK")
         
         if restype3 == "UNK":
-            print("There is a UNK in restype")
             continue
 
         atom_names = residue_constants.restype_name_to_atom14_names[restype3] # atom list 
