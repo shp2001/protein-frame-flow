@@ -137,8 +137,8 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            h, l = complex_id.split('_')[1:3]
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h), du.CHAIN_TO_INT.get(l)]
+            
+            processed_row['selected_chains'] = list(dict.fromkeys(processed_row['chain_index']))[:2]
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
@@ -153,8 +153,8 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            hs = list(complex_id.split('_')[1])
-            processed_row['selected_chains'] = [du.CHAIN_TO_INT.get(h) for h in hs]
+
+            processed_row['selected_chains'] = [list(dict.fromkeys(processed_row['chain_index']))[0]]
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
@@ -252,9 +252,9 @@ def collate_fn(batch):
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=350,
+                max_len=2000,
                 seq_list=feat['chain_seq_list'],
-                crop_ab=True,
+                crop_ab=False,
                 include_ag=include_ag
                 )
         if mode == 'loop_ppi' or mode == 'polymer' or mode == 'monomer':
