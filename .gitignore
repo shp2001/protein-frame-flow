@@ -24,6 +24,7 @@ weights/
 **/*.pse
 **/*.err
 **/*.png 
+notebook/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
