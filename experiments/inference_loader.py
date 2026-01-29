@@ -179,7 +179,7 @@ class BaseDataset(Dataset):
             scaffold_mask = torch.tensor(scaffold_mask)
             processed_row['selected_chains'] = [selected_chain]
 
-        remask_prob = 1.0 if self._inference_cfg.mask_ag else 0.0
+        remask_prob = 1.0 if self._inference_cfg.ag_interface_condition else 0.0
         processed_row['loop_mask'] = remask_antigen_mask(
             loop_mask=scaffold_mask,
             chain_index=processed_row['chain_index'],
@@ -190,7 +190,7 @@ class BaseDataset(Dataset):
 
         processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
-
+        processed_row['processed_path'] = path
         return processed_row
         
     def __getitem__(self, row_idx):
@@ -334,6 +334,7 @@ def collate_fn(batch):
     cropped_batch['pseudo_beta'] = cropped_batch['pseudo_beta'] - motif_com[:, None, :] # (B, L, 3)
 
     cropped_batch['raw_path'] = feat['raw_path']
+    cropped_batch['selected_chains'] = feat['selected_chains']
     cropped_batch['processed_path'] = feat['processed_path']
     cropped_batch['mode'] = feat['mode']
     cropped_batch['original_atom14_gt_positions'] = feat['atom14_gt_positions']
