@@ -137,8 +137,14 @@ class BaseDataset(Dataset):
             for cdr in cdr_types:
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
-            
-            processed_row['selected_chains'] = list(dict.fromkeys(processed_row['chain_index']))[:2]
+            seen = set()
+            selected = []
+            for ch in processed_row['chain_index'].tolist():
+                if ch not in seen:
+                    selected.append(ch)
+                    seen.add(ch)
+            processed_row['selected_chains'] = selected[:2]
+            print("selected_chains", processed_row['selected_chains'])
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
@@ -147,6 +153,7 @@ class BaseDataset(Dataset):
                 pseudo_beta=processed_row['pseudo_beta'],
                 nan_mask=processed_row['res_mask']
             )
+
         if csv_row['mode'] == 'nanobody':
             scaffold_idx = {}
             cdr_types = ['h1', 'h2', 'h3']
@@ -154,7 +161,13 @@ class BaseDataset(Dataset):
                 scaffold_idx[f'{cdr}_start'] = int(csv_row[f'{cdr}_start'])
                 scaffold_idx[f'{cdr}_end'] = int(csv_row[f'{cdr}_end'])
 
-            processed_row['selected_chains'] = [list(dict.fromkeys(processed_row['chain_index']))[0]]
+            seen = set()
+            selected = []
+            for ch in processed_row['chain_index'].tolist():
+                if ch not in seen:
+                    selected.append(ch)
+                    seen.add(ch)
+            processed_row['selected_chains'] = [selected[0]]
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
@@ -187,7 +200,6 @@ class BaseDataset(Dataset):
             remask_prob=remask_prob,
             seed=123
         )
-
         processed_row['raw_path'] = csv_row['raw_path']
         processed_row['mode'] = csv_row['mode']
         processed_row['processed_path'] = path
@@ -252,7 +264,7 @@ def collate_fn(batch):
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=2000,
+                max_len=800,
                 seq_list=feat['chain_seq_list'],
                 crop_ab=False,
                 include_ag=include_ag
