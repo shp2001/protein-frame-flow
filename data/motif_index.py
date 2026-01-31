@@ -394,6 +394,60 @@ def load_general_mask(
     
     return loop_mask, du.CHAIN_TO_INT.get(selected_chain)
 
+def load_general_mask_all(
+        mask_info_file,
+        residue_index,
+        chain_index,
+        threshold_length,
+        seed=None
+    ):
+
+    def get_random_contiguous_segment(indices, limit):
+        if len(indices) > limit:
+            max_start_idx = len(indices) - limit
+            start_idx = random.randint(0, max_start_idx)
+            return indices[start_idx : start_idx + limit]
+        return indices
+
+    with open(mask_info_file, 'r') as file:
+        mask_info = json.load(file)
+
+    mask_info = convert_mask_info_index(
+        mask_info,
+        residue_index,
+        chain_index
+    )
+
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+
+    L = len(residue_index)
+    loop_mask = torch.zeros(L)
+
+    if not mask_info:
+        return loop_mask
+
+    loop_index_set = set()
+
+    for chain_key, blocks in mask_info.items():
+        for block in blocks:
+
+            if len(block) < 4:
+                continue
+
+            selected = get_random_contiguous_segment(
+                block,
+                limit=threshold_length
+            )
+
+            loop_index_set.update(selected)
+
+    if loop_index_set:
+        loop_mask[list(loop_index_set)] = 1.0
+
+    return loop_mask
+
 ######################## crop_antigen ########################
 
 def group_numbers(numbers, nan_mask):
