@@ -20,7 +20,7 @@ inference:
   num_gpus: 1
 
   # trans rot perturbation 
-  perturbation: True 
+  perturbation: False 
   ag_interface_condition: True # if True: ag interface backbone is conditioned  / else: ag interface should be predicted
 
   interpolant:
@@ -85,7 +85,7 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/benchmark_after210930/meta/metadata.csv
+    csv_path: /home/psh/BioBetter/kkh_output/meta/metadata_acc_med_high.csv
     # Number of scaffolds to sample per target.
     samples_per_target: 10
 
