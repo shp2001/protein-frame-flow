@@ -18,7 +18,8 @@ from data import residue_constants as rc
 from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 
-from data.motif_index import load_general_mask_all, crop_antigen, crop_general_protein, provide_anchor, remask_antigen_mask
+from data.motif_index import load_general_mask_all, get_relpos_input, crop_general_protein, provide_anchor
+
 
 import logging
 
@@ -459,11 +460,17 @@ class AffinityDataset(Dataset):
 
     def process_csv_row(self, csv_row, mut):
         path = csv_row['processed_path']
-        complex_id = csv_row['pdb_name']
         processed_row = _process_csv_row(path, mut)
         
         mask_path = path.replace("meta", "mask_index").replace('.pkl', '.json')
         complex_id = os.path.basename(mask_path).replace('.json', '')
+        if len(complex_id.split('_')) == 3:
+            pdb_id, ligand_chains_str, receptor_chains_str = complex_id.split('_')
+        elif len(complex_id.split('_')) == 4:
+            pdb_id, h_str, l_str, ag_str = complex_id.split('_')
+            ligand_chains_str = h_str + l_str
+            receptor_chains_str = ag_str
+
         pdb_id, ligand_chains_str, receptor_chains_str = complex_id.split('_')
         self.ligand_chains = list(ligand_chains_str)
         self.receptor_chains = list(receptor_chains_str)
@@ -475,7 +482,7 @@ class AffinityDataset(Dataset):
         scaffold_mask = load_general_mask_all(
             mask_info_file=mask_path,
             residue_index=processed_row['residue_index'],
-            chain_index=processed_row['cahin_index'],
+            chain_index=processed_row['chain_index'],
             threshold_length=25,
         )
         processed_row['loop_mask'] = torch.tensor(scaffold_mask)
@@ -528,15 +535,21 @@ class AffinityDataset(Dataset):
                 feats['chain_index'],
                 feats['mode']
                 ).to(torch.long)
+            loop_mask = provide_anchor(
+                feats['loop_mask'],
+                feats['res_mask'], 
+                feats['chain_index'],
+                feats['mode']
+                ).to(torch.long)
             
+            feats['loop_mask'] = loop_mask
             feats['diffuse_mask'] = diffuse_mask
-            if torch.sum(diffuse_mask) == 0:
-                raise ValueError(
-                    f"diffuse_mask is all zero for sample {feats['pdb_name']}. "
-                    "Check if ligand_chains or loop_mask (CDR/Interface) are correctly defined."
-                )
 
-            mask_path = meta_row['processed_path'].replace("meta", "mask_index").replace('.pkl', '.json')
+            # 3. Relative Position Encoding
+            asym_id, entity_id, sym_id = get_relpos_input(feats['chain_seq_list'])
+            feats['asym_id'] = torch.tensor(asym_id)
+            feats['entity_id'] = torch.tensor(entity_id)
+            feats['sym_id'] = torch.tensor(sym_id)
 
             feats['crop_idx'] = crop_general_protein(
                 trans_1=feats['trans_1'],

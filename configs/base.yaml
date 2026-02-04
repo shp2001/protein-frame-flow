@@ -22,6 +22,8 @@ data:
       false_hotspot_ratio: 0.0
       noise_range: 6
 
+  use_unbound: True
+  
   sampler:
     # Setting for 48GB GPUs
     max_batch_size: 40
@@ -64,7 +66,7 @@ interpolant:
 
   save_traj: False 
 
-mini_rollout:
+rollout:
   min_t: 1e-2
 
   twisting:
@@ -102,7 +104,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 4
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_general_stage1_no_hotspot/2026-01-25_23-08-18/epoch=106-step=287188.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_loop_ppi/2026-01-29_00-29-37/epoch=47-step=34320.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -144,7 +146,14 @@ experiment:
     sc_aux_loss_t_pass: 0.5
     bb_viol_loss_t_pass: 0.5
     sc_viol_loss_t_pass: 0.75
-  
+
+    # affinity loss 
+    rank_loss_weight: 5.0
+    rank_margin: 0.5
+    reg_loss_weight: 0.0 # 0.5
+    reg_margin: 1.0
+    prob_loss_weight: 0.0 # 1.0
+
     # confidence loss 
     plddt:
       min_bin: 0
@@ -163,8 +172,8 @@ experiment:
       reduction: mean
 
   wandb:
-    name: CDRFlow_v2.4.0_loop_ppi
-    project: v2.4.0
+    name: v2.4.0_affinity
+    project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0
     decay_steps: 500_000
@@ -183,7 +192,7 @@ experiment:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
     save_top_k: 3
-    monitor: valid/h3_trans_loss
+    monitor: valid/affinity_rank_loss
     mode: min
   # Keep this null. Will be populated at runtime.
   inference_dir: null

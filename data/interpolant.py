@@ -287,7 +287,6 @@ class Interpolant:
             r_t_2 = _r_diffuse_mask(r_t_2, r_1, atom_diffuse_mask)
             prot_traj.append(r_t_2)
             t_1 = t_2
-
         # We only integrated to min_t, so need to make a final step
         t_1 = ts[-1]
         r_t_1 = prot_traj[-1]
