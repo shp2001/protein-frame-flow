@@ -124,7 +124,7 @@ model:
     use_affinity: ${model.train_affinity}
     n_blocks: 6
     c_s: 384
-    c_z: 128
+    c_z: 256
     c_s_inputs: 384
     pairformer_dropout: 0.0
     blocks_per_ckpt: 1

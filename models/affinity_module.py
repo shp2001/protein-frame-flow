@@ -200,20 +200,19 @@ class AffinityModule(LightningModule):
                         batch_receptor['edge_mask'].shape[0]
                     )
 
-                    # --- Delta-z 계산 로직 ---
-                    s = s_complex.clone()
+                    # --- Unbound Feature Mapping & Concatenation ---
+                    B, L, _, C = z_complex.shape
+                    
+                    # 1. Unbound 정보를 담을 텐서 생성 (모든 값을 0으로 초기화)
+                    # [B, L_complex, L_complex, 128]
+                    z_unbound_mapped = torch.zeros_like(z_complex)
 
                     ligand_mask = batch_complex['ligand_mask'].bool()
                     is_ligand = ligand_mask
                     is_receptor = ~is_ligand
 
-                    B, L, _, C = z_complex.shape
-                    
                     L_lig_tensor = z_ligand.shape[1]
                     L_rec_tensor = z_receptor.shape[1]
-
-                    z_lig_expanded = torch.zeros_like(z_complex)
-                    z_rec_expanded = torch.zeros_like(z_complex)
 
                     for b in range(B):
                         lig_idx = is_ligand[b].nonzero(as_tuple=True)[0]
@@ -222,14 +221,19 @@ class AffinityModule(LightningModule):
                         n_lig = len(lig_idx)
                         n_rec = len(rec_idx)
 
+                        # --- Ligand 영역 채우기 ---
                         if n_lig != L_lig_tensor:
                             raise RuntimeError(f"Ligand dimension mismatch: mask has {n_lig}, tensor has {L_lig_tensor}")
-                        z_lig_expanded[b][lig_idx[:, None], lig_idx[None, :]] = z_ligand[b]
-
+                        # Ligand 영역 (Intra)에 z_ligand 값 할당
+                        z_unbound_mapped[b][lig_idx[:, None], lig_idx[None, :]] = z_ligand[b]
+                        # --- Receptor 영역 채우기 ---
                         if n_rec != L_rec_tensor:
                             raise RuntimeError(f"Receptor dimension mismatch: mask has {n_rec}, tensor has {L_rec_tensor}")
-                        z_rec_expanded[b][rec_idx[:, None], rec_idx[None, :]] = z_receptor[b]
-                    z = z_complex - z_lig_expanded - z_rec_expanded
+                        # Receptor 영역 (Intra)에 z_receptor 값 할당
+                        z_unbound_mapped[b][rec_idx[:, None], rec_idx[None, :]] = z_receptor[b]
+
+                    # 2. Concatenation
+                    z = torch.cat([z_complex, z_unbound_mapped], dim=-1)
 
                 else:
                     s_init_complex, z_init_complex, _ = self.model.embed_input(batch_complex)
@@ -241,21 +245,21 @@ class AffinityModule(LightningModule):
                         batch_complex['edge_mask'].shape[0]
                         )
                     z_complex = z
-
+                    s_complex = s
+                    
                 pred_trans_1 = None
                 if self._affinity_cfg.use_coords:
                     _, _, pred_positions, pred_trans_1 = self.rollout.sample(
                         self.model,
                         batch_complex,
-                        s,
-                        s,
+                        s_complex,
+                        s_complex,
                         z_complex
                     )
-                    
             
             affinity_pred_value, affinity_pred_logit = self.affinity_model(
                 s_inputs=s_init_complex[0],
-                s_trunk=s[0],
+                s_trunk=s_complex[0],
                 z_trunk=z[0],
                 inter_pair_mask=loop_mask_2d_complex[0],
                 x_pred_coords=pred_trans_1,
@@ -367,20 +371,19 @@ class AffinityModule(LightningModule):
                         self._model_cfg.pairformer.n_cycles, 
                         batch_receptor['edge_mask'].shape[0]
                     )
-                    # --- Delta-z 계산 로직 ---
-                    s = s_complex.clone()
+                    # --- Unbound Feature Mapping & Concatenation ---
+                    B, L, _, C = z_complex.shape
+                    
+                    # 1. Unbound 정보를 담을 텐서 생성 (모든 값을 0으로 초기화)
+                    # [B, L_complex, L_complex, 128]
+                    z_unbound_mapped = torch.zeros_like(z_complex)
 
                     ligand_mask = batch_complex['ligand_mask'].bool()
                     is_ligand = ligand_mask
                     is_receptor = ~is_ligand
 
-                    B, L, _, C = z_complex.shape
-                    
                     L_lig_tensor = z_ligand.shape[1]
                     L_rec_tensor = z_receptor.shape[1]
-
-                    z_lig_expanded = torch.zeros_like(z_complex)
-                    z_rec_expanded = torch.zeros_like(z_complex)
 
                     for b in range(B):
                         lig_idx = is_ligand[b].nonzero(as_tuple=True)[0]
@@ -389,14 +392,19 @@ class AffinityModule(LightningModule):
                         n_lig = len(lig_idx)
                         n_rec = len(rec_idx)
 
+                        # --- Ligand 영역 채우기 ---
                         if n_lig != L_lig_tensor:
                             raise RuntimeError(f"Ligand dimension mismatch: mask has {n_lig}, tensor has {L_lig_tensor}")
-                        z_lig_expanded[b][lig_idx[:, None], lig_idx[None, :]] = z_ligand[b]
-
+                        # Ligand 영역 (Intra)에 z_ligand 값 할당
+                        z_unbound_mapped[b][lig_idx[:, None], lig_idx[None, :]] = z_ligand[b]
+                        # --- Receptor 영역 채우기 ---
                         if n_rec != L_rec_tensor:
                             raise RuntimeError(f"Receptor dimension mismatch: mask has {n_rec}, tensor has {L_rec_tensor}")
-                        z_rec_expanded[b][rec_idx[:, None], rec_idx[None, :]] = z_receptor[b]
-                    z = z_complex - z_lig_expanded - z_rec_expanded
+                        # Receptor 영역 (Intra)에 z_receptor 값 할당
+                        z_unbound_mapped[b][rec_idx[:, None], rec_idx[None, :]] = z_receptor[b]
+
+                    # 2. Concatenation
+                    z = torch.cat([z_complex, z_unbound_mapped], dim=-1)
 
                 else:
                     # --- Bound 모드: 기존 단일 Complex 처리 ---
@@ -408,15 +416,15 @@ class AffinityModule(LightningModule):
                         batch_complex['edge_mask'].shape[0]
                     )
                     z_complex = z
-
+                    s_complex = s
                 # --- 공통: Coordinate Sampling (Rollout) ---
                 pred_trans_1 = None
                 if self._affinity_cfg.use_coords:
                     _, _, pred_positions, pred_trans_1 = self.rollout.sample(
                         self.model,
                         batch_complex,
-                        s,
-                        s,
+                        s_complex,
+                        s_complex,
                         z_complex
                     ) # save 3d structure for validation 
                     pred_positions_37 = []
@@ -455,7 +463,7 @@ class AffinityModule(LightningModule):
             # affinity prediction 
             affinity_pred_value, affinity_pred_logit = self.affinity_model(
                 s_inputs=s_init_complex[0],
-                s_trunk=s[0],
+                s_trunk=s_complex[0],
                 z_trunk=z[0],
                 inter_pair_mask=loop_mask_2d_complex[0],
                 x_pred_coords=pred_trans_1,

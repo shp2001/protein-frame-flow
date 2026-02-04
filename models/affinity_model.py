@@ -86,11 +86,11 @@ class AffinityHead(nn.Module):
         )
 
         self.to_affinity_pred_value = nn.Sequential(
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            Linear(self.c_z//2, self.c_z//4, initializer='relu'),
             nn.ReLU(),
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
+            Linear(self.c_z//4, self.c_z//4, initializer='relu'),
             nn.ReLU(),
-            LinearNoBias(self.c_z//2, 1),
+            LinearNoBias(self.c_z//4, 1),
         )
 
         self.to_affinity_pred_score = nn.Sequential(

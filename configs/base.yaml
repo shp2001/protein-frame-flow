@@ -26,7 +26,7 @@ data:
   
   sampler:
     # Setting for 48GB GPUs
-    max_batch_size: 40
+    max_batch_size: 1
     max_num_res_squared: 200_000
     ab_max_num_res: ${pdb_dataset.ab_max_num_res}
     general_max_num_res: ${pdb_dataset.general_max_num_res}
@@ -187,7 +187,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 1
+    accumulate_grad_batches: 8
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
