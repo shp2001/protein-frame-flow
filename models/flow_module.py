@@ -1000,7 +1000,7 @@ class FlowModule(LightningModule):
 
 
         else:
-            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factor_alt = loop_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
 
         for i in range(pred_positions.shape[0]):
