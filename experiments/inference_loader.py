@@ -128,7 +128,6 @@ class BaseDataset(Dataset):
 
     def process_csv_row(self, csv_row):
         path = csv_row['processed_path']
-        complex_id = csv_row['pdb_name']
         processed_row = _process_csv_row(path)
 
         if csv_row['mode'] == 'ab':
@@ -144,7 +143,6 @@ class BaseDataset(Dataset):
                     selected.append(ch)
                     seen.add(ch)
             processed_row['selected_chains'] = selected[:2]
-            print("selected_chains", processed_row['selected_chains'])
             scaffold_mask = load_antibody_mask(
                 scaffold_idx=scaffold_idx,
                 chain_index=processed_row['chain_index'],
@@ -264,7 +262,7 @@ def collate_fn(batch):
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=800,
+                max_len=400,
                 seq_list=feat['chain_seq_list'],
                 crop_ab=False,
                 include_ag=include_ag
