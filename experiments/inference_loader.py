@@ -271,7 +271,7 @@ def collate_fn(batch):
                 feat['trans_1'],
                 cdr_mask=feat['loop_mask'],
                 nan_mask=feat['res_mask'],
-                max_len=600,
+                max_len=1000,
                 seq_list=feat['chain_seq_list'],
                 crop_ab=False,
                 include_ag=include_ag
