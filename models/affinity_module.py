@@ -157,7 +157,7 @@ class AffinityModule(LightningModule):
 
         # 1. Unbound 모드 판별 (batch_0 내부 구조 확인)
         use_unbound = self._data_cfg.use_unbound
-
+        print(f'{os.path.basename(paired_batch["batch_0"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]} & {os.path.basename(paired_batch["batch_1"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]}')
         for i in range(2):
             full_sample = paired_batch[f"batch_{i}"]
             batch_complex = full_sample['complex']

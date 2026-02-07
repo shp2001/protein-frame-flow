@@ -874,12 +874,6 @@ class FlowModule(LightningModule):
 
         optimizer.step(closure=optimizer_closure)
 
-    def on_train_batch_start(self, batch, batch_idx):
-        # 첫 번째 optimizer 기준
-        optimizer = self.trainer.optimizers[0]
-        lr = optimizer.param_groups[0]['lr']
-        print(f"[Step {self.global_step}] Learning Rate: {lr:.6f}")
-
     def on_predict_start(self):
         self.pairformer_cache = {}
         self.current_pdb_id = None

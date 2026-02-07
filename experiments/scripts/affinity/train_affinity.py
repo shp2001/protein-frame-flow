@@ -19,6 +19,34 @@ import wandb
 log = eu.get_pylogger(__name__)
 torch.set_float32_matmul_precision('high')
 
+# class SetPairDataCallback(Callback):
+#     def on_train_epoch_start(self, trainer, pl_module):
+#         trainer.datamodule.set_current_epoch(trainer.current_epoch)
+#         log.info(f"Setting datamodule epoch to {trainer.current_epoch}")
+
+class SetPairDataCallback(Callback):
+    def on_train_epoch_start(self, trainer, pl_module):
+        epoch = trainer.current_epoch
+        log.info("=" * 70)
+        log.info(f"🔄 Epoch {epoch} Started - Regenerating Pairs...")
+        
+        # 1. Dataset pair 재생성
+        trainer.datamodule.set_current_epoch(epoch)
+        
+        # 2. DistributedSampler의 epoch 설정 (셔플 시드용)
+        train_loader = trainer.train_dataloader
+        if hasattr(train_loader, 'sampler') and hasattr(train_loader.sampler, 'set_epoch'):
+            train_loader.sampler.set_epoch(epoch)
+        
+        # 3. 디버깅: pair 개수 및 DataLoader 길이 확인
+        dataset = trainer.datamodule._train_dataset
+        num_pairs = len(dataset.pair_df)
+        pair_df_id = id(dataset.pair_df)
+        log.info(f"✅ Dataset Pairs: {num_pairs} (ID: {pair_df_id})")
+        
+        # DataLoader 길이 출력
+        log.info(f"   DataLoader Length: {len(train_loader)}")
+        log.info("=" * 70)
 
 class Experiment:
 
@@ -57,10 +85,10 @@ class Experiment:
             log.info(f"Checkpoints saved to {ckpt_dir}")
             
             # Model checkpoints
+            callbacks.append(SetPairDataCallback())
             callbacks.append(ModelCheckpoint(**self._exp_cfg.checkpointer))
             callbacks.append(LearningRateMonitor(logging_interval='step'))
             # Save config only for main process.
-
             cfg_path = os.path.join(ckpt_dir, 'config.yaml')
             # no perturbation 
             self._cfg.model.edge_features.contact_map_off_diag.perturb = False
