@@ -396,15 +396,15 @@ class AffinityPairSampler:
         elif kd2 >= 10 * kd1: return 1.0, True
         else: return None, False
 
-    def generate_epoch_pairs(self):
+    def generate_epoch_pairs(self, epoch):
         # [핵심] Validation 모드일 경우, 함수 호출 시마다 시드를 리셋하여 
         # 항상 '똑같은 Pair 조합'이 나오도록 보장합니다.
         if not self.is_training:
             self.rng = np.random.default_rng(self.seed)
         else:
             # Training일 때는 계속 랜덤 상태 유지
-            pass
-
+            current_seed = self.seed + epoch
+            self.rng = np.random.default_rng(current_seed)
         pairs = []
         seen_pairs = set() 
         clusters_insufficient = 0
@@ -418,50 +418,51 @@ class AffinityPairSampler:
         # 1. Intra-Cluster Pairing
         # ==================================================================
         
-        for cluster in current_clusters:
-            indices = self.cluster_dict[cluster]
-            n_samples = len(indices)
-            
-            if n_samples < 2:
-                clusters_insufficient += 1
-                continue
-
-            found_for_this_cluster = 0
-            
-            if n_samples <= 30:
-                all_combos = list(itertools.combinations(indices, 2))
-                # 리스트 셔플도 rng 사용
-                self.rng.shuffle(all_combos)
+        if self.pairs_per_cluster > 0:
+            for cluster in current_clusters:
+                indices = self.cluster_dict[cluster]
+                n_samples = len(indices)
                 
-                for idx1, idx2 in all_combos:
-                    pair_key = tuple(sorted((idx1, idx2)))
-                    if pair_key in seen_pairs: continue
+                if n_samples < 2:
+                    clusters_insufficient += 1
+                    continue
 
-                    label, is_valid = self.check_kd_ratio(idx1, idx2)
-                    if is_valid:
-                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
-                        seen_pairs.add(pair_key)
-                        found_for_this_cluster += 1
-                        if found_for_this_cluster >= self.pairs_per_cluster: break
-            
-            else:
-                attempts = 0
-                while found_for_this_cluster < self.pairs_per_cluster and attempts < 100:
-                    attempts += 1
-                    # rng.choice 사용
-                    idx1, idx2 = self.rng.choice(indices, 2, replace=False)
+                found_for_this_cluster = 0
+                
+                if n_samples <= 30:
+                    all_combos = list(itertools.combinations(indices, 2))
+                    # 리스트 셔플도 rng 사용
+                    self.rng.shuffle(all_combos)
                     
-                    pair_key = tuple(sorted((idx1, idx2)))
-                    if pair_key in seen_pairs: continue
-                    
-                    label, is_valid = self.check_kd_ratio(idx1, idx2)
-                    if is_valid:
-                        pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
-                        seen_pairs.add(pair_key)
-                        found_for_this_cluster += 1
+                    for idx1, idx2 in all_combos:
+                        pair_key = tuple(sorted((idx1, idx2)))
+                        if pair_key in seen_pairs: continue
 
-            if found_for_this_cluster < self.pairs_per_cluster:
-                clusters_insufficient += 1
+                        label, is_valid = self.check_kd_ratio(idx1, idx2)
+                        if is_valid:
+                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
+                            seen_pairs.add(pair_key)
+                            found_for_this_cluster += 1
+                            if found_for_this_cluster >= self.pairs_per_cluster: break
+                
+                else:
+                    attempts = 0
+                    while found_for_this_cluster < self.pairs_per_cluster and attempts < 100:
+                        attempts += 1
+                        # rng.choice 사용
+                        idx1, idx2 = self.rng.choice(indices, 2, replace=False)
+                        
+                        pair_key = tuple(sorted((idx1, idx2)))
+                        if pair_key in seen_pairs: continue
+                        
+                        label, is_valid = self.check_kd_ratio(idx1, idx2)
+                        if is_valid:
+                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
+                            seen_pairs.add(pair_key)
+                            found_for_this_cluster += 1
+
+                if found_for_this_cluster < self.pairs_per_cluster:
+                    clusters_insufficient += 1
 
         # ==================================================================
         # 2. Inter-Cluster Pairing
@@ -757,7 +758,7 @@ class PdbDataset(AffinityDataset):
                 pairs_per_cluster=dataset_cfg.pairs_per_cluster,
                 is_training=True
             )
-            initial_pairs = self.sampler.generate_epoch_pairs()
+            initial_pairs = self.sampler.generate_epoch_pairs(self.current_epoch)
         else:
             print(f">> [Init] Generating pairs for validation...")
             self.sampler = AffinityPairSampler(
@@ -765,7 +766,7 @@ class PdbDataset(AffinityDataset):
                 pairs_per_cluster=dataset_cfg.pairs_per_cluster,
                 is_training=False
             )
-            initial_pairs = self.sampler.generate_epoch_pairs()
+            initial_pairs = self.sampler.generate_epoch_pairs(self.current_epoch)
         # ------------------------------------------------------------------
         # 3. 부모 클래스 (AffinityDataset) 초기화
         # ------------------------------------------------------------------
@@ -791,7 +792,7 @@ class PdbDataset(AffinityDataset):
             self._log.info(f">> [Epoch {epoch}] Regenerating pairs for diversity...")
             
             # 1. 새로운 Pair 생성
-            new_pairs = self.sampler.generate_epoch_pairs()
+            new_pairs = self.sampler.generate_epoch_pairs(self.current_epoch)
             
             # 2. 데이터셋 내부의 pair_df 교체
             self.pair_df = new_pairs

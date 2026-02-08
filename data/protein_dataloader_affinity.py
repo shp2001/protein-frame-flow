@@ -17,6 +17,76 @@ import analysis.utils as au
 from itertools import accumulate
 import bisect
 
+class DynamicDistributedSampler(DistributedSampler):
+    """
+    Dataset의 길이가 epoch마다 동적으로 변하는 경우를 위한 DistributedSampler.
+    num_samples와 total_size를 property로 만들어 매번 동적으로 계산합니다.
+    """
+    def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True, seed=0, drop_last=False):
+        # 부모 클래스 초기화 (num_samples, total_size는 property로 대체)
+        if num_replicas is None:
+            num_replicas = torch.distributed.get_world_size()
+        if rank is None:
+            rank = torch.distributed.get_rank()
+        if rank >= num_replicas or rank < 0:
+            raise ValueError(
+                f"Invalid rank {rank}, rank should be in the interval [0, {num_replicas - 1}]"
+            )
+        self.dataset = dataset
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.epoch = 0
+        self.drop_last = drop_last
+        self.shuffle = shuffle
+        self.seed = seed
+    
+    @property
+    def num_samples(self):
+        """매번 동적으로 계산"""
+        if self.drop_last and len(self.dataset) % self.num_replicas != 0:
+            return len(self.dataset) // self.num_replicas
+        else:
+            return (len(self.dataset) + self.num_replicas - 1) // self.num_replicas
+    
+    @property
+    def total_size(self):
+        """매번 동적으로 계산"""
+        return self.num_samples * self.num_replicas
+    
+    def __iter__(self):
+        # Shuffle 또는 순차 인덱스 생성
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self.seed + self.epoch)
+            indices = torch.randperm(len(self.dataset), generator=g).tolist()
+        else:
+            indices = list(range(len(self.dataset)))
+
+        # Padding 또는 Drop
+        if not self.drop_last:
+            padding_size = self.total_size - len(indices)
+            if padding_size > 0:
+                if padding_size <= len(indices):
+                    indices += indices[:padding_size]
+                else:
+                    indices += (indices * ((padding_size // len(indices)) + 1))[:padding_size]
+        else:
+            indices = indices[:self.total_size]
+        
+        assert len(indices) == self.total_size
+
+        # Subsample for this rank
+        indices = indices[self.rank:self.total_size:self.num_replicas]
+        assert len(indices) == self.num_samples
+
+        return iter(indices)
+    
+    def __len__(self):
+        return self.num_samples
+    
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
 class ProteinData(LightningDataModule):
 
     def __init__(self, *, data_cfg, train_dataset, valid_dataset, predict_dataset=None):
@@ -31,8 +101,7 @@ class ProteinData(LightningDataModule):
 
     def set_current_epoch(self, epoch):
         self._current_epoch = epoch
-        if hasattr(self._train_dataset, 'set_current_epoch'):
-            self._train_dataset.set_current_epoch(epoch)
+        self._train_dataset.set_current_epoch(epoch)
 
     def _collate_single_side(self, batch_feats):
         """
@@ -155,14 +224,15 @@ class ProteinData(LightningDataModule):
     def train_dataloader(self, rank=None, num_replicas=None):
         return DataLoader(
             self._train_dataset,
-            sampler=DistributedSampler(
+            sampler=DynamicDistributedSampler(
                 self._train_dataset,
-                shuffle=True
+                shuffle=True,
+                drop_last=True
             ),
             num_workers=self.loader_cfg.num_workers,
             prefetch_factor=None if self.loader_cfg.num_workers == 0 else self.loader_cfg.prefetch_factor,
             pin_memory=False,
-            persistent_workers=True if self.loader_cfg.num_workers > 0 else False,
+            persistent_workers=False,
             collate_fn=self.collate_fn,
         )
 

@@ -154,12 +154,12 @@ class AffinityModule(LightningModule):
     def model_step(self, paired_batch, N_cycle):
         affinity_pred_values = []
         affinity_pred_logits = []
+        print(f'{os.path.basename(paired_batch["batch_0"]["raw_path"])} & {os.path.basename(paired_batch["batch_1"]["raw_path"])}')
 
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
             diffuse_mask = batch["diffuse_mask"]
-            print("diffuse_mask", diffuse_mask.shape)
-
+            
             if 'ligand_mask' in batch:
                 ligand_mask = batch['ligand_mask']
             else:

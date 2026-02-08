@@ -144,7 +144,7 @@ experiment:
 
     # affinity loss 
     rank_loss_weight: 5.0
-    rank_margin: 0.2
+    rank_margin: 0.5
     reg_loss_weight: 0.0 # 0.5
     reg_margin: 1.0
     prob_loss_weight: 0.0 # 1.0
@@ -167,11 +167,11 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.3.2.2_w_coords
+    name: v2.3.2.2_w_coords_margin_0.5_pair_reinit
     project: v2.3.2.2_affinity
   optimizer:
     warmup_steps: 0
-    decay_steps: 0
+    decay_steps: 500_000
     min_lr: 1e-4
     max_lr: 1e-4
   trainer:
