@@ -157,7 +157,7 @@ class AffinityModule(LightningModule):
 
         # 1. Unbound 모드 판별 (batch_0 내부 구조 확인)
         use_unbound = self._data_cfg.use_unbound
-        print(f'{os.path.basename(paired_batch["batch_0"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]} & {os.path.basename(paired_batch["batch_1"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]}')
+        print(f'{os.path.basename(paired_batch["batch_0"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]} (KD: {paired_batch["kd1"]}) & {os.path.basename(paired_batch["batch_1"]["complex"]["raw_path"])}_{paired_batch["batch_1"]["complex"]["mutation"]} (KD: {paired_batch["kd2"]})')
         for i in range(2):
             full_sample = paired_batch[f"batch_{i}"]
             batch_complex = full_sample['complex']
@@ -261,7 +261,7 @@ class AffinityModule(LightningModule):
                 s_inputs=s_init_complex[0],
                 s_trunk=s_complex[0],
                 z_trunk=z[0],
-                inter_pair_mask=loop_mask_2d_complex[0],
+                inter_pair_mask=batch_complex['edge_mask'][0],
                 x_pred_coords=pred_trans_1,
                 use_coords=self._affinity_cfg.use_coords
                 )       
@@ -280,6 +280,7 @@ class AffinityModule(LightningModule):
         affinity_rank_loss = margin_loss_fn(affinity_pred_values[0], affinity_pred_values[1], target)
         if len(affinity_rank_loss.shape) == 1:
             affinity_rank_loss = affinity_rank_loss[None, ...]
+        affinity_rank_loss = torch.clamp(affinity_rank_loss, max=3.0)
         
         # calculate affinity regression loss 
         preds = torch.stack(affinity_pred_values) # (2, B)
@@ -316,6 +317,16 @@ class AffinityModule(LightningModule):
         total_loss = (affinity_rank_loss.mean() * self._exp_cfg.training.rank_loss_weight + 
                       affinity_reg_loss.mean() * self._exp_cfg.training.reg_loss_weight + 
                       affinity_binding_prob_loss.mean() * self._exp_cfg.training.prob_loss_weight)
+
+        print("--------------------------------")
+        print("affinity_pred_values[0]", affinity_pred_values[0])
+        print("affinity_pred_values[1]", affinity_pred_values[1])
+        print("log_kd1", torch.log10(paired_batch['kd1']))
+        print("log_kd2", torch.log10(paired_batch['kd2']))
+        print("target", target)
+        print("affinity_rank_loss", affinity_rank_loss)
+        print("total_loss", total_loss)
+        print("--------------------------------")
 
         return {
             "total_loss": total_loss,
@@ -465,7 +476,7 @@ class AffinityModule(LightningModule):
                 s_inputs=s_init_complex[0],
                 s_trunk=s_complex[0],
                 z_trunk=z[0],
-                inter_pair_mask=loop_mask_2d_complex[0],
+                inter_pair_mask=batch_complex['edge_mask'][0],
                 x_pred_coords=pred_trans_1,
                 use_coords=self._affinity_cfg.use_coords
                 ) 

@@ -46,6 +46,10 @@ class AffinityHead(nn.Module):
         self.c_z = c_z
         self.c_s_inputs = c_s_inputs
         self.stop_gradient = stop_gradient
+        self.input_ztrunk_ln = LayerNorm(self.c_z)
+        self.linear_no_bias_z = LinearNoBias(
+            in_features=self.c_z, out_features=self.c_z
+        )
         self.linear_no_bias_s1 = LinearNoBias(
             in_features=self.c_s_inputs, out_features=self.c_z
         )
@@ -60,8 +64,6 @@ class AffinityHead(nn.Module):
         self.upper_bins = nn.Parameter(upper_bins, requires_grad=False)
         self.num_bins = len(lower_bins)  # + 1
 
-        self.input_strunk_ln = LayerNorm(self.c_s)
-
         self.linear_no_bias_d = LinearNoBias(
             in_features=self.num_bins, out_features=self.c_z
         )
@@ -75,8 +77,6 @@ class AffinityHead(nn.Module):
             dropout=pairformer_dropout,
             blocks_per_ckpt=blocks_per_ckpt,
         )
-
-        self.norm_g = nn.LayerNorm(self.c_z)
 
         self.affinity_out_mlp = nn.Sequential(
             Linear(self.c_z, self.c_z, initializer='relu'),
@@ -136,14 +136,7 @@ class AffinityHead(nn.Module):
             s_trunk = s_trunk.detach()
             z_trunk = z_trunk.detach()
 
-        s_trunk = self.input_strunk_ln(torch.clamp(s_trunk, min=-512, max=512))
-
-        if not use_embedding:
-            if inplace_safe:
-                z_trunk *= 0
-            else:
-                z_trunk = 0 * z_trunk
-
+        z_trunk = self.linear_no_bias_z(self.input_ztrunk_ln(z_trunk))
         z_init = (
             self.linear_no_bias_s1(s_inputs)[..., None, :, :]
             + self.linear_no_bias_s2(s_inputs)[..., None, :]
@@ -235,11 +228,11 @@ class AffinityHead(nn.Module):
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
         # apply MeanPooling 
         g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
-        g = self.norm_g(g)
         
         # Affinity MLP 
         g = self.affinity_out_mlp(g) # (64)
         
+
         affinity_pred_value = self.to_affinity_pred_value(g)
         affinity_pred_score = self.to_affinity_pred_score(g)
         affinity_logits_binary = self.to_affinity_logits_binary(affinity_pred_score)

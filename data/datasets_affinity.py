@@ -472,7 +472,6 @@ class AffinityDataset(Dataset):
             ligand_chains_str = h_str + l_str
             receptor_chains_str = ag_str
 
-        pdb_id, ligand_chains_str, receptor_chains_str = complex_id.split('_')
         self.ligand_chains = list(ligand_chains_str)
         self.receptor_chains = list(receptor_chains_str)
         # TCR ligand-receptor mapping is changed 

@@ -1,11 +1,12 @@
 #!/bin/bash
-#SBATCH -J v2.4.0_affinity
+#SBATCH -J v2.4.0_affinity_no_gnorm
 #SBATCH -p h100
 #SBATCH --gres=gpu:h100:4
 #SBATCH --mem=320G 
+#SBATCH --qos=cssb_h100
 #SBATCH -c 32
 #SBATCH -w node02
-#SBATCH --error=/home/psh/logs/v2.4.0.err
+#SBATCH --error=/home/psh/logs/v2.4.0_dev1.err
 #SBATCH --out=/home/psh/logs/v2.4.0.out
 
 echo "Running train_abb3.py"
