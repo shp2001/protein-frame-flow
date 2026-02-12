@@ -323,7 +323,7 @@ class AffinityPairSampler:
         # Validation에서도 매 Epoch마다 똑같은 결과를 얻으려면 generate 함수 안에서 리셋해야 함
         self.rng = np.random.default_rng(None if is_training else seed)
 
-    def check_kd_ratio(self, idx1, idx2):
+    def check_kd_ratio(self, idx1, idx2, threshold):
         # ... (기존과 동일) ...
         kd1 = self.kd_values[idx1]
         kd2 = self.kd_values[idx2]
@@ -333,8 +333,8 @@ class AffinityPairSampler:
         if kd2 == float('inf'): return 1.0, True
         if kd1 <= 0 or kd2 <= 0: return None, False
 
-        if kd1 >= 10 * kd2: return 0.0, True
-        elif kd2 >= 10 * kd1: return 1.0, True
+        if kd1 >= threshold * kd2: return 0.0, True
+        elif kd2 >= threshold * kd1: return 1.0, True
         else: return None, False
 
     def generate_epoch_pairs(self, epoch):
@@ -378,7 +378,7 @@ class AffinityPairSampler:
                         pair_key = tuple(sorted((idx1, idx2)))
                         if pair_key in seen_pairs: continue
 
-                        label, is_valid = self.check_kd_ratio(idx1, idx2)
+                        label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
                         if is_valid:
                             pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
                             seen_pairs.add(pair_key)
@@ -395,7 +395,7 @@ class AffinityPairSampler:
                         pair_key = tuple(sorted((idx1, idx2)))
                         if pair_key in seen_pairs: continue
                         
-                        label, is_valid = self.check_kd_ratio(idx1, idx2)
+                        label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
                         if is_valid:
                             pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
                             seen_pairs.add(pair_key)
@@ -422,7 +422,7 @@ class AffinityPairSampler:
                 pair_key = tuple(sorted((idx1, idx2)))
                 if pair_key in seen_pairs: continue
                 
-                label, is_valid = self.check_kd_ratio(idx1, idx2)
+                label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
                 if is_valid:
                     pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'inter'})
                     seen_pairs.add(pair_key)

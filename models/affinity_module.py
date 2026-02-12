@@ -167,7 +167,6 @@ class AffinityModule(LightningModule):
 
             # 2. 두 잔기 모두 loop_mask가 1인 영역 필터링 [B, L, L]
             loop_mask_complex = batch_complex['loop_mask'] # (B, L)
-            loop_mask_2d_complex = (loop_mask_complex[:, :, None] * loop_mask_complex[:, None, :]).float() # (B, L, L)
 
             with torch.no_grad():
                 if use_unbound:
@@ -658,28 +657,97 @@ class AffinityModule(LightningModule):
         print("Pairformer cache has been initialized.")
 
     def predict_step(self, batch, batch_idx):
-        del batch_idx # Unused
-        device = f'cuda:{torch.cuda.current_device()}'
+        use_unbound = self._infer_cfg.use_unbound
+        batch_complex = batch["complex"]
+        loop_mask_complex = batch_complex['loop_mask'] # (B, L)
         interpolant = Interpolant(self._infer_cfg.interpolant) 
-        interpolant.set_device(device)
+        interpolant.set_device(loop_mask_complex.device)
 
-        num_batch = batch['diffuse_mask'].shape[0]
-        mutation = batch['mutation']
-        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation
-        if 'data_source' in batch:
-            data_source = batch['data_source']
-            pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
-        diffuse_mask = batch['diffuse_mask']
+        with torch.no_grad():
+            if use_unbound:
+                batch_ligand = batch['ligand']
+                batch_receptor = batch['receptor']
 
-        if "ligand_mask" not in batch:
-            ligand_mask = diffuse_mask 
-        else:
-            ligand_mask = batch['ligand_mask']
+                s_init_complex, z_init_complex, _ = self.model.embed_input(batch_complex)
+                s_init_ligand, z_init_ligand, _ = self.model.embed_input(batch_ligand)
+                s_init_receptor, z_init_receptor, _ = self.model.embed_input(batch_receptor)
+
+                # 2. Pairformer Pass (Complex)
+                _, s_complex, z_complex, _ = self.model.do_pairformer(
+                    s_init_complex, z_init_complex, 
+                    batch_complex['edge_mask'][0][None, ...], 
+                    self._model_cfg.pairformer.n_cycles, 
+                    batch_complex['edge_mask'].shape[0]
+                )
+                # 3. Pairformer Pass (Ligand)
+                _, _, z_ligand, _ = self.model.do_pairformer(
+                    s_init_ligand, z_init_ligand, 
+                    batch_ligand['edge_mask'][0][None, ...], 
+                    self._model_cfg.pairformer.n_cycles, 
+                    batch_ligand['edge_mask'].shape[0]
+                )
+                # 4. Pairformer Pass (Receptor)
+                _, _, z_receptor, _ = self.model.do_pairformer(
+                    s_init_receptor, z_init_receptor, 
+                    batch_receptor['edge_mask'][0][None, ...], 
+                    self._model_cfg.pairformer.n_cycles, 
+                    batch_receptor['edge_mask'].shape[0]
+                )
+                # --- Unbound Feature Mapping & Concatenation ---
+                B, L, _, C = z_complex.shape
+                
+                # 1. Unbound 정보를 담을 텐서 생성 (모든 값을 0으로 초기화)
+                # [B, L_complex, L_complex, 128]
+                z_unbound_mapped = torch.zeros_like(z_complex)
+
+                ligand_mask = batch_complex['ligand_mask'].bool()
+                is_ligand = ligand_mask
+                is_receptor = ~is_ligand
+
+                L_lig_tensor = z_ligand.shape[1]
+                L_rec_tensor = z_receptor.shape[1]
+
+                for b in range(B):
+                    lig_idx = is_ligand[b].nonzero(as_tuple=True)[0]
+                    rec_idx = is_receptor[b].nonzero(as_tuple=True)[0]
+
+                    n_lig = len(lig_idx)
+                    n_rec = len(rec_idx)
+
+                    # --- Ligand 영역 채우기 ---
+                    if n_lig != L_lig_tensor:
+                        raise RuntimeError(f"Ligand dimension mismatch: mask has {n_lig}, tensor has {L_lig_tensor}")
+                    # Ligand 영역 (Intra)에 z_ligand 값 할당
+                    z_unbound_mapped[b][lig_idx[:, None], lig_idx[None, :]] = z_ligand[b]
+                    # --- Receptor 영역 채우기 ---
+                    if n_rec != L_rec_tensor:
+                        raise RuntimeError(f"Receptor dimension mismatch: mask has {n_rec}, tensor has {L_rec_tensor}")
+                    # Receptor 영역 (Intra)에 z_receptor 값 할당
+                    z_unbound_mapped[b][rec_idx[:, None], rec_idx[None, :]] = z_receptor[b]
+
+                # 2. Concatenation
+                z = torch.cat([z_complex, z_unbound_mapped], dim=-1)
+
+            else:
+                # --- Bound 모드: 기존 단일 Complex 처리 ---
+                s_init_complex, z_init_complex, _ = self.model.embed_input(batch_complex)
+                _, s, z, _ = self.model.do_pairformer(
+                    s_init_complex, z_init_complex, 
+                    batch_complex['edge_mask'][0][None, ...], 
+                    self._model_cfg.pairformer.n_cycles, 
+                    batch_complex['edge_mask'].shape[0]
+                )
+                z_complex = z
+
+
+        num_batch = batch_complex['diffuse_mask'].shape[0]
+        mutation = batch_complex['mutation']
+        pdb_mt_id = batch_complex['processed_path'][0].split('/')[-1].replace('.pkl', '') + "_" + mutation
+        if 'data_source' in batch_complex:
+            data_source = batch_complex['data_source'][0]
+            pdb_mt_id = batch_complex['processed_path'][0].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
+        diffuse_mask = batch_complex['diffuse_mask']
             
-        ligand_mask_i = ligand_mask[:, :, None]  # (B, L, 1)
-        ligand_mask_j = ligand_mask[:, None, :]  # (B, 1, L)
-        inter_mask = 1 - (ligand_mask_i == ligand_mask_j).float() # 0: diag / 1: off-diag
-
         sample_root_dir = os.path.join(self.inference_dir, pdb_mt_id)
 
         if not os.path.exists(sample_root_dir):
@@ -689,56 +757,40 @@ class AffinityModule(LightningModule):
             self.pairformer_cache.clear()
             self.current_pdb_id = pdb_mt_id
 
-        if pdb_mt_id in self.pairformer_cache:
-            s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_mt_id]
-            
-        else:
-            s_init, z_init, trans_perturbed = self.model.embed_input(batch)
-            _, s, z, pair_outputs = self.model.do_pairformer(
-                s_init,
-                z_init,
-                batch['edge_mask'][0][None, ...],
-                self._model_cfg.pairformer.n_cycles,
-                num_batch
-            )
-
-            # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[pdb_mt_id] = (s_init, s, z, trans_perturbed)
-
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
-            batch,
-            s,
-            s,
-            z
+            batch_complex,
+            s_complex,
+            s_complex,
+            z_complex
         )
 
         bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1)) # (B, N_steps, L, 37, 3)
         pred_positions = du.to_numpy(pred_positions)
         pred_positions_37 = []
 
-        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
-        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
+        batch_complex['residx_atom37_to_atom14'] = batch_complex['residx_atom37_to_atom14'][0]
+        batch_complex['atom37_atom_exists'] = batch_complex['atom37_atom_exists'][0]
 
         if hasattr(self, "confidence_model"):
             plddt_pred, pae_pred = self.confidence_model(
-                batch['ref_feature_dict'],
+                batch_complex['ref_feature_dict'],
                 s[0],
                 s[0],
                 z[0],
-                batch['edge_mask'][0],
+                batch_complex['edge_mask'][0],
                 pred_trans_1,
             )       
             plddt_bins = plddt_pred.shape[-1]
             plddt_probs = nn.functional.softmax(plddt_pred, dim=-1)  # [B, N_atom, plddt_bins]
             bin_values = torch.linspace(0, 1, plddt_bins, device=plddt_pred.device)  # [plddt_bins]
             plddt_score = torch.sum(plddt_probs * bin_values, dim=-1)  # [B, N_atom]
-            b_factors_14 = du.atom_unflatten(plddt_score, batch['atom14_gt_exists']) # [B, N_token, 14]
+            b_factors_14 = du.atom_unflatten(plddt_score, batch_complex['atom14_gt_exists']) # [B, N_token, 14]
             b_factors_14 = du.to_numpy(b_factors_14) * 100
 
 
             # cdr 별 plddt 저장 
-            anchors = find_anchor(batch['loop_mask'][0], only_h3=False)
+            anchors = find_anchor(batch_complex['loop_mask'][0], only_h3=False)
             plddts_by_cdr_all_atom = []
             plddts_by_cdr_backbone = []
             for i in range(len(anchors)//2):
@@ -747,12 +799,12 @@ class AffinityModule(LightningModule):
 
                 # all atom plddt 
                 cdr_b_factors = b_factors_14[:, start+1:end, :] # (B, L_cdr, 14)
-                cdr_atom14_mask = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :]) # (B, L_cdr, 14)
+                cdr_atom14_mask = du.to_numpy(batch_complex['atom14_gt_exists'][:, start+1:end, :]) # (B, L_cdr, 14)
                 plddts_by_cdr_all_atom.append(np.sum(cdr_b_factors, axis=(-1, -2)) / np.sum(cdr_atom14_mask, axis=(-1, -2))) # (B)
 
                 # all atom plddt 
                 cdr_b_factors_bb = b_factors_14[:, start+1:end, :3] # (B, L_cdr, 3)
-                cdr_atom14_mask_bb = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :3]) # (B, L_cdr, 3)
+                cdr_atom14_mask_bb = du.to_numpy(batch_complex['atom14_gt_exists'][:, start+1:end, :3]) # (B, L_cdr, 3)
                 plddts_by_cdr_backbone.append(np.sum(cdr_b_factors_bb, axis=(-1, -2)) / np.sum(cdr_atom14_mask_bb, axis=(-1, -2))) # (B)
                 
             plddts_by_cdr_all_atom = np.stack(plddts_by_cdr_all_atom, axis=1) # (B, 6)
@@ -761,7 +813,7 @@ class AffinityModule(LightningModule):
             # b_factor 차원 (14 -> 37)
             b_factors = []
             for i in range(pred_positions.shape[0]):
-                b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch)
+                b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch_complex)
                 b_factors.append(np.squeeze(b_factors_37, axis=-1))
             b_factors = np.stack(b_factors) # (B, L, 37)
 
@@ -769,19 +821,19 @@ class AffinityModule(LightningModule):
         else:
             b_factor_alt = diffuse_mask.cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
+        
         if hasattr(self, "affinity_model"):
-            inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred_value, affinity_pred_logit = self.affinity_model(
-                s_inputs=s_init[0],
-                s_trunk=s[0],
+                s_inputs=s_init_complex[0],
+                s_trunk=s_complex[0],
                 z_trunk=z[0],
-                inter_pair_mask=inter_pair_mask[0],
+                inter_pair_mask=batch_complex['edge_mask'][0],
                 x_pred_coords=pred_trans_1,
                 use_coords=self._affinity_cfg.use_coords
                 )
             
         for i in range(pred_positions.shape[0]):
-            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
+            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch_complex) # (L_crop, 37, 3)
             pred_positions_37.append(pred_position_37)
         pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
 
@@ -801,10 +853,10 @@ class AffinityModule(LightningModule):
             bb_traj = bb_trajs[i]
 
             # save structure data 
-            aatype = du.to_numpy(batch['aatype'][i].int())
-            chain_idx = du.to_numpy(batch['chain_idx'][i].int())
-            residue_idx = du.to_numpy(batch['residue_index'][i].int())
-            diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
+            aatype = du.to_numpy(batch_complex['aatype'][i].int())
+            chain_idx = du.to_numpy(batch_complex['chain_idx'][i].int())
+            residue_idx = du.to_numpy(batch_complex['residue_index'][i].int())
+            diffuse_mask = du.to_numpy(batch_complex['diffuse_mask'][i].int())
             b_factor = b_factors[i]
             _ = eu.save_traj(
                 sample=pred_position, # (L, 37, 3)
@@ -818,15 +870,6 @@ class AffinityModule(LightningModule):
                 residue_index=residue_idx,
                 save_traj_bool=self._interpolant_cfg.save_traj
             )
-            # save perturbed trans 
-            if trans_perturbed != None:
-                perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
-                du.save_perturbed_trans(
-                    trans_perturbed[i][None, ...], 
-                    batch['chain_index'][i][None, ...], 
-                    batch['residue_index'][i][None, ...],
-                    perturbed_trans_path
-                    )
 
             # save plddt 
             if hasattr(self, "confidence_model"):
@@ -858,10 +901,10 @@ class AffinityModule(LightningModule):
                 affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
     
                 affinity_dict = {
-                    "category": batch['mode'],
+                    "category": batch_complex['mode'],
                     "affinity_pred_value": affinity_pred_value.squeeze().item(),
                     "affinity_pred_logit": affinity_pred_logit.squeeze().item(),
-                    "affinity_true_log_value": torch.log10(batch['affinity_kd']).squeeze().item()
+                    "affinity_true_log_value": torch.log10(torch.tensor(batch_complex['affinity_kd'][0])).squeeze().item()
                 }
                 with open(affinity_json_path, 'w') as f:
                     json.dump(affinity_dict, f, indent=4)

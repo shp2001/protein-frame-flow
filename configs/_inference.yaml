@@ -15,14 +15,15 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_loop_ppi/CDRFlow_v2.4.0_loop_ppi/2026-01-29_00-29-37/epoch=57-step=41470.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.4.0_affinity/v2.4.0_affinity_no_norm_g_4_ratio/2026-02-11_22-08-25/epoch=41-step=2394.ckpt
   use_gpu: True
   num_gpus: 1
 
   # trans rot perturbation 
   perturbation: False 
-  ag_interface_condition: True # if True: ag interface backbone is conditioned  / else: ag interface should be predicted
-
+  ag_interface_condition: False # if True: ag interface backbone is conditioned  / else: ag interface should be predicted
+  use_unbound: True 
+  
   interpolant:
     use_prmsd: False
     min_t: 1e-2
@@ -85,9 +86,10 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/BioBetter/kkh_output/meta/metadata_acc_med_high.csv
+    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_test_valid.csv
+    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_test_valid.csv 
     # Number of scaffolds to sample per target.
-    samples_per_target: 10
+    samples_per_target: 1
 
     # Batch size when sampling from the model
     batch_size: 1

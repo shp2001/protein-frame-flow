@@ -104,7 +104,7 @@ experiment:
   debug: False
   seed: 123
   num_devices: 4
-  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0/CDRFlow_v2.4.0_loop_ppi/2026-01-29_00-29-37/epoch=47-step=34320.ckpt
+  warm_start: /home/psh/protein-frame-flow/ckpt/v2.4.0_affinity/v2.4.0_affinity_no_norm_g/2026-02-10_21-32-21/epoch=51-step=1404.ckpt
   warm_start_cfg_override: False
   training:
     mask_plddt: True
@@ -149,7 +149,7 @@ experiment:
 
     # affinity loss 
     rank_loss_weight: 1.0 # 5.0
-    rank_margin: 0.5
+    rank_margin: 0.2
     reg_loss_weight: 0.0 # 0.5
     reg_margin: 0.0
     prob_loss_weight: 0.0 # 1.0
@@ -172,13 +172,13 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_affinity_no_norm_g
+    name: v2.4.0_affinity_no_norm_g_4_ratio
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0
     decay_steps: 500_000
-    min_lr: 5e-4
-    max_lr: 5e-4
+    min_lr: 1e-4
+    max_lr: 1e-4
   trainer:
     overfit_batches: 0
     min_epochs: 1 # prevents early stopping
@@ -187,7 +187,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 16
+    accumulate_grad_batches: 8
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True
