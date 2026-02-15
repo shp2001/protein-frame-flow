@@ -148,9 +148,9 @@ experiment:
     sc_viol_loss_t_pass: 0.75
 
     # affinity loss 
-    rank_loss_weight: 1.0 # 5.0
-    rank_margin: 0.2
-    reg_loss_weight: 0.0 # 0.5
+    rank_loss_weight: 0.0 # 5.0
+    rank_margin: 0.3
+    reg_loss_weight: 1.0 # 0.5
     reg_margin: 0.0
     prob_loss_weight: 0.0 # 1.0
 
@@ -172,7 +172,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_affinity_no_norm_g_4_ratio
+    name: v2.4.0_affinity_no_norm_g_reg
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0

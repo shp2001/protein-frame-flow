@@ -2,10 +2,9 @@ import pandas as pd
 import numpy as np
 import random
 from collections import defaultdict
-
-import itertools 
+import bisect 
 import re
-import copy 
+import itertools
 import json 
 import os 
 
@@ -304,59 +303,82 @@ class DataManager:
         return df, cluster_group
 
 
-# ==============================================================================
-# 3. Pair Sampler (Pairing Logic - 변수 적용됨)
-# ==============================================================================
-
 class AffinityPairSampler:
-    def __init__(self, data_manager, pairs_per_cluster=6, is_training=True, seed=42):
+    def __init__(self, data_manager, pairs_per_cluster=1, is_training=True, seed=42, 
+                 fold_threshold=5.0, upper_fold_threshold=1000.0):
         self.affinity_df = data_manager.affinity_df
         self.cluster_dict = data_manager.cluster_group
         self.clusters = list(self.cluster_dict.keys())
         self.kd_values = self.affinity_df['Affinity_Kd [nM]'].values
         
+        # 설정값
         self.pairs_per_cluster = pairs_per_cluster
         self.is_training = is_training
         self.seed = seed
+        self.fold_threshold = fold_threshold        # 최소 차이 (예: 5배)
+        self.upper_fold_threshold = upper_fold_threshold  # 최대 차이 (예: 50배)
         
-        # Generator 초기화 (Training이면 None -> 랜덤, Valid면 고정 값)
-        # Validation에서도 매 Epoch마다 똑같은 결과를 얻으려면 generate 함수 안에서 리셋해야 함
+        # Generator 초기화
         self.rng = np.random.default_rng(None if is_training else seed)
 
-    def check_kd_ratio(self, idx1, idx2, threshold):
-        # ... (기존과 동일) ...
-        kd1 = self.kd_values[idx1]
-        kd2 = self.kd_values[idx2]
+        # [Optim] Inter-cluster 검색을 위한 전체 정렬
+        self._prepare_global_sort()
 
-        if kd1 == float('inf') and kd2 == float('inf'): return None, False
-        if kd1 == float('inf'): return 0.0, True
-        if kd2 == float('inf'): return 1.0, True
-        if kd1 <= 0 or kd2 <= 0: return None, False
+    def _prepare_global_sort(self):
+        """전체 데이터셋 Kd 정렬 (Inter-cluster 검색 속도 최적화)"""
+        self.sorted_indices = np.argsort(self.kd_values)
+        self.sorted_kds = self.kd_values[self.sorted_indices]
+        self.first_inf_idx = bisect.bisect_left(self.sorted_kds, float('inf'))
 
-        if kd1 >= threshold * kd2: return 0.0, True
-        elif kd2 >= threshold * kd1: return 1.0, True
-        else: return None, False
+    def check_kd_ratio(self, val1, val2, min_fold, max_fold):
+        """
+        값 차이가 [min_fold, max_fold) 구간 내에 있는지 확인
+        """
+        if val1 <= 0 or val2 <= 0: return None, False
+        
+        # 둘 다 inf -> 차이 없음 -> False
+        if val1 == float('inf') and val2 == float('inf'): return None, False
+        
+        # 하나만 inf -> 비율 무한대
+        if val1 == float('inf') or val2 == float('inf'):
+            # 상한선이 유한하면(예: 50배), inf와의 매칭은 허용 불가
+            if max_fold != float('inf'):
+                return None, False
+            
+            # 상한선이 없으면(inf), 하한선은 자동 충족
+            if val1 == float('inf'): return 0.0, True # val1(inf) > val2
+            if val2 == float('inf'): return 1.0, True # val2(inf) > val1
+
+        # 둘 다 Finite
+        if val1 >= val2:
+            ratio = val1 / val2
+            if min_fold <= ratio < max_fold:
+                return 0.0, True
+        else:
+            ratio = val2 / val1
+            if min_fold <= ratio < max_fold:
+                return 1.0, True
+                
+        return None, False
 
     def generate_epoch_pairs(self, epoch):
-        # [핵심] Validation 모드일 경우, 함수 호출 시마다 시드를 리셋하여 
-        # 항상 '똑같은 Pair 조합'이 나오도록 보장합니다.
+        # 1. 시드 설정 (Validation 결정론적 보장)
         if not self.is_training:
             self.rng = np.random.default_rng(self.seed)
         else:
-            # Training일 때는 계속 랜덤 상태 유지
             current_seed = self.seed + epoch
             self.rng = np.random.default_rng(current_seed)
+        
         pairs = []
-        seen_pairs = set() 
+        seen_pairs = set()
         clusters_insufficient = 0
         
-        # Generator를 이용해 셔플 (이제 random.shuffle 대신 self.rng.shuffle 사용)
-        # self.clusters는 원본 보존을 위해 복사 후 셔플 추천
+        # 클러스터 순서 셔플
         current_clusters = self.clusters.copy()
         self.rng.shuffle(current_clusters) 
 
         # ==================================================================
-        # 1. Intra-Cluster Pairing
+        # 1. Intra-Cluster Pairing (동일 클러스터 내 비교)
         # ==================================================================
         if self.pairs_per_cluster > 0:
             for cluster in current_clusters:
@@ -369,35 +391,43 @@ class AffinityPairSampler:
 
                 found_for_this_cluster = 0
                 
+                # Case A: 샘플 수가 적으면 모든 조합(Combination) 시도
                 if n_samples <= 30:
                     all_combos = list(itertools.combinations(indices, 2))
-                    # 리스트 셔플도 rng 사용
                     self.rng.shuffle(all_combos)
                     
                     for idx1, idx2 in all_combos:
                         pair_key = tuple(sorted((idx1, idx2)))
                         if pair_key in seen_pairs: continue
 
-                        label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
+                        kd1, kd2 = self.kd_values[idx1], self.kd_values[idx2]
+                        
+                        # [변경] 상한/하한 적용
+                        label, is_valid = self.check_kd_ratio(kd1, kd2, self.fold_threshold, self.upper_fold_threshold)
+                        
                         if is_valid:
-                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
+                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': kd1, 'kd2': kd2, 'type': 'intra'})
                             seen_pairs.add(pair_key)
                             found_for_this_cluster += 1
                             if found_for_this_cluster >= self.pairs_per_cluster: break
                 
+                # Case B: 샘플 수가 많으면 랜덤 샘플링 시도
                 else:
                     attempts = 0
                     while found_for_this_cluster < self.pairs_per_cluster and attempts < 100:
                         attempts += 1
-                        # rng.choice 사용
                         idx1, idx2 = self.rng.choice(indices, 2, replace=False)
                         
                         pair_key = tuple(sorted((idx1, idx2)))
                         if pair_key in seen_pairs: continue
                         
-                        label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
+                        kd1, kd2 = self.kd_values[idx1], self.kd_values[idx2]
+                        
+                        # [변경] 상한/하한 적용
+                        label, is_valid = self.check_kd_ratio(kd1, kd2, self.fold_threshold, self.upper_fold_threshold)
+                        
                         if is_valid:
-                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'intra'})
+                            pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': kd1, 'kd2': kd2, 'type': 'intra'})
                             seen_pairs.add(pair_key)
                             found_for_this_cluster += 1
 
@@ -405,30 +435,83 @@ class AffinityPairSampler:
                     clusters_insufficient += 1
 
         # ==================================================================
-        # 2. Inter-Cluster Pairing
+        # 2. Inter-Cluster Pairing (다른 클러스터 간 비교)
+        #    - 기존의 Random Loop 방식 대신 Binary Search 방식 적용
         # ==================================================================
         
-        for cluster_a in current_clusters:
-            indices_a = self.cluster_dict[cluster_a]
-            idx1 = self.rng.choice(indices_a) # rng 사용
+        for anchor_cluster in current_clusters:
+            indices_a = self.cluster_dict[anchor_cluster]
             
-            for _ in range(20):
-                cluster_b = self.rng.choice(current_clusters) # rng 사용
-                if cluster_a == cluster_b: continue
+            # Anchor 하나 선택
+            anchor_idx = self.rng.choice(indices_a)
+            anchor_kd = self.kd_values[anchor_idx]
+            
+            if anchor_kd <= 0: continue
+            
+            # Anchor가 inf이고 상한선이 설정되어 있다면 매칭 불가 (Fast Skip)
+            if anchor_kd == float('inf') and self.upper_fold_threshold != float('inf'):
+                continue
+
+            # --- Target Candidate Search (Binary Search) ---
+            # Random Loop 20회 대신, 조건에 맞는 범위를 직접 계산하여 추출
+            
+            target_idx = None
+            
+            if anchor_kd == float('inf'):
+                # 상한선이 없는 경우에만 여기 도달 (Target은 Finite여야 함)
+                if self.first_inf_idx > 0:
+                    rand_pos = self.rng.integers(0, self.first_inf_idx)
+                    target_idx = self.sorted_indices[rand_pos]
+            else:
+                # 1. Stronger Range: (Anchor / Upper) < Kd <= (Anchor / Bottom)
+                strong_limit_min = anchor_kd / self.upper_fold_threshold
+                strong_limit_max = anchor_kd / self.fold_threshold
+                idx_strong_start = bisect.bisect_right(self.sorted_kds, strong_limit_min)
+                idx_strong_end = bisect.bisect_right(self.sorted_kds, strong_limit_max)
+                count_strong = max(0, idx_strong_end - idx_strong_start)
+
+                # 2. Weaker Range: (Anchor * Bottom) <= Kd < (Anchor * Upper)
+                weak_limit_min = anchor_kd * self.fold_threshold
+                weak_limit_max = anchor_kd * self.upper_fold_threshold
+                idx_weak_start = bisect.bisect_left(self.sorted_kds, weak_limit_min)
+                idx_weak_end = bisect.bisect_left(self.sorted_kds, weak_limit_max)
+                count_weak = max(0, idx_weak_end - idx_weak_start)
+
+                total_candidates = count_strong + count_weak
                 
-                indices_b = self.cluster_dict[cluster_b]
-                idx2 = self.rng.choice(indices_b) # rng 사용
+                if total_candidates > 0:
+                    r = self.rng.integers(0, total_candidates)
+                    if r < count_strong:
+                        target_idx = self.sorted_indices[idx_strong_start + r]
+                    else:
+                        target_idx = self.sorted_indices[idx_weak_start + (r - count_strong)]
+
+            # --- Validation & Add ---
+            if target_idx is not None and anchor_idx != target_idx:
+                pair_key = tuple(sorted((anchor_idx, target_idx)))
                 
-                pair_key = tuple(sorted((idx1, idx2)))
-                if pair_key in seen_pairs: continue
-                
-                label, is_valid = self.check_kd_ratio(idx1, idx2, threshold=4)
-                if is_valid:
-                    pairs.append({'idx1': idx1, 'idx2': idx2, 'label': label, 'kd1': self.kd_values[idx1], 'kd2': self.kd_values[idx2], 'type': 'inter'})
-                    seen_pairs.add(pair_key)
-                    break
+                # 이미 본 쌍이 아니고
+                if pair_key not in seen_pairs:
+                    target_kd = self.kd_values[target_idx]
+                    
+                    # [최종 검증]
+                    label, is_valid = self.check_kd_ratio(anchor_kd, target_kd, self.fold_threshold, self.upper_fold_threshold)
+                    
+                    if is_valid:
+                        # Inter 로직이지만 우연히 같은 클러스터일 확률이 낮음 (Global Search 특성상)
+                        # 만약 엄격하게 다른 클러스터여야 한다면 여기서 cluster check를 추가하면 됨.
+                        # 여기서는 'inter'로 태깅 (Global Pool에서 왔으므로)
+                        pairs.append({
+                            'idx1': anchor_idx, 
+                            'idx2': target_idx, 
+                            'label': label, 
+                            'kd1': anchor_kd, 
+                            'kd2': target_kd, 
+                            'type': 'inter'
+                        })
+                        seen_pairs.add(pair_key)
         
-        print("seen_pairs", seen_pairs)
+        print(f"Epoch {epoch}: Generated {len(pairs)} pairs (Intra/Inter mixed)")
         return pd.DataFrame(pairs)
 
 # ==============================================================================
@@ -591,7 +674,9 @@ class PdbDataset(AffinityDataset):
             self.sampler = AffinityPairSampler(
                 self.data_manager, 
                 pairs_per_cluster=dataset_cfg.pairs_per_cluster,
-                is_training=True
+                is_training=True,
+                fold_threshold=dataset_cfg.fold_threshold,
+                upper_fold_threshold=dataset_cfg.upper_fold_threshold,
             )
             initial_pairs = self.sampler.generate_epoch_pairs(self.current_epoch)
         else:
@@ -599,7 +684,9 @@ class PdbDataset(AffinityDataset):
             self.sampler = AffinityPairSampler(
                 self.data_manager, 
                 pairs_per_cluster=dataset_cfg.pairs_per_cluster,
-                is_training=False
+                is_training=False,
+                fold_threshold=dataset_cfg.fold_threshold,
+                upper_fold_threshold=dataset_cfg.upper_fold_threshold,
             )
             initial_pairs = self.sampler.generate_epoch_pairs(self.current_epoch)
         # ------------------------------------------------------------------
