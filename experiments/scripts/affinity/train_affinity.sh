@@ -6,7 +6,7 @@
 #SBATCH --qos=cssb_h100
 #SBATCH -c 32
 #SBATCH -w node02
-#SBATCH --error=/home/psh/logs/v2.4.0_dev1.err
+#SBATCH --error=/home/psh/logs/v2.4.0.err
 #SBATCH --out=/home/psh/logs/v2.4.0.out
 
 echo "Running train_abb3.py"

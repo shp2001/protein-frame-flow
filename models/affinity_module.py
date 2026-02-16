@@ -165,9 +165,6 @@ class AffinityModule(LightningModule):
             # rollout for affinity
             self.rollout.set_device(batch_complex['edge_mask'].device)
 
-            # 2. 두 잔기 모두 loop_mask가 1인 영역 필터링 [B, L, L]
-            loop_mask_complex = batch_complex['loop_mask'] # (B, L)
-
             with torch.no_grad():
                 if use_unbound:
                     batch_ligand = full_sample['ligand']

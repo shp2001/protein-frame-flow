@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from protenix.model.modules.pairformer import PairformerStack
-from protenix.model.modules.primitives import LinearNoBias, Linear, BiasInitLinear
-from protenix.model.utils import broadcast_token_to_atom, one_hot
+from protenix.model.modules.primitives import LinearNoBias, Linear
+from protenix.model.utils import one_hot
 from protenix.openfold_local.model.primitives import LayerNorm
 
 
@@ -26,6 +26,7 @@ class AffinityHead(nn.Module):
         distance_bin_end: float = 52.0,
         distance_bin_step: float = 1.25,
         stop_gradient: bool = True,
+        sigma=8.0,
     ) -> None:
         """
         Args:
@@ -46,6 +47,8 @@ class AffinityHead(nn.Module):
         self.c_z = c_z
         self.c_s_inputs = c_s_inputs
         self.stop_gradient = stop_gradient
+        self.sigma = sigma
+
         self.input_ztrunk_ln = LayerNorm(self.c_z)
         self.linear_no_bias_z = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
@@ -88,9 +91,7 @@ class AffinityHead(nn.Module):
         self.to_affinity_pred_value = nn.Sequential(
             Linear(self.c_z//2, self.c_z//4, initializer='relu'),
             nn.ReLU(),
-            Linear(self.c_z//4, self.c_z//4, initializer='relu'),
-            nn.ReLU(),
-            LinearNoBias(self.c_z//4, 1),
+            LinearNoBias(self.c_z//4, 1, initializer='zeros'),
         )
 
         self.to_affinity_pred_score = nn.Sequential(
@@ -114,22 +115,6 @@ class AffinityHead(nn.Module):
         inplace_safe: bool = False,
         use_coords: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Args:
-            s_inputs (torch.Tensor): single embedding from InputFeatureEmbedder
-                [..., N_tokens, c_s_inputs]
-            s_trunk (torch.Tensor): single feature embedding from PairFormer (Alg17)
-                [..., N_tokens, c_s]
-            z_trunk (torch.Tensor): pair feature embedding from PairFormer (Alg17)
-                [..., N_tokens, N_tokens, c_z]
-            inter_pair_mask (torch.Tensor): inter-pair mask
-                [..., N_token, N_token]
-            x_pred_coords (torch.Tensor): predicted coordinates
-                [..., N_atoms, 3]
-
-        Returns:
-            affinity_value (torch.Tensor): predicted affinity [..., 1]
-        """
 
         if self.stop_gradient:
             s_inputs = s_inputs.detach()
@@ -151,7 +136,6 @@ class AffinityHead(nn.Module):
             []
         )
         x_pred_rep_coords = x_pred_coords
-
         if use_coords:
             N_sample = x_pred_rep_coords.size(-3)
             for i in range(N_sample):
@@ -226,12 +210,12 @@ class AffinityHead(nn.Module):
 
         # Upcast after pairformer
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
-        # apply MeanPooling 
-        g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
-        
-        # Affinity MLP 
+        mask = inter_pair_mask[..., None] # (L, L, 1)
+        dist_weight = torch.exp(-(distance_pred**2) / (self.sigma**2))[..., None] # (L, L, 1)
+        combined_weight = dist_weight * mask
+
+        g = torch.sum(z_pair * combined_weight, dim=(0,1)) / (torch.sum(combined_weight, dim=(0,1)) + 1e-6)
         g = self.affinity_out_mlp(g) # (64)
-        
 
         affinity_pred_value = self.to_affinity_pred_value(g)
         affinity_pred_score = self.to_affinity_pred_score(g)
