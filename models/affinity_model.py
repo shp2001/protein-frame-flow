@@ -49,10 +49,18 @@ class AffinityHead(nn.Module):
         self.stop_gradient = stop_gradient
         self.sigma = sigma
 
+        # processing z
+        self.linear_no_bias_z_intra = LinearNoBias(
+            in_features=self.c_z, out_features=self.c_z
+        )
+        self.linear_no_bias_z_inter = LinearNoBias(
+            in_features=self.c_z, out_features=self.c_z
+        )
         self.input_ztrunk_ln = LayerNorm(self.c_z)
         self.linear_no_bias_z = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
         )
+        
         self.linear_no_bias_s1 = LinearNoBias(
             in_features=self.c_s_inputs, out_features=self.c_z
         )
@@ -82,7 +90,7 @@ class AffinityHead(nn.Module):
         )
 
         self.affinity_out_mlp = nn.Sequential(
-            Linear(self.c_z, self.c_z, initializer='relu'),
+            Linear(self.c_z * 2, self.c_z, initializer='relu'),
             nn.ReLU(),
             Linear(self.c_z, self.c_z//2, initializer='relu'),
             nn.ReLU()
@@ -108,25 +116,36 @@ class AffinityHead(nn.Module):
         self,
         s_inputs: torch.Tensor,
         s_trunk: torch.Tensor,
-        z_trunk: torch.Tensor,
-        inter_pair_mask: torch.Tensor,
+        z_bound: torch.Tensor,
+        z_unbound: torch.Tensor,
+        inter_mask: torch.Tensor,
+        edge_mask: torch.Tensor,
         x_pred_coords: torch.Tensor,
-        use_embedding: bool = True,
         inplace_safe: bool = False,
-        use_coords: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         if self.stop_gradient:
             s_inputs = s_inputs.detach()
             s_trunk = s_trunk.detach()
-            z_trunk = z_trunk.detach()
+            z_bound = z_bound.detach()
+            z_unbound = z_unbound.detach()
+        
+        z_delta = z_bound - z_unbound # [L, L, 128]
+        inter_mask = inter_mask[..., None]
+        intra_mask = 1.0 - inter_mask
 
+        inter_out = self.linear_no_bias_z_inter(z_delta * inter_mask) * inter_mask
+        intra_out = self.linear_no_bias_z_intra(z_delta * intra_mask) * intra_mask
+
+        z_trunk = inter_out + intra_out
         z_trunk = self.linear_no_bias_z(self.input_ztrunk_ln(z_trunk))
+
         z_init = (
             self.linear_no_bias_s1(s_inputs)[..., None, :, :]
             + self.linear_no_bias_s2(s_inputs)[..., None, :]
         )
         z_trunk = z_init + z_trunk
+
         if not self.training:
             del z_init
             torch.cuda.empty_cache()
@@ -136,26 +155,15 @@ class AffinityHead(nn.Module):
             []
         )
         x_pred_rep_coords = x_pred_coords
-        if use_coords:
-            N_sample = x_pred_rep_coords.size(-3)
-            for i in range(N_sample):
-                affinity_value, affinity_logit = self.memory_efficient_forward(
-                        s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
-                        z_pair=z_trunk.clone() if inplace_safe else z_trunk,
-                        inter_pair_mask=inter_pair_mask,
-                        x_pred_rep_coords=x_pred_coords[..., i, :, :],
-                        use_coords=use_coords,
-                )
-                affinity_values.append(affinity_value)
-                affinity_logits.append(affinity_logit)
-
-        else:
+        N_sample = x_pred_rep_coords.size(-3)
+        for i in range(N_sample):
             affinity_value, affinity_logit = self.memory_efficient_forward(
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
-                    inter_pair_mask=inter_pair_mask,
-                    x_pred_rep_coords=x_pred_coords,
-                    use_coords=use_coords,
+                    z_delta=z_delta.clone() if inplace_safe else z_delta,
+                    edge_mask=edge_mask,
+                    inter_mask=inter_mask,
+                    x_pred_rep_coords=x_pred_coords[..., i, :, :],
             )
             affinity_values.append(affinity_value)
             affinity_logits.append(affinity_logit)
@@ -169,9 +177,10 @@ class AffinityHead(nn.Module):
         self,
         s_trunk: torch.Tensor,
         z_pair: torch.Tensor,
-        inter_pair_mask: torch.Tensor,
+        z_delta: torch.Tensor,
+        edge_mask: torch.Tensor,
+        inter_mask: torch.Tensor,
         x_pred_rep_coords: torch.Tensor,
-        use_coords: bool,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
@@ -180,41 +189,49 @@ class AffinityHead(nn.Module):
                 [..., N_atoms, 3] # Note: N_sample = 1 for avoiding CUDA OOM
         """
         
-        if use_coords: 
-            # Embed pair distances of representative atoms:
-            with torch.amp.autocast("cuda", enabled=False):
-                x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
-                distance_pred = torch.cdist(
-                    x_pred_rep_coords, x_pred_rep_coords
-                )  # [..., N_tokens, N_tokens]
-            z_pair = z_pair + self.linear_no_bias_d(
-                one_hot(
-                    x=distance_pred,
-                    lower_bins=self.lower_bins,
-                    upper_bins=self.upper_bins,
-                )
-            )  # [..., N_tokens, N_tokens, c_z]
+        # Embed pair distances of representative atoms:
+        with torch.amp.autocast("cuda", enabled=False):
+            x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
+            distance_pred = torch.cdist(
+                x_pred_rep_coords, x_pred_rep_coords
+            )  # [..., N_tokens, N_tokens]
+        z_pair = z_pair + self.linear_no_bias_d(
+            one_hot(
+                x=distance_pred,
+                lower_bins=self.lower_bins,
+                upper_bins=self.upper_bins,
+            )
+        )  # [..., N_tokens, N_tokens, c_z]
 
-            z_pair = z_pair + self.linear_no_bias_d_wo_onehot(
-                distance_pred.unsqueeze(dim=-1)
-            )  # [..., N_tokens, N_tokens, c_z]
-        else:
-            z_pair = z_pair 
+        z_pair = z_pair + self.linear_no_bias_d_wo_onehot(
+            distance_pred.unsqueeze(dim=-1)
+        )  # [..., N_tokens, N_tokens, c_z]
+
 
         # pairformer w/ inter pair mask (attention to off-diagonal part of the pair feature)
         s_single, z_pair = self.pairformer_stack(
             s_trunk,
             z_pair,
-            inter_pair_mask
+            edge_mask
         )
 
         # Upcast after pairformer
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
-        mask = inter_pair_mask[..., None] # (L, L, 1)
-        dist_weight = torch.exp(-(distance_pred**2) / (self.sigma**2))[..., None] # (L, L, 1)
-        combined_weight = dist_weight * mask
 
-        g = torch.sum(z_pair * combined_weight, dim=(0,1)) / (torch.sum(combined_weight, dim=(0,1)) + 1e-6)
+        # [Inter: Distance-weighted pooling]
+        mask = edge_mask[..., None] # (L, L, 1)
+        dist_w = torch.exp(-(distance_pred**2) / (self.sigma**2))[..., None] # (L, L, 1)
+        dist_w_inter = dist_w * inter_mask * mask
+        g_inter = torch.sum(z_pair * dist_w_inter, dim=(0,1)) / torch.sum(dist_w_inter, dim=(0,1))
+
+        # [Intra: Delta z weightd pooling]
+        intra_mask = 1.0 - inter_mask
+        delta_w = torch.linalg.vector_norm(z_delta, ord=2, dim=-1, keepdim=True)
+        delta_w_intra = delta_w * intra_mask * mask
+        g_intra = torch.sum(z_pair * delta_w_intra, dim=(0,1)) / torch.sum(delta_w_intra, dim=(0,1))
+
+        # Final Output
+        g = torch.cat([g_inter, g_intra], dim=-1)
         g = self.affinity_out_mlp(g) # (64)
 
         affinity_pred_value = self.to_affinity_pred_value(g)
