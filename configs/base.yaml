@@ -149,7 +149,7 @@ experiment:
 
     # affinity loss 
     rank_loss_weight: 1.0 # 5.0
-    rank_margin: 1.0
+    rank_margin: 0.5
     reg_loss_weight: 0.0 # 0.5
     reg_margin: 0.0
     prob_loss_weight: 0.0 # 1.0
@@ -172,7 +172,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_affinity_no_norm_g_dist_weighted_ppb_data
+    name: v2.4.0_affinity_dist_weighted
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0
@@ -186,8 +186,8 @@ experiment:
     accelerator: gpu
     log_every_n_steps: 1
     deterministic: False
-    check_val_every_n_epoch: 2
-    accumulate_grad_batches: 8
+    check_val_every_n_epoch: 1
+    accumulate_grad_batches: 16
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

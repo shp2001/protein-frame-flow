@@ -26,7 +26,7 @@ class AffinityHead(nn.Module):
         distance_bin_end: float = 52.0,
         distance_bin_step: float = 1.25,
         stop_gradient: bool = True,
-        sigma=8.0,
+        sigma=10.0,
     ) -> None:
         """
         Args:
@@ -53,9 +53,12 @@ class AffinityHead(nn.Module):
         self.linear_no_bias_z_intra = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
         )
+        self.z_intra_ln = LayerNorm(self.c_z)
         self.linear_no_bias_z_inter = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
         )
+        self.z_inter_ln = LayerNorm(self.c_z)
+
         self.input_ztrunk_ln = LayerNorm(self.c_z)
         self.linear_no_bias_z = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
@@ -90,7 +93,7 @@ class AffinityHead(nn.Module):
         )
 
         self.affinity_out_mlp = nn.Sequential(
-            Linear(self.c_z * 2, self.c_z, initializer='relu'),
+            Linear(self.c_z + 1, self.c_z, initializer='relu'),
             nn.ReLU(),
             Linear(self.c_z, self.c_z//2, initializer='relu'),
             nn.ReLU()
@@ -99,7 +102,7 @@ class AffinityHead(nn.Module):
         self.to_affinity_pred_value = nn.Sequential(
             Linear(self.c_z//2, self.c_z//4, initializer='relu'),
             nn.ReLU(),
-            LinearNoBias(self.c_z//4, 1, initializer='zeros'),
+            LinearNoBias(self.c_z//4, 1),
         )
 
         self.to_affinity_pred_score = nn.Sequential(
@@ -130,12 +133,12 @@ class AffinityHead(nn.Module):
             z_bound = z_bound.detach()
             z_unbound = z_unbound.detach()
         
-        z_delta = z_bound - z_unbound # [L, L, 128]
         inter_mask = inter_mask[..., None]
         intra_mask = 1.0 - inter_mask
+        z_delta = z_bound - z_unbound # [L, L, 128]
 
-        inter_out = self.linear_no_bias_z_inter(z_delta * inter_mask) * inter_mask
-        intra_out = self.linear_no_bias_z_intra(z_delta * intra_mask) * intra_mask
+        inter_out = self.linear_no_bias_z_inter(self.z_inter_ln(z_bound * inter_mask)) * inter_mask
+        intra_out = self.linear_no_bias_z_intra(self.z_intra_ln(z_delta * intra_mask)) * intra_mask
 
         z_trunk = inter_out + intra_out
         z_trunk = self.linear_no_bias_z(self.input_ztrunk_ln(z_trunk))
@@ -156,6 +159,7 @@ class AffinityHead(nn.Module):
         )
         x_pred_rep_coords = x_pred_coords
         N_sample = x_pred_rep_coords.size(-3)
+
         for i in range(N_sample):
             affinity_value, affinity_logit = self.memory_efficient_forward(
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
@@ -223,16 +227,18 @@ class AffinityHead(nn.Module):
         dist_w = torch.exp(-(distance_pred**2) / (self.sigma**2))[..., None] # (L, L, 1)
         dist_w_inter = dist_w * inter_mask * mask
         g_inter = torch.sum(z_pair * dist_w_inter, dim=(0,1)) / torch.sum(dist_w_inter, dim=(0,1))
+        # g_inter = torch.sum(z_pair * dist_w_inter, dim=(0,1))
 
-        # [Intra: Delta z weightd pooling]
-        intra_mask = 1.0 - inter_mask
-        delta_w = torch.linalg.vector_norm(z_delta, ord=2, dim=-1, keepdim=True)
-        delta_w_intra = delta_w * intra_mask * mask
-        g_intra = torch.sum(z_pair * delta_w_intra, dim=(0,1)) / torch.sum(delta_w_intra, dim=(0,1))
+        # # [Intra: Delta z weightd pooling]
+        # intra_mask = 1.0 - inter_mask
+        # delta_w = torch.linalg.vector_norm(z_delta, ord=2, dim=-1, keepdim=True)
+        # delta_w_intra = delta_w * intra_mask * mask
+        # g_intra = torch.sum(z_pair * delta_w_intra, dim=(0,1)) / torch.sum(delta_w_intra, dim=(0,1))
 
         # Final Output
-        g = torch.cat([g_inter, g_intra], dim=-1)
-        g = self.affinity_out_mlp(g) # (64)
+        g = g_inter
+        affinity_scale = torch.log(torch.sum(dist_w_inter, dim=(0,1)))
+        g = self.affinity_out_mlp(torch.cat([g, affinity_scale], dim=-1))
 
         affinity_pred_value = self.to_affinity_pred_value(g)
         affinity_pred_score = self.to_affinity_pred_score(g)

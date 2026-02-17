@@ -22,7 +22,7 @@ pdb_dataset:
 
   pairs_per_cluster: 2 # 2 for ppb / 6 for abrank
   fold_threshold: 10
-  upper_fold_threshold: 1000
+  upper_fold_threshold: 10000
 
   max_cache_size: ${shared.max_cache_size}
   cache_num_res: 10000000
