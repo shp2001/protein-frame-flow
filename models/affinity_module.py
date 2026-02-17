@@ -157,7 +157,6 @@ class AffinityModule(LightningModule):
 
         # 1. Unbound 모드 판별 (batch_0 내부 구조 확인)
         use_unbound = self._data_cfg.use_unbound
-        print(f'{os.path.basename(paired_batch["batch_0"]["complex"]["raw_path"])}_{paired_batch["batch_0"]["complex"]["mutation"]} (KD: {paired_batch["kd1"]}) & {os.path.basename(paired_batch["batch_1"]["complex"]["raw_path"])}_{paired_batch["batch_1"]["complex"]["mutation"]} (KD: {paired_batch["kd2"]})')
         for i in range(2):
             full_sample = paired_batch[f"batch_{i}"]
             batch_complex = full_sample['complex']
@@ -257,6 +256,7 @@ class AffinityModule(LightningModule):
                 z_bound=z_complex[0],
                 z_unbound=z_unbound[0],
                 inter_mask=inter_mask[0],
+                loop_mask=batch_complex['loop_mask'][0],
                 edge_mask=batch_complex['edge_mask'][0],
                 x_pred_coords=pred_trans_1,
                 )       
@@ -318,9 +318,6 @@ class AffinityModule(LightningModule):
         print("affinity_pred_values[1]", affinity_pred_values[1])
         print("log_kd1", torch.log10(paired_batch['kd1']))
         print("log_kd2", torch.log10(paired_batch['kd2']))
-        print("target", target)
-        print("affinity_rank_loss", affinity_rank_loss)
-        print("total_loss", total_loss)
         print("--------------------------------")
 
         return {
@@ -462,19 +459,20 @@ class AffinityModule(LightningModule):
                         b_factors=b_factor
                     )
 
-            # affinity prediction 
-            affinity_pred_value, affinity_pred_logit = self.affinity_model(
-                s_inputs=s_init_complex[0],
-                s_trunk=s_complex[0],
-                z_bound=z_complex[0],
-                z_unbound=z_unbound[0],
-                inter_mask=inter_mask[0],
-                edge_mask=batch_complex['edge_mask'][0],
-                x_pred_coords=pred_trans_1,
-                ) 
-  
-            affinity_pred_values.append(affinity_pred_value)
-            affinity_pred_logits.append(affinity_pred_logit)
+                # affinity prediction 
+                affinity_pred_value, affinity_pred_logit = self.affinity_model(
+                    s_inputs=s_init_complex[0],
+                    s_trunk=s_complex[0],
+                    z_bound=z_complex[0],
+                    z_unbound=z_unbound[0],
+                    inter_mask=inter_mask[0],
+                    loop_mask=batch_complex['loop_mask'][0],
+                    edge_mask=batch_complex['edge_mask'][0],
+                    x_pred_coords=pred_trans_1,
+                    ) 
+    
+                affinity_pred_values.append(affinity_pred_value)
+                affinity_pred_logits.append(affinity_pred_logit)
 
 
         # calculate affinity loss 
@@ -774,6 +772,7 @@ class AffinityModule(LightningModule):
                 s_trunk=s_complex[0],
                 z_bound=z_complex[0],
                 z_unbound=z_unbound[0],
+                loop_mask=batch_complex['loop_mask'][0],
                 edge_mask=batch_complex['edge_mask'][0],
                 inter_mask=inter_mask[0],
                 x_pred_coords=pred_trans_1,

@@ -172,7 +172,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_affinity_dist_weighted
+    name: v2.4.0_affinity_inter_intra_sep
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0

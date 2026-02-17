@@ -40,7 +40,7 @@ pdb_dataset:
   ab_threshold: 40
   general_threshold: 40
   ab_max_num_res: 350
-  general_max_num_res: 400
+  general_max_num_res: 350
 
   # Filtering
   filter:

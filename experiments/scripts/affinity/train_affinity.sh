@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH -J v2.4.0_affinity_no_gnorm
+#SBATCH -J v2.4.0_affinity_inter_intra_sep
 #SBATCH -p h100
 #SBATCH --gres=gpu:h100:4
-#SBATCH --mem=320G 
+#SBATCH --mem=480G 
 #SBATCH --qos=cssb_h100
-#SBATCH -c 32
-#SBATCH -w node02
+#SBATCH -c 16
+#SBATCH -w node01
 #SBATCH --error=/home/psh/logs/v2.4.0.err
 #SBATCH --out=/home/psh/logs/v2.4.0.out
 
