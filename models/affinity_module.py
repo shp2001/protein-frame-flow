@@ -48,6 +48,7 @@ class AffinityModule(LightningModule):
             distance_bin_end=self._affinity_cfg.distance_bin_end,
             distance_bin_step=self._affinity_cfg.distance_bin_step,
             stop_gradient=self._affinity_cfg.stop_gradient,
+            use_unbound=self._data_cfg.use_unbound
         )
         # Set-up interpolant for mini-rollout
         self.rollout = Interpolant(cfg.rollout)
@@ -239,7 +240,8 @@ class AffinityModule(LightningModule):
                         )
                     z_complex = z
                     s_complex = s
-                    
+                    z_unbound = torch.zeros_like(z_complex)
+
                 pred_trans_1 = None
                 if self._affinity_cfg.use_coords:
                     _, _, pred_positions, pred_trans_1 = self.rollout.sample(
@@ -416,8 +418,10 @@ class AffinityModule(LightningModule):
                         self._model_cfg.pairformer.n_cycles, 
                         batch_complex['edge_mask'].shape[0]
                     )
-                    z_complex = z
                     s_complex = s
+                    z_complex = z
+                    z_unbound = torch.zeros_like(z_complex)
+                    
                 # --- 공통: Coordinate Sampling (Rollout) ---
                 _, _, pred_positions, pred_trans_1 = self.rollout.sample(
                     self.model,
@@ -728,8 +732,9 @@ class AffinityModule(LightningModule):
                     self._model_cfg.pairformer.n_cycles, 
                     batch_complex['edge_mask'].shape[0]
                 )
+                s_complex = s
                 z_complex = z
-
+                z_unbound = torch.zeros_like(z_complex)
 
         num_batch = batch_complex['diffuse_mask'].shape[0]
         mutation = batch_complex['mutation']

@@ -20,6 +20,7 @@ class AffinityHead(nn.Module):
         c_s: int = 384,
         c_z: int = 128,
         c_s_inputs: int = 449,
+        use_unbound: bool = True,
         pairformer_dropout: float = 0.0,
         blocks_per_ckpt: Optional[int] = None,
         distance_bin_start: float = 3.25,
@@ -46,6 +47,7 @@ class AffinityHead(nn.Module):
         self.c_s = c_s
         self.c_z = c_z
         self.c_s_inputs = c_s_inputs
+        self.use_unbound = use_unbound
         self.stop_gradient = stop_gradient
         self.sigma = sigma
 
@@ -54,10 +56,11 @@ class AffinityHead(nn.Module):
         self.linear_no_bias_z_bound = LinearNoBias(
             in_features=self.c_z, out_features=self.c_z
         )
-        self.input_ln_z_delta = LayerNorm(self.c_z)
-        self.linear_no_bias_z_delta = LinearNoBias(
-            in_features=self.c_z, out_features=self.c_z
-        )
+        if self.use_unbound:
+            self.input_ln_z_delta = LayerNorm(self.c_z)
+            self.linear_no_bias_z_delta = LinearNoBias(
+                in_features=self.c_z, out_features=self.c_z
+            )
 
         # processing init_z
         self.linear_no_bias_s1 = LinearNoBias(
@@ -87,13 +90,14 @@ class AffinityHead(nn.Module):
             dropout=pairformer_dropout,
             blocks_per_ckpt=blocks_per_ckpt,
         )
-        self.pairformer_stack_intra = PairformerStack(
-            c_z=self.c_z,
-            c_s=self.c_s,
-            n_blocks=n_blocks,
-            dropout=pairformer_dropout,
-            blocks_per_ckpt=blocks_per_ckpt,
-        )
+        if self.use_unbound:
+            self.pairformer_stack_intra = PairformerStack(
+                c_z=self.c_z,
+                c_s=self.c_s,
+                n_blocks=n_blocks,
+                dropout=pairformer_dropout,
+                blocks_per_ckpt=blocks_per_ckpt,
+            )
 
         self.main_mlp = nn.Sequential(
             Linear(self.c_z + 1, self.c_z, initializer='relu'),
@@ -101,11 +105,12 @@ class AffinityHead(nn.Module):
             Linear(self.c_z, self.c_z, initializer='relu'),
             nn.ReLU() 
         )
-        self.intra_modulator = nn.Sequential(
-            Linear(self.c_z, self.c_z, initializer='relu'),
-            nn.ReLU(),
-            Linear(self.c_z, self.c_z * 2, initializer='zeros') 
-        )
+        if self.use_unbound:
+            self.intra_modulator = nn.Sequential(
+                Linear(self.c_z, self.c_z, initializer='relu'),
+                nn.ReLU(),
+                Linear(self.c_z, self.c_z * 2, initializer='zeros') 
+            )
 
         self.to_affinity_pred_value = nn.Sequential(
             Linear(self.c_z, self.c_z//2, initializer='relu'),
@@ -146,17 +151,20 @@ class AffinityHead(nn.Module):
         
         inter_mask = inter_mask[..., None]
         edge_mask = edge_mask[..., None]
-        z_delta = z_bound - z_unbound # [L, L, 128]
-
-        z_bound = self.linear_no_bias_z_bound(self.input_ln_z_bound(z_bound))
-        z_delta = self.linear_no_bias_z_delta(self.input_ln_z_delta(z_delta))
 
         z_init = (
             self.linear_no_bias_s1(s_inputs)[..., None, :, :]
             + self.linear_no_bias_s2(s_inputs)[..., None, :]
         )
+
+        z_bound = self.linear_no_bias_z_bound(self.input_ln_z_bound(z_bound))
         z_bound = z_init + z_bound
-        z_delta = z_init + z_delta
+        if self.use_unbound:
+            z_delta = z_bound - z_unbound # [L, L, 128]
+            z_delta = self.linear_no_bias_z_delta(self.input_ln_z_delta(z_delta))
+            z_delta = z_init + z_delta
+        else:
+            z_delta = torch.zeros_like(z_bound)
 
         if not self.training:
             del z_init
@@ -166,8 +174,7 @@ class AffinityHead(nn.Module):
             [],
             []
         )
-        x_pred_rep_coords = x_pred_coords
-        N_sample = x_pred_rep_coords.size(-3)
+        N_sample = x_pred_coords.size(-3)
 
         for i in range(N_sample):
             affinity_value, affinity_logit = self.memory_efficient_forward(
@@ -222,16 +229,15 @@ class AffinityHead(nn.Module):
         )  # [..., N_tokens, N_tokens, c_z]
 
         z_bound = z_bound + d_one_hot + d_wo_one_hot
-        z_delta = z_delta + d_one_hot + d_wo_one_hot
 
-        del d_one_hot, d_wo_one_hot  # 즉시 해제
+        if self.use_unbound:
+            z_delta = z_delta + d_one_hot + d_wo_one_hot
 
         # pairformer (inter)
-        torch.cuda.empty_cache()
         _, z_inter = self.pairformer_stack_inter(
             s=s_trunk,
             z=z_bound,
-            pair_mask=inter_mask * edge_mask
+            pair_mask=(inter_mask * edge_mask).squeeze(-1)
         )
         z_inter = z_inter.to(torch.float32) # (L, L, 128)
         # [Pooling: Inter]
@@ -243,40 +249,43 @@ class AffinityHead(nn.Module):
         del z_bound 
 
         # pairformer (intra)
-        intra_mask = 1 - inter_mask
-        _, z_intra = self.pairformer_stack_intra(
-            s=s_trunk,
-            z=z_delta,
-            pair_mask=intra_mask * edge_mask
-        )
-        z_intra = z_intra.to(torch.float32)
+        if self.use_unbound:
+            intra_mask = 1 - inter_mask
+            _, z_intra = self.pairformer_stack_intra(
+                s=s_trunk,
+                z=z_delta,
+                pair_mask=(intra_mask * edge_mask).squeeze(-1)
+            )
+            z_intra = z_intra.to(torch.float32)
 
-        # [Pooling: Intra]
-        intra_mask = 1.0 - inter_mask
-        loop_mask_2d = loop_mask[:, None].bool() | loop_mask[None, :].bool()
-        loop_mask_2d_intra = intra_mask * loop_mask_2d
-        g_intra = torch.sum(z_intra * loop_mask_2d_intra, dim=(0,1)) / torch.sum(loop_mask_2d_intra, dim=(0,1))
-        del z_intra
-        del z_delta
+            # [Pooling: Intra]
+            intra_mask = 1.0 - inter_mask
+            loop_mask_2d = loop_mask[:, None].bool() | loop_mask[None, :].bool()
+            loop_mask_2d_intra = intra_mask * loop_mask_2d
+            g_intra = torch.sum(z_intra * loop_mask_2d_intra, dim=(0,1)) / torch.sum(loop_mask_2d_intra, dim=(0,1))
+            del z_intra
+            del z_delta
 
         # g_main
-        affinity_scale = torch.log(torch.sum(dist_w_inter, dim=(0,1)))
         g_main = self.main_mlp(torch.cat([g_inter, affinity_scale], dim=-1))
-
         # g_aux
-        g_aux = self.intra_modulator(g_intra)
-        gamma, beta = torch.chunk(g_aux, 2, dim=-1)
-        
+        if self.use_unbound:
+            g_aux = self.intra_modulator(g_intra)
+            gamma, beta = torch.chunk(g_aux, 2, dim=-1)
+        else:
+            gamma = 0
+            beta = 0
+
         g = g_main * (1 + gamma) + beta
         affinity_pred_value = self.to_affinity_pred_value(g)
         affinity_pred_score = self.to_affinity_pred_score(g)
         affinity_logits_binary = self.to_affinity_logits_binary(affinity_pred_score)
 
-
-        # 1. Gamma가 Main을 얼마나 변화시키는지 (Scale 변화율 %)
-        gamma_impact = gamma.abs().mean() * 100
-        # 2. Main의 크기 대비 Beta가 차지하는 비중 (Shift 비중 %)
-        main_norm = g_main.abs().mean() + 1e-6
-        beta_impact = (beta.abs().mean() / main_norm) * 100
-        print(f"[Intra 영향도] Scale변화: {gamma_impact.item():.2f}% | 위치이동: {beta_impact.item():.2f}%")
+        if self.use_unbound:
+            # 1. Gamma가 Main을 얼마나 변화시키는지 (Scale 변화율 %)
+            gamma_impact = gamma.abs().mean() * 100
+            # 2. Main의 크기 대비 Beta가 차지하는 비중 (Shift 비중 %)
+            main_norm = g_main.abs().mean() + 1e-6
+            beta_impact = (beta.abs().mean() / main_norm) * 100
+            print(f"[Intra 영향도] Scale변화: {gamma_impact.item():.2f}% | 위치이동: {beta_impact.item():.2f}%")
         return affinity_pred_value, affinity_logits_binary
