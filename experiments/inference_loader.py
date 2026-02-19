@@ -9,7 +9,6 @@ from data import utils as du
 from openfold.data import data_transforms
 from openfold.utils import rigid_utils
 import json
-import random
 import re
 import os
 import copy
@@ -264,7 +263,7 @@ class BaseDataset(Dataset):
         mutations = str(csv_row['mutation']).split(';')
         
         # 랜덤하게 하나 선택 (또는 첫 번째 선택)
-        part_idx = random.randint(0, len(chains) - 1)
+        part_idx = 0
         
         meta_key = chains[part_idx].strip()
         selected_mutation = mutations[part_idx].strip()
@@ -321,17 +320,10 @@ class BaseDataset(Dataset):
                                 scaffold_idx[f"{m_chain}_{idx}_end"] = block[-1]
                                 break
 
-        # 캐시 사용
-        use_cache = True
-        cache_key = (path, selected_mutation)
-        if use_cache and cache_key in self._cache:
-            processed_row = self._cache[cache_key]
-        else:
-            processed_row = _process_csv_row(path, selected_mutation, scaffold_idx)
-            processed_row['mode'] = selected_meta_row.get('mode', 'affinity')
-            processed_row['raw_path'] = selected_meta_row.get('raw_path', '')
-            if use_cache:
-                self._cache[cache_key] = processed_row
+
+        processed_row = _process_csv_row(path, selected_mutation, scaffold_idx)
+        processed_row['mode'] = selected_meta_row.get('mode', 'affinity')
+        processed_row['raw_path'] = selected_meta_row.get('raw_path', '')
         
         return processed_row
 
@@ -395,7 +387,7 @@ class BaseDataset(Dataset):
         chains = str(csv_row['mapped_chains']).split(';')
         
         # 랜덤하게 하나 선택 (또는 첫 번째 선택)
-        part_idx = random.randint(0, len(chains) - 1)
+        part_idx = 0
         selected_mutation = mutations[part_idx].strip()
         
         # metadata 정보 가져오기
@@ -592,6 +584,7 @@ def collate_fn(batch):
     cropped_batch["mutation"] = feat['mutation']
     cropped_batch['processed_path'] = feat['processed_path']
     cropped_batch['data_source'] = feat['data_source']
+    cropped_batch['mode'] = feat['mode']
     return cropped_batch
 
 

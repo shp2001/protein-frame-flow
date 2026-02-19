@@ -707,7 +707,7 @@ class AffinityModule(LightningModule):
 
 
         else:
-            b_factor_alt = diffuse_mask.cpu().numpy()
+            b_factor_alt = batch['loop_mask'].cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
         if hasattr(self, "affinity_model"):
             inter_pair_mask = batch['edge_mask'] * inter_mask
@@ -797,6 +797,7 @@ class AffinityModule(LightningModule):
             if hasattr(self, 'affinity_model'):
                 affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
                 affinity_dict = {
+                    "category": batch['mode'],
                     "affinity_pred_value": affinity_pred_value.squeeze().item(),
                     "affinity_pred_logit": affinity_pred_logit.squeeze().item(),
                     "affinity_true_log_value": torch.log10(batch['affinity_kd']).squeeze().item()

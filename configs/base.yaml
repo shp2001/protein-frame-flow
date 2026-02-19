@@ -171,8 +171,8 @@ experiment:
     project: v2.3.2.2_affinity
   optimizer:
     warmup_steps: 0
-    decay_steps: 500_000
-    min_lr: 1e-4
+    decay_steps: 90000
+    min_lr: 9e-5
     max_lr: 1e-4
   trainer:
     overfit_batches: 0

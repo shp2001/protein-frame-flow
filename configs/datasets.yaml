@@ -47,7 +47,7 @@ pdb_dataset:
   train_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_train.csv
   valid_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_valid.csv
 
-  pairs_per_cluster: 2
+  pairs_per_cluster: 3
 
   max_cache_size: ${shared.max_cache_size}
   cache_num_res: 10000000
