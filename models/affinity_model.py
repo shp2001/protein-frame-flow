@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from protenix.model.modules.pairformer import PairformerStack
-from protenix.model.modules.primitives import LinearNoBias, Linear, BiasInitLinear
-from protenix.model.utils import broadcast_token_to_atom, one_hot
+from protenix.model.modules.primitives import LinearNoBias, Linear
+from protenix.model.utils import one_hot
 from protenix.openfold_local.model.primitives import LayerNorm
 
 
@@ -26,6 +26,7 @@ class AffinityHead(nn.Module):
         distance_bin_end: float = 52.0,
         distance_bin_step: float = 1.25,
         stop_gradient: bool = True,
+        sigma: float = 10.0
     ) -> None:
         """
         Args:
@@ -42,6 +43,7 @@ class AffinityHead(nn.Module):
         """
         super(AffinityHead, self).__init__()
         self.n_blocks = n_blocks
+        self.sigma = sigma
         self.c_s = c_s
         self.c_z = c_z
         self.c_s_inputs = c_s_inputs
@@ -93,15 +95,6 @@ class AffinityHead(nn.Module):
             LinearNoBias(self.c_z//2, 1),
         )
 
-        self.to_affinity_pred_score = nn.Sequential(
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
-            nn.ReLU(),
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
-            nn.ReLU(),
-            Linear(self.c_z//2, 1),
-        )
-
-        self.to_affinity_logits_binary = Linear(1, 1)
 
     def forward(
         self,
@@ -153,16 +146,13 @@ class AffinityHead(nn.Module):
             del z_init
             torch.cuda.empty_cache()
 
-        affinity_values, affinity_logits = (
-            [],
-            []
-        )
+        affinity_values = []
         x_pred_rep_coords = x_pred_coords
 
         if use_coords:
             N_sample = x_pred_rep_coords.size(-3)
             for i in range(N_sample):
-                affinity_value, affinity_logit = self.memory_efficient_forward(
+                affinity_value = self.memory_efficient_forward(
                         s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                         z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                         inter_pair_mask=inter_pair_mask,
@@ -170,10 +160,9 @@ class AffinityHead(nn.Module):
                         use_coords=use_coords,
                 )
                 affinity_values.append(affinity_value)
-                affinity_logits.append(affinity_logit)
 
         else:
-            affinity_value, affinity_logit = self.memory_efficient_forward(
+            affinity_value = self.memory_efficient_forward(
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                     inter_pair_mask=inter_pair_mask,
@@ -181,12 +170,10 @@ class AffinityHead(nn.Module):
                     use_coords=use_coords,
             )
             affinity_values.append(affinity_value)
-            affinity_logits.append(affinity_logit)
 
         affinity_values = torch.stack(affinity_values).squeeze(-1)
-        affinity_logits = torch.stack(affinity_logits).squeeze(-1)
 
-        return affinity_values, affinity_logits
+        return affinity_values
 
     def memory_efficient_forward(
         self,
@@ -233,15 +220,19 @@ class AffinityHead(nn.Module):
 
         # Upcast after pairformer
         z_pair = z_pair.to(torch.float32) # (L, L, 128)
-        # apply MeanPooling 
-        g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
-        g = self.norm_g(g)
+
+        # apply DistWeightedPooling 
+        dist_w = torch.exp(-(distance_pred**2) / (self.sigma**2))[..., None]
+        dist_w_inter = dist_w * inter_pair_mask[..., None]
+        g = torch.sum(z_pair * dist_w_inter, dim=(0,1)) / torch.sum(dist_w_inter, dim=(0,1))
+
+        # # apply MeanPooling 
+        # g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
         
-        # Affinity MLP 
+        # Affinity MLP
+        g = self.norm_g(g)
         g = self.affinity_out_mlp(g) # (64)
         
         affinity_pred_value = self.to_affinity_pred_value(g)
-        affinity_pred_score = self.to_affinity_pred_score(g)
-        affinity_logits_binary = self.to_affinity_logits_binary(affinity_pred_score)
 
-        return affinity_pred_value, affinity_logits_binary
+        return affinity_pred_value

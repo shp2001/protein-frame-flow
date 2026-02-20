@@ -153,8 +153,6 @@ class AffinityModule(LightningModule):
 
     def model_step(self, paired_batch, N_cycle):
         affinity_pred_values = []
-        affinity_pred_logits = []
-        print(f'{os.path.basename(paired_batch["batch_0"]["raw_path"])} & {os.path.basename(paired_batch["batch_1"]["raw_path"])}')
 
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
@@ -193,7 +191,7 @@ class AffinityModule(LightningModule):
                     pred_trans_1 = None
             
             inter_pair_mask = batch['edge_mask'] * inter_mask
-            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+            affinity_pred_value = self.affinity_model(
                 s_inputs=s_init[0],
                 s_trunk=s[0],
                 z_trunk=z[0],
@@ -202,7 +200,6 @@ class AffinityModule(LightningModule):
                 use_coords=self._affinity_cfg.use_coords
                 )       
             affinity_pred_values.append(affinity_pred_value)
-            affinity_pred_logits.append(affinity_pred_logit)
         
         label = paired_batch['label'].to(batch['edge_mask'].device)
         kd1 = paired_batch["kd1"].to(batch['edge_mask'].device)
@@ -224,27 +221,16 @@ class AffinityModule(LightningModule):
         if len(affinity_reg_loss.shape) == 1:
             affinity_reg_loss = affinity_reg_loss[None, ...]
 
-        # calculate affinity probability loss 
-        if paired_batch["kd1"] == float('inf') or paired_batch["kd2"] == float('inf'):
-            target_0 = label.float()
-            target_1 = 1.0 - label 
-            loss_0 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[0].float(), target_0, reduction='none')
-            loss_1 = nn.functional.binary_cross_entropy_with_logits(affinity_pred_logits[1].float(), target_1, reduction='none')
-            affinity_binding_prob_loss = (loss_0 + loss_1) / 2
-            if len(affinity_binding_prob_loss.shape) == 1:
-                affinity_binding_prob_loss = affinity_binding_prob_loss[None, ...]
-        else:
-            affinity_binding_prob_loss = torch.zeros_like(label, dtype=torch.float32, requires_grad=True)
 
-        total_loss = affinity_rank_loss * self._exp_cfg.training.rank_loss_weight + affinity_reg_loss * self._exp_cfg.training.reg_loss_weight + affinity_binding_prob_loss * self._exp_cfg.training.prob_loss_weight
+        total_loss = affinity_rank_loss * self._exp_cfg.training.rank_loss_weight + affinity_reg_loss * self._exp_cfg.training.reg_loss_weight
         print("--------------------------------")
+        print(f'{os.path.basename(paired_batch["batch_0"]["raw_path"])} & {os.path.basename(paired_batch["batch_1"]["raw_path"])}')
         print("affinity_pred_values[0]", affinity_pred_values[0])
         print("affinity_pred_values[1]", affinity_pred_values[1])
         print("log_kd1", torch.log10(paired_batch['kd1']))
         print("log_kd2", torch.log10(paired_batch['kd2']))
         print("affinity_rank_loss", affinity_rank_loss)
         print("affinity_reg_loss", affinity_reg_loss)
-        print("affinity_binding_prob_loss", affinity_binding_prob_loss)
         print("total_loss", total_loss)
         print("--------------------------------")
 
@@ -252,7 +238,6 @@ class AffinityModule(LightningModule):
             "total_loss": total_loss,
             "affinity_rank_loss": affinity_rank_loss,
             "affinity_reg_loss": affinity_reg_loss,
-            "affinity_binding_prob_loss": affinity_binding_prob_loss,
         }
 
 
@@ -352,7 +337,7 @@ class AffinityModule(LightningModule):
 
             # affinity prediction 
             inter_pair_mask = batch['edge_mask'] * inter_mask
-            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+            affinity_pred_value = self.affinity_model(
                 s_inputs=s_init[0],
                 s_trunk=s[0],
                 z_trunk=z[0],
@@ -362,8 +347,6 @@ class AffinityModule(LightningModule):
                 ) 
   
             affinity_pred_values.append(affinity_pred_value)
-            affinity_pred_logits.append(affinity_pred_logit)
-
 
         # calculate affinity loss 
         label = paired_batch['label'].to(batch['edge_mask'].device)
@@ -607,8 +590,8 @@ class AffinityModule(LightningModule):
 
         num_batch = batch['diffuse_mask'].shape[0]
         mutation = batch['mutation']
-        data_source = batch['data_source']
-        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
+        # data_source = batch['data_source']
+        pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation
         diffuse_mask = batch['diffuse_mask']
 
         if "ligand_mask" not in batch:
@@ -711,7 +694,7 @@ class AffinityModule(LightningModule):
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
         if hasattr(self, "affinity_model"):
             inter_pair_mask = batch['edge_mask'] * inter_mask
-            affinity_pred_value, affinity_pred_logit = self.affinity_model(
+            affinity_pred_value = self.affinity_model(
                 s_inputs=s_init[0],
                 s_trunk=s[0],
                 z_trunk=z[0],
@@ -799,7 +782,6 @@ class AffinityModule(LightningModule):
                 affinity_dict = {
                     "category": batch['mode'],
                     "affinity_pred_value": affinity_pred_value.squeeze().item(),
-                    "affinity_pred_logit": affinity_pred_logit.squeeze().item(),
                     "affinity_true_log_value": torch.log10(batch['affinity_kd']).squeeze().item()
                 }
                 with open(affinity_json_path, 'w') as f:

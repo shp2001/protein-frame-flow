@@ -118,6 +118,7 @@ class Experiment:
             enable_model_summary=True,
             strategy=DDPStrategy(find_unused_parameters=True),
             devices=self._exp_cfg.num_devices,
+            reload_dataloaders_every_n_epochs=1,
             gradient_clip_val=1.0
         )
 

@@ -308,17 +308,17 @@ class BaseDataset(Dataset):
                     scaffold_idx[f"{chain_id}_{idx}_end"] = block[-1]
 
             if selected_mutation != "No_Mutation":
-                mut_parts = selected_mutation.split('_')
+                mut_parts = selected_mutation.split('_')          
                 for part in mut_parts:
-                    m_chain = part[1]
-                    m_residue = int(part[2:-1])
+                    m_chain = part[1] # Chain ID 추출
+                    m_residue = int(part[2:-1]) # Residue ID 추출 (숫자 부분)
 
                     if m_chain in self.receptor_chains and m_chain in mask_info:
                         for idx, block in enumerate(mask_info[m_chain]):
                             if m_residue in block:
-                                scaffold_idx[f"{m_chain}_{idx}_start"] = block[0]
-                                scaffold_idx[f"{m_chain}_{idx}_end"] = block[-1]
-                                break
+                                scaffold_idx[f"{m_chain}_{idx}_start"] = m_residue
+                                scaffold_idx[f"{m_chain}_{idx}_end"] = m_residue
+                                break 
 
 
         processed_row = _process_csv_row(path, selected_mutation, scaffold_idx)
@@ -368,9 +368,17 @@ class BaseDataset(Dataset):
 
             interface_points = sorted(interface_points)
             for i in range(len(interface_points)//2):
-                scaffold_mask[interface_points[2*i]:interface_points[2*i+1]+1] = 1
-                if interface_points[2*i] == interface_points[2*i+1]:
-                    scaffold_mask[interface_points[2*i]-1:interface_points[2*i+1]+2] = 1
+                start = interface_points[2*i]
+                end   = interface_points[2*i+1]
+                block_len = end - start + 1
+
+                if block_len >= 20:
+                    crop_start = 0
+                    crop_end   = crop_start + 19
+                    scaffold_mask[crop_start:crop_end + 1] = 1
+
+                else:
+                    scaffold_mask[start:end + 1] = 1
 
         return scaffold_mask * batch['res_mask']
 
@@ -583,7 +591,8 @@ def collate_fn(batch):
     cropped_batch["edge_mask"] = cropped_batch['res_mask'][:, None] * cropped_batch['res_mask'][:, :, None]
     cropped_batch["mutation"] = feat['mutation']
     cropped_batch['processed_path'] = feat['processed_path']
-    cropped_batch['data_source'] = feat['data_source']
+    if 'data_source' in feat:
+        cropped_batch['data_source'] = feat['data_source']
     cropped_batch['mode'] = feat['mode']
     return cropped_batch
 

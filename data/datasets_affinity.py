@@ -149,9 +149,10 @@ def _process_mutations(processed_file_path, mut, scaffold_idx):
     return processed_feats, updated_scaffold_idx
 
 def _process_csv_row(processed_file_path, mut, scaffold_idx):
-    processed_feats = du.read_pkl(processed_file_path)
     if mut != "No_Mutation":
         processed_feats, scaffold_idx = _process_mutations(processed_file_path, mut, scaffold_idx)
+    else:
+        processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
     # make chain sequence list (for the multimer relpos embedding)
@@ -559,8 +560,8 @@ class AffinityDataset(Dataset):
                     if m_chain in self.receptor_chains and m_chain in mask_info:
                         for idx, block in enumerate(mask_info[m_chain]):
                             if m_residue in block:
-                                scaffold_idx[f"{m_chain}_{idx}_start"] = block[0]
-                                scaffold_idx[f"{m_chain}_{idx}_end"] = block[-1]
+                                scaffold_idx[f"{m_chain}_{idx}_start"] = m_residue
+                                scaffold_idx[f"{m_chain}_{idx}_end"] = m_residue
                                 break 
 
         processed_row = _process_csv_row(path, mut, scaffold_idx)
@@ -621,12 +622,20 @@ class AffinityDataset(Dataset):
 
             interface_points = sorted(interface_points)
             for i in range(len(interface_points)//2):
-                scaffold_mask[interface_points[2*i]:interface_points[2*i+1]+1] = 1
-                if interface_points[2*i] == interface_points[2*i+1]:
-                    scaffold_mask[interface_points[2*i]-1:interface_points[2*i+1]+2] = 1
+                start = interface_points[2*i]
+                end   = interface_points[2*i+1]
+                block_len = end - start + 1
+
+                if block_len >= 20:
+                    crop_start = random.randint(start, end - 19)
+                    crop_end   = crop_start + 19
+                    scaffold_mask[crop_start:crop_end + 1] = 1
+
+                else:
+                    scaffold_mask[start:end + 1] = 1
 
         return scaffold_mask * batch['res_mask']
-
+    
     def setup_inpainting(self, feats):
         loop_mask = self._sample_scaffold_mask(feats)
         feats['loop_mask'] = loop_mask
@@ -667,27 +676,15 @@ class AffinityDataset(Dataset):
                 diffuse_mask = torch.isin(asym_id, masked_chain).to(torch.long)
 
             elif 'affinity' in feats['mode']:
-                # 1. 리간드 체인 인덱스 준비
                 ligand_chain_indices = [du.chain_str_to_int(c) for c in self.ligand_chains]
                 ligand_chain_tensor = torch.tensor(ligand_chain_indices, device=feats['loop_mask'].device)
                 chain_index = feats['chain_index']
-                
-                # 2. ligand_mask 생성 (단순히 리간드 체인에 속하면 1, 아니면 0)
-                # 크기: (residue_length,)
                 ligand_mask = torch.isin(chain_index, ligand_chain_tensor).to(torch.long)
                 diffuse_mask = torch.max(ligand_mask, feats['loop_mask'])
-                
-                # 4. 결과 저장
                 feats['ligand_mask'] = ligand_mask
 
-            diffuse_mask = provide_anchor(
-                diffuse_mask, 
-                feats['res_mask'], 
-                feats['chain_index'],
-                feats['mode']
-                ).to(torch.long)
-            
             feats['diffuse_mask'] = diffuse_mask
+            
             if torch.sum(diffuse_mask) == 0:
                 raise ValueError(
                     f"diffuse_mask is all zero for sample {feats['pdb_name']}. "
