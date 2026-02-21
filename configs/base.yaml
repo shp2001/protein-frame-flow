@@ -167,7 +167,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.3.2.2_wo_ag_mask_dist_weighted_ppb
+    name: v2.3.2.2_wo_ag_mask_dist_weighted_w_mut_mask
     project: v2.3.2.2_affinity
   optimizer:
     warmup_steps: 0

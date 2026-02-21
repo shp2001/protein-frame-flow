@@ -195,6 +195,33 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
     chain_idx = torch.tensor(processed_feats['chain_index'])
     residue_index = torch.tensor(processed_feats['residue_index'])
 
+    num_res = chain_feats['aatype'].shape[0]
+    mutation_mask = torch.zeros(num_res, dtype=torch.long)
+
+    if mut != "No_Mutation":
+        raw_mutations = mut.split('_')
+        for m in raw_mutations:
+            match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", m)
+            if not match:
+                continue
+            aa_char, chain_char, res_id_str, type_str = match.groups()
+            target_res_id = int(res_id_str)
+            target_chain_idx = du.chain_str_to_int(chain_char)
+
+            curr_chain = processed_feats['chain_index']
+            curr_res = processed_feats['residue_index']
+
+            if not isinstance(curr_chain, torch.Tensor):
+                curr_chain = torch.tensor(curr_chain)
+            if not isinstance(curr_res, torch.Tensor):
+                curr_res = torch.tensor(curr_res)
+
+            mask_loc = (curr_chain == target_chain_idx) & (curr_res == target_res_id)
+            idx_locs = torch.where(mask_loc)[0]
+
+            for idx_loc in idx_locs:
+                mutation_mask[idx_loc.item()] = 1
+
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
@@ -222,6 +249,7 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
         'rigidgroups_gt_frames': chain_feats['rigidgroups_gt_frames'], # require centering  (L, 8, 4, 4)
         'rigidgroups_gt_exists': chain_feats['rigidgroups_gt_exists'],
         'rigidgroups_alt_gt_frames': chain_feats['rigidgroups_alt_gt_frames'], # require centering (L, 8, 4, 4)
+        'mutation_mask': mutation_mask
     }
 
 # ==============================================================================

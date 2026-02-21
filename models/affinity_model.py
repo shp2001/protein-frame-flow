@@ -64,6 +64,9 @@ class AffinityHead(nn.Module):
 
         self.input_strunk_ln = LayerNorm(self.c_s)
 
+        self.mut_emb_s = LinearNoBias(in_features=1, out_features=self.c_s)
+        self.mut_emb_z = LinearNoBias(in_features=1, out_features=self.c_z)
+
         self.linear_no_bias_d = LinearNoBias(
             in_features=self.num_bins, out_features=self.c_z
         )
@@ -103,6 +106,7 @@ class AffinityHead(nn.Module):
         z_trunk: torch.Tensor,
         inter_pair_mask: torch.Tensor,
         x_pred_coords: torch.Tensor,
+        mutation_mask: torch.Tensor,
         use_embedding: bool = True,
         inplace_safe: bool = False,
         use_coords: bool = True,
@@ -158,6 +162,7 @@ class AffinityHead(nn.Module):
                         inter_pair_mask=inter_pair_mask,
                         x_pred_rep_coords=x_pred_coords[..., i, :, :],
                         use_coords=use_coords,
+                        mutation_mask=mutation_mask,
                 )
                 affinity_values.append(affinity_value)
 
@@ -168,6 +173,7 @@ class AffinityHead(nn.Module):
                     inter_pair_mask=inter_pair_mask,
                     x_pred_rep_coords=x_pred_coords,
                     use_coords=use_coords,
+                    mutation_mask=mutation_mask,
             )
             affinity_values.append(affinity_value)
 
@@ -182,6 +188,7 @@ class AffinityHead(nn.Module):
         inter_pair_mask: torch.Tensor,
         x_pred_rep_coords: torch.Tensor,
         use_coords: bool,
+        mutation_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
@@ -189,6 +196,10 @@ class AffinityHead(nn.Module):
             x_pred_coords (torch.Tensor): predicted coordinates
                 [..., N_atoms, 3] # Note: N_sample = 1 for avoiding CUDA OOM
         """
+        mut_mask_expand = mutation_mask.to(s_trunk.dtype).unsqueeze(-1)
+        s_trunk = s_trunk + self.mut_emb_s(mut_mask_expand)
+        z_mut = self.mut_emb_z(mut_mask_expand)
+        z_pair = z_pair + z_mut.unsqueeze(-2) + z_mut.unsqueeze(-3)
         
         if use_coords: 
             # Embed pair distances of representative atoms:

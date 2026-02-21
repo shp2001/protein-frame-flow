@@ -157,7 +157,8 @@ class AffinityModule(LightningModule):
         for i in range(2):
             batch = paired_batch[f"batch_{i}"]
             diffuse_mask = batch["diffuse_mask"]
-            
+            mutation_mask = batch['mutation_mask']
+
             if 'ligand_mask' in batch:
                 ligand_mask = batch['ligand_mask']
             else:
@@ -197,7 +198,8 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords
+                use_coords=self._affinity_cfg.use_coords,
+                mutation_mask=mutation_mask[0]
                 )       
             affinity_pred_values.append(affinity_pred_value)
         
@@ -256,6 +258,7 @@ class AffinityModule(LightningModule):
             pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
 
             diffuse_mask = batch["diffuse_mask"]
+            mutation_mask = batch['mutation_mask']
             loop_mask = batch['loop_mask']
 
             if "ligand_mask" not in batch:
@@ -343,7 +346,8 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords
+                use_coords=self._affinity_cfg.use_coords,
+                mutation_mask=mutation_mask[0],
                 ) 
   
             affinity_pred_values.append(affinity_pred_value)
@@ -578,7 +582,6 @@ class AffinityModule(LightningModule):
             }
 
     def on_predict_start(self):
-        self.pairformer_cache = {}
         self.current_pdb_id = None
         print("Pairformer cache has been initialized.")
 
@@ -593,6 +596,7 @@ class AffinityModule(LightningModule):
         # data_source = batch['data_source']
         pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation
         diffuse_mask = batch['diffuse_mask']
+        mutation_mask = batch['mutation_mask']
 
         if "ligand_mask" not in batch:
             ligand_mask = diffuse_mask 
@@ -607,26 +611,15 @@ class AffinityModule(LightningModule):
 
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
-            
-        if pdb_mt_id != self.current_pdb_id:
-            self.pairformer_cache.clear()
-            self.current_pdb_id = pdb_mt_id
 
-        if pdb_mt_id in self.pairformer_cache:
-            s_init, s, z, trans_perturbed = self.pairformer_cache[pdb_mt_id]
-            
-        else:
-            s_init, z_init, trans_perturbed = self.model.embed_input(batch)
-            _, s, z, pair_outputs = self.model.do_pairformer(
-                s_init,
-                z_init,
-                batch['edge_mask'][0][None, ...],
-                self._model_cfg.pairformer.n_cycles,
-                num_batch
-            )
-
-            # 결과를 캐시에 저장합니다.
-            self.pairformer_cache[pdb_mt_id] = (s_init, s, z, trans_perturbed)
+        s_init, z_init, trans_perturbed = self.model.embed_input(batch)
+        _, s, z, pair_outputs = self.model.do_pairformer(
+            s_init,
+            z_init,
+            batch['edge_mask'][0][None, ...],
+            self._model_cfg.pairformer.n_cycles,
+            num_batch
+        )
 
         atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
             self.model,
@@ -700,7 +693,8 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords
+                use_coords=self._affinity_cfg.use_coords,
+                mutation_mask=mutation_mask[0]
                 )
             
         for i in range(pred_positions.shape[0]):
