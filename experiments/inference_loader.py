@@ -139,9 +139,10 @@ def _process_mutations(processed_file_path, mut, scaffold_idx):
 
 def _process_csv_row(processed_file_path, mut, scaffold_idx):
     """Training dataloader와 동일한 CSV row 처리 로직"""
-    processed_feats = du.read_pkl(processed_file_path)
     if mut != "No_Mutation":
         processed_feats, scaffold_idx = _process_mutations(processed_file_path, mut, scaffold_idx)
+    else:
+        processed_feats = du.read_pkl(processed_file_path)
     processed_feats = du.parse_chain_feats(processed_feats)
 
     # make chain sequence list (for the multimer relpos embedding)
@@ -446,12 +447,6 @@ class BaseDataset(Dataset):
             diffuse_mask = torch.max(ligand_mask, feats['loop_mask'])
             feats['ligand_mask'] = ligand_mask
 
-        diffuse_mask = provide_anchor(
-            diffuse_mask, 
-            feats['res_mask'], 
-            feats['chain_index'],
-            feats['mode']
-            ).to(torch.long)
         feats['diffuse_mask'] = diffuse_mask
         
         if torch.sum(diffuse_mask) == 0:
