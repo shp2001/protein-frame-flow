@@ -26,7 +26,8 @@ class AffinityHead(nn.Module):
         distance_bin_end: float = 52.0,
         distance_bin_step: float = 1.25,
         stop_gradient: bool = True,
-        sigma: float = 10.0
+        sigma: float = 10.0,
+        pool_mutation: bool = False
     ) -> None:
         """
         Args:
@@ -44,6 +45,7 @@ class AffinityHead(nn.Module):
         super(AffinityHead, self).__init__()
         self.n_blocks = n_blocks
         self.sigma = sigma
+        self.pool_mutation = pool_mutation
         self.c_s = c_s
         self.c_z = c_z
         self.c_s_inputs = c_s_inputs
@@ -83,17 +85,15 @@ class AffinityHead(nn.Module):
 
         self.norm_g = nn.LayerNorm(self.c_z)
 
+        if pool_mutation:
+            affinity_out_mlp_in = self.c_z * 2
+        else:
+            affinity_out_mlp_in = self.c_z
+
         self.affinity_out_mlp = nn.Sequential(
-            Linear(self.c_z, self.c_z, initializer='relu'),
+            Linear(affinity_out_mlp_in, self.c_z, initializer='relu'),
             nn.ReLU(),
             Linear(self.c_z, self.c_z//2, initializer='relu'),
-            nn.ReLU()
-        )
-
-        self.to_affinity_pred_value = nn.Sequential(
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
-            nn.ReLU(),
-            Linear(self.c_z//2, self.c_z//2, initializer='relu'),
             nn.ReLU(),
             LinearNoBias(self.c_z//2, 1),
         )
@@ -159,7 +159,7 @@ class AffinityHead(nn.Module):
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                     inter_pair_mask=inter_pair_mask,
                     x_pred_rep_coords=x_pred_coords[..., i, :, :],
-                    mutation_mask=mutation_mask,
+                    mutation_mask=mutation_mask
             )
             affinity_values.append(affinity_value)
         affinity_values = torch.stack(affinity_values).squeeze(-1)
@@ -217,13 +217,21 @@ class AffinityHead(nn.Module):
         dist_w_inter = dist_w * inter_pair_mask[..., None]
         g = torch.sum(z_pair * dist_w_inter, dim=(0,1)) / torch.sum(dist_w_inter, dim=(0,1))
 
+        # apply MutationWeightedPooling 
+        if self.pool_mutation:
+            mutation_mask_2d = (
+                (mutation_mask.unsqueeze(-1) + mutation_mask.unsqueeze(-2)).clamp(max=1.0)
+            )
+            mutation_pooling_mask = dist_w_inter * mutation_mask_2d[..., None]
+            g_mut = torch.sum(z_pair * mutation_pooling_mask, dim=(0, 1)) / torch.clamp(
+                torch.sum(mutation_pooling_mask, dim=(0, 1)), min=1e-8
+            )  # (c_z,)
+            g = torch.cat([g, g_mut], dim=-1)  # (c_z * 2,)
         # # apply MeanPooling 
         # g = torch.sum(z_pair * inter_pair_mask[..., None], dim=(0,1)) / torch.sum(inter_pair_mask, dim=(0,1)) # (128)
         
         # Affinity MLP
         g = self.norm_g(g)
-        g = self.affinity_out_mlp(g) # (64)
-        
-        affinity_pred_value = self.to_affinity_pred_value(g)
+        affinity_pred_value = self.affinity_out_mlp(g) # (64)
 
         return affinity_pred_value
