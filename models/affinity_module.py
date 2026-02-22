@@ -180,7 +180,7 @@ class AffinityModule(LightningModule):
                     batch['edge_mask'].shape[0]
                     )
                 
-                if self._affinity_cfg.use_coords:
+                if self._affinity_cfg.use_pred_coords:
                     r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.rollout.sample(
                         self.model,
                         batch,
@@ -189,7 +189,7 @@ class AffinityModule(LightningModule):
                         z
                     ) 
                 else:
-                    pred_trans_1 = None
+                    pred_trans_1 = batch['trans_1']
             
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred_value = self.affinity_model(
@@ -198,7 +198,6 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords,
                 mutation_mask=mutation_mask[0]
                 )       
             affinity_pred_values.append(affinity_pred_value)
@@ -281,7 +280,7 @@ class AffinityModule(LightningModule):
                     batch['edge_mask'].shape[0]
                     )
                 
-                if self._affinity_cfg.use_coords:
+                if self._affinity_cfg.use_pred_coords:
                     r3_traj, clean_atom37_traj, pred_positions, pred_trans_1 = self.interpolant.sample(
                         self.model,
                         batch,
@@ -326,7 +325,7 @@ class AffinityModule(LightningModule):
                             b_factors=b_factor
                         )
                 else:
-                    pred_trans_1 = None
+                    pred_trans_1 = batch['trans_1']
 
             # if hasattr(self, "confidence_model"):
             #     plddt_pred, pae_pred = self.confidence_model(
@@ -346,7 +345,6 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords,
                 mutation_mask=mutation_mask[0],
                 ) 
   
@@ -391,7 +389,7 @@ class AffinityModule(LightningModule):
         batch_metrics.append(affinity_loss_dict)
 
         # calculate trans diffuse loss (rmsd)
-        if self._affinity_cfg.use_coords:
+        if self._affinity_cfg.use_pred_coords:
             gt_trans_1 = batch['trans_1']
             trans_error = (gt_trans_1 - pred_trans_1) 
             trans_diffuse_loss = torch.sum(
@@ -595,6 +593,9 @@ class AffinityModule(LightningModule):
         mutation = batch['mutation']
         # data_source = batch['data_source']
         pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation
+        if 'data_source' in batch:
+            data_source = batch['data_source']
+            pdb_mt_id = batch['processed_path'].split('/')[-1].replace('.pkl', '') + "_" + mutation + "_" + data_source
         diffuse_mask = batch['diffuse_mask']
         mutation_mask = batch['mutation_mask']
 
@@ -621,70 +622,32 @@ class AffinityModule(LightningModule):
             num_batch
         )
 
-        atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
-            self.model,
-            batch,
-            s,
-            s,
-            z
-        )
+        if self._affinity_cfg.use_pred_coords:
+            atom37_traj, model_traj, pred_positions, pred_trans_1 = interpolant.sample(
+                self.model,
+                batch,
+                s,
+                s,
+                z,
+            )
+            bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1)) # (B, N_steps, L, 37, 3)
+            pred_positions = du.to_numpy(pred_positions)
+            pred_positions_37 = []
 
-        bb_trajs = du.to_numpy(torch.stack(atom37_traj, dim=0).transpose(0, 1)) # (B, N_steps, L, 37, 3)
-        pred_positions = du.to_numpy(pred_positions)
-        pred_positions_37 = []
+            batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
+            batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
 
-        batch['residx_atom37_to_atom14'] = batch['residx_atom37_to_atom14'][0]
-        batch['atom37_atom_exists'] = batch['atom37_atom_exists'][0]
-
-        if hasattr(self, "confidence_model"):
-            plddt_pred, pae_pred = self.confidence_model(
-                batch['ref_feature_dict'],
-                s[0],
-                s[0],
-                z[0],
-                batch['edge_mask'][0],
-                pred_trans_1,
-            )       
-            plddt_bins = plddt_pred.shape[-1]
-            plddt_probs = nn.functional.softmax(plddt_pred, dim=-1)  # [B, N_atom, plddt_bins]
-            bin_values = torch.linspace(0, 1, plddt_bins, device=plddt_pred.device)  # [plddt_bins]
-            plddt_score = torch.sum(plddt_probs * bin_values, dim=-1)  # [B, N_atom]
-            b_factors_14 = du.atom_unflatten(plddt_score, batch['atom14_gt_exists']) # [B, N_token, 14]
-            b_factors_14 = du.to_numpy(b_factors_14) * 100
-
-
-            # cdr 별 plddt 저장 
-            anchors = find_anchor(batch['loop_mask'][0], only_h3=False)
-            plddts_by_cdr_all_atom = []
-            plddts_by_cdr_backbone = []
-            for i in range(len(anchors)//2):
-                start = anchors[2*i]
-                end = anchors[2*i+1]
-
-                # all atom plddt 
-                cdr_b_factors = b_factors_14[:, start+1:end, :] # (B, L_cdr, 14)
-                cdr_atom14_mask = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :]) # (B, L_cdr, 14)
-                plddts_by_cdr_all_atom.append(np.sum(cdr_b_factors, axis=(-1, -2)) / np.sum(cdr_atom14_mask, axis=(-1, -2))) # (B)
-
-                # all atom plddt 
-                cdr_b_factors_bb = b_factors_14[:, start+1:end, :3] # (B, L_cdr, 3)
-                cdr_atom14_mask_bb = du.to_numpy(batch['atom14_gt_exists'][:, start+1:end, :3]) # (B, L_cdr, 3)
-                plddts_by_cdr_backbone.append(np.sum(cdr_b_factors_bb, axis=(-1, -2)) / np.sum(cdr_atom14_mask_bb, axis=(-1, -2))) # (B)
-                
-            plddts_by_cdr_all_atom = np.stack(plddts_by_cdr_all_atom, axis=1) # (B, 6)
-            plddts_by_cdr_backbone = np.stack(plddts_by_cdr_backbone, axis=1) # (B, 6)
-
-            # b_factor 차원 (14 -> 37)
-            b_factors = []
-            for i in range(pred_positions.shape[0]):
-                b_factors_37 = all_atom.atom14_to_atom37(b_factors_14[i][..., None], batch)
-                b_factors.append(np.squeeze(b_factors_37, axis=-1))
-            b_factors = np.stack(b_factors) # (B, L, 37)
-
-
-        else:
             b_factor_alt = batch['loop_mask'].cpu().numpy()
             b_factors = np.tile((b_factor_alt * 100)[:, :, None], (1, 1, 37)) # (B, L, 37)
+
+            for i in range(pred_positions.shape[0]):
+                pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
+                pred_positions_37.append(pred_position_37)
+            pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
+
+        else:
+            pred_trans_1 = batch['trans_1']
+
         if hasattr(self, "affinity_model"):
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred_value = self.affinity_model(
@@ -693,15 +656,9 @@ class AffinityModule(LightningModule):
                 z_trunk=z[0],
                 inter_pair_mask=inter_pair_mask[0],
                 x_pred_coords=pred_trans_1,
-                use_coords=self._affinity_cfg.use_coords,
                 mutation_mask=mutation_mask[0]
                 )
             
-        for i in range(pred_positions.shape[0]):
-            pred_position_37 = all_atom.atom14_to_atom37(pred_positions[i], batch) # (L_crop, 37, 3)
-            pred_positions_37.append(pred_position_37)
-        pred_positions = np.stack(pred_positions_37) # (B, L, 37, 3)
-
         samples = os.listdir(sample_root_dir)
         sample_nums = samples 
         next_sample_num = -1
@@ -714,63 +671,38 @@ class AffinityModule(LightningModule):
         for i in range(num_batch):
             next_sample_num += 1
             sample_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}.pdb")
-            pred_position = pred_positions[i]
-            bb_traj = bb_trajs[i]
 
             # save structure data 
-            aatype = du.to_numpy(batch['aatype'][i].int())
-            chain_idx = du.to_numpy(batch['chain_idx'][i].int())
-            residue_idx = du.to_numpy(batch['residue_index'][i].int())
-            diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
-            b_factor = b_factors[i]
-            _ = eu.save_traj(
-                sample=pred_position, # (L, 37, 3)
-                bb_prot_traj=bb_traj, 
-                x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
-                b_factors=b_factor,  # 위의 prmsd 집어넣기 
-                diffuse_mask=diffuse_mask,
-                output_path=sample_path,
-                aatype=aatype,
-                chain_index=chain_idx,
-                residue_index=residue_idx,
-                save_traj_bool=self._interpolant_cfg.save_traj
-            )
-            # save perturbed trans 
-            if trans_perturbed != None:
-                perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
-                du.save_perturbed_trans(
-                    trans_perturbed[i][None, ...], 
-                    batch['chain_index'][i][None, ...], 
-                    batch['residue_index'][i][None, ...],
-                    perturbed_trans_path
-                    )
-
-            # save plddt 
-            if hasattr(self, "confidence_model"):
-                plddt_by_cdr_all_atom = plddts_by_cdr_all_atom[i].tolist()
-                plddt_by_cdr_backbone = plddts_by_cdr_backbone[i].tolist()
-                plddt_by_cdr_dict = {
-                    'h1_aa': plddt_by_cdr_all_atom[0],
-                    'h2_aa': plddt_by_cdr_all_atom[1],
-                    'h3_aa': plddt_by_cdr_all_atom[2],
-                    'l1_aa': plddt_by_cdr_all_atom[3],
-                    'l2_aa': plddt_by_cdr_all_atom[4],
-                    'l3_aa': plddt_by_cdr_all_atom[5],       
-                    'h1_bb': plddt_by_cdr_backbone[0],
-                    'h2_bb': plddt_by_cdr_backbone[1],
-                    'h3_bb': plddt_by_cdr_backbone[2],
-                    'l1_bb': plddt_by_cdr_backbone[3],
-                    'l2_bb': plddt_by_cdr_backbone[4],
-                    'l3_bb': plddt_by_cdr_backbone[5],          
-                }
-                
-                # 저장할 파일 경로
-                json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_plddts.json')
-
-                # JSON으로 저장
-                with open(json_path, 'w') as f:
-                    json.dump(plddt_by_cdr_dict, f, indent=4)
-            
+            if self._affinity_cfg.use_pred_coords:
+                pred_position = pred_positions[i]
+                bb_traj = bb_trajs[i]
+                aatype = du.to_numpy(batch['aatype'][i].int())
+                chain_idx = du.to_numpy(batch['chain_idx'][i].int())
+                residue_idx = du.to_numpy(batch['residue_index'][i].int())
+                diffuse_mask = du.to_numpy(batch['diffuse_mask'][i].int())
+                b_factor = b_factors[i]
+                _ = eu.save_traj(
+                    sample=pred_position, # (L, 37, 3)
+                    bb_prot_traj=bb_traj, 
+                    x0_traj=np.flip(du.to_numpy(torch.concat(model_traj, dim=0)), axis=0),
+                    b_factors=b_factor,  # 위의 prmsd 집어넣기 
+                    diffuse_mask=diffuse_mask,
+                    output_path=sample_path,
+                    aatype=aatype,
+                    chain_index=chain_idx,
+                    residue_index=residue_idx,
+                    save_traj_bool=self._interpolant_cfg.save_traj
+                )
+                # save perturbed trans 
+                if trans_perturbed != None:
+                    perturbed_trans_path = os.path.join(sample_root_dir, f"sample_{next_sample_num}_perturbed_trans.pdb")
+                    du.save_perturbed_trans(
+                        trans_perturbed[i][None, ...], 
+                        batch['chain_index'][i][None, ...], 
+                        batch['residue_index'][i][None, ...],
+                        perturbed_trans_path
+                        )
+                                
             if hasattr(self, 'affinity_model'):
                 affinity_json_path = os.path.join(sample_root_dir, f'sample_{next_sample_num}_affinity.json')
                 affinity_dict = {

@@ -21,7 +21,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_dist_weighted_wo_ag_mask/2026-02-20_13-57-27/epoch=28-step=1827.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_wo_ag_mask_dist_weighted_ppb/2026-02-21_00-32-15/epoch=39-step=2320.ckpt
   num_gpus: 1
 
   # trans rot perturbation 
@@ -89,8 +89,8 @@ inference:
     overwrite: False
 
     # CSV path for scaffolding targets.
-    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_test.csv
-    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_test.csv 
+    csv_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_valid_ppb.csv
+    csv_path_affinity: /home/psh/data/affinity/ppb_affinity/affinity_valid_ppb.csv 
     # Number of scaffolds to sample per target.
     samples_per_target: 1
 

@@ -195,9 +195,9 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
     chain_idx = torch.tensor(processed_feats['chain_index'])
     residue_index = torch.tensor(processed_feats['residue_index'])
 
+    # create mutation mask
     num_res = chain_feats['aatype'].shape[0]
     mutation_mask = torch.zeros(num_res, dtype=torch.long)
-
     if mut != "No_Mutation":
         raw_mutations = mut.split('_')
         for m in raw_mutations:
@@ -400,6 +400,7 @@ class AffinityPairSampler:
     def __init__(self, data_manager, pairs_per_cluster=6, is_training=True, seed=42):
         self.affinity_df = data_manager.affinity_df
         self.cluster_dict = data_manager.cluster_group
+        self.dataset_cfg = data_manager.dataset_cfg
         self.clusters = list(self.cluster_dict.keys())
         self.kd_values = self.affinity_df['Affinity_Kd [nM]'].values
         
@@ -547,6 +548,72 @@ class AffinityDataset(Dataset):
         
         return selected_mutation, selected_meta_row
 
+    def _build_scaffold_idx(self, mask_info, target_chains, processed_path,
+                            max_mask_ratio, min_anchor_residues,
+                            mask_all_ag_blocks):
+        """체인별 interface masking (비율 초과 시 작은 block 우선으로 한도 내 포함)"""
+        processed_feats = du.read_pkl(processed_path)
+        chain_index_arr = torch.tensor(processed_feats['chain_index'])
+
+        scaffold_idx = {}
+        for chain_id in target_chains:
+            if chain_id not in mask_info:
+                continue
+
+            chain_total_len = int((chain_index_arr == du.chain_str_to_int(chain_id)).sum())
+            if chain_total_len == 0:
+                continue
+
+            # mask_all_ag_blocks=True이면 receptor_chains는 scaffold_idx에서 제외
+            if mask_all_ag_blocks and chain_id in self.receptor_chains:
+                continue
+
+            blocks = mask_info[chain_id]
+            n_interface = sum(len(b) for b in blocks)
+            max_maskable = max(min(int(chain_total_len * max_mask_ratio),
+                                chain_total_len - min_anchor_residues), 0)
+
+            if n_interface <= max_maskable:
+                selected = list(enumerate(blocks))
+            else:
+                selected, accumulated = [], 0
+                for orig_idx, block in sorted(enumerate(blocks), key=lambda x: len(x[1])):
+                    if accumulated + len(block) > max_maskable:
+                        continue
+                    selected.append((orig_idx, block))
+                    accumulated += len(block)
+
+                if not selected and blocks:
+                    smallest_idx, smallest_block = min(enumerate(blocks), key=lambda x: len(x[1]))
+                    partial = smallest_block[:max_maskable]
+                    if partial:
+                        scaffold_idx[f"{chain_id}_{smallest_idx}_start"] = partial[0]
+                        scaffold_idx[f"{chain_id}_{smallest_idx}_end"] = partial[-1]
+                    continue
+
+            for orig_idx, block in selected:
+                scaffold_idx[f"{chain_id}_{orig_idx}_start"] = block[0]
+                scaffold_idx[f"{chain_id}_{orig_idx}_end"] = block[-1]
+
+        return scaffold_idx
+
+
+    def _get_covered_residues(self, scaffold_idx):
+        """scaffold_idx의 start/end 구간을 {chain_str: set(residue_ids)} 로 반환"""
+        prefixes = {}
+        for key, val in scaffold_idx.items():
+            for suffix in ('_start', '_end'):
+                if key.endswith(suffix):
+                    prefixes.setdefault(key[:-len(suffix)], {})[suffix[1:]] = val
+
+        covered = {}
+        for prefix, bounds in prefixes.items():
+            if 'start' not in bounds or 'end' not in bounds:
+                continue
+            chain_str = prefix.split('_')[0]
+            covered.setdefault(chain_str, set()).update(range(bounds['start'], bounds['end'] + 1))
+        return covered
+
     def process_csv_row(self, csv_row, mut):
         path = csv_row['processed_path']
         scaffold_idx = {}
@@ -565,32 +632,34 @@ class AffinityDataset(Dataset):
 
             with open(mask_path, 'r') as f:
                 mask_info = json.load(f)
-            
-            scaffold_idx = {}
 
             if "TCR" in csv_row['mode']:
                 self.ligand_chains = list(receptor_chains_str)
                 self.receptor_chains = list(ligand_chains_str)
 
-            for chain_id in self.ligand_chains:
-                if chain_id not in mask_info:
+            scaffold_idx = self._build_scaffold_idx(
+                mask_info=mask_info,
+                target_chains=self.ligand_chains + self.receptor_chains,
+                processed_path=path,
+                max_mask_ratio=self.dataset_cfg.max_interface_mask_ratio,
+                min_anchor_residues=self.dataset_cfg.min_anchor_residues,
+                mask_all_ag_blocks=self.dataset_cfg.mask_all_ag_blocks
+            )
+
+        if mut != "No_Mutation":
+            covered = self._get_covered_residues(scaffold_idx)
+            for part in mut.split('_'):
+                match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", part)
+                _, chain_char, res_id_str, type_str = match.groups()
+                res_id = int(res_id_str)
+                # del은 residue가 사라지므로 제외, 이미 커버된 경우도 제외
+                if type_str == 'del' or res_id in covered[chain_char]:
                     continue
-                for idx, block in enumerate(mask_info[chain_id]):
-                    scaffold_idx[f"{chain_id}_{idx}_start"] = block[0]
-                    scaffold_idx[f"{chain_id}_{idx}_end"] = block[-1]
-
-            if mut != "No_Mutation":
-                mut_parts = mut.split('_')          
-                for part in mut_parts:
-                    m_chain = part[1] # Chain ID 추출
-                    m_residue = int(part[2:-1]) # Residue ID 추출 (숫자 부분)
-
-                    if m_chain in self.receptor_chains and m_chain in mask_info:
-                        for idx, block in enumerate(mask_info[m_chain]):
-                            if m_residue in block:
-                                scaffold_idx[f"{m_chain}_{idx}_start"] = m_residue
-                                scaffold_idx[f"{m_chain}_{idx}_end"] = m_residue
-                                break 
+                i = 0
+                while f"{chain_char}_mut{i}_start" in scaffold_idx:
+                    i += 1
+                scaffold_idx[f"{chain_char}_mut{i}_start"] = res_id
+                scaffold_idx[f"{chain_char}_mut{i}_end"] = res_id
 
         processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = csv_row['mode']
@@ -648,7 +717,6 @@ class AffinityDataset(Dataset):
                 if found_idx != -1:
                     interface_points.append(found_idx)
 
-            interface_points = sorted(interface_points)
             for i in range(len(interface_points)//2):
                 start = interface_points[2*i]
                 end   = interface_points[2*i+1]

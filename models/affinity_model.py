@@ -109,7 +109,6 @@ class AffinityHead(nn.Module):
         mutation_mask: torch.Tensor,
         use_embedding: bool = True,
         inplace_safe: bool = False,
-        use_coords: bool = True,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Args:
@@ -153,32 +152,17 @@ class AffinityHead(nn.Module):
         affinity_values = []
         x_pred_rep_coords = x_pred_coords
 
-        if use_coords:
-            N_sample = x_pred_rep_coords.size(-3)
-            for i in range(N_sample):
-                affinity_value = self.memory_efficient_forward(
-                        s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
-                        z_pair=z_trunk.clone() if inplace_safe else z_trunk,
-                        inter_pair_mask=inter_pair_mask,
-                        x_pred_rep_coords=x_pred_coords[..., i, :, :],
-                        use_coords=use_coords,
-                        mutation_mask=mutation_mask,
-                )
-                affinity_values.append(affinity_value)
-
-        else:
+        N_sample = x_pred_rep_coords.size(-3)
+        for i in range(N_sample):
             affinity_value = self.memory_efficient_forward(
                     s_trunk=s_trunk.clone() if inplace_safe else s_trunk,
                     z_pair=z_trunk.clone() if inplace_safe else z_trunk,
                     inter_pair_mask=inter_pair_mask,
-                    x_pred_rep_coords=x_pred_coords,
-                    use_coords=use_coords,
+                    x_pred_rep_coords=x_pred_coords[..., i, :, :],
                     mutation_mask=mutation_mask,
             )
             affinity_values.append(affinity_value)
-
         affinity_values = torch.stack(affinity_values).squeeze(-1)
-
         return affinity_values
 
     def memory_efficient_forward(
@@ -187,7 +171,6 @@ class AffinityHead(nn.Module):
         z_pair: torch.Tensor,
         inter_pair_mask: torch.Tensor,
         x_pred_rep_coords: torch.Tensor,
-        use_coords: bool,
         mutation_mask: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -201,26 +184,23 @@ class AffinityHead(nn.Module):
         z_mut = self.mut_emb_z(mut_mask_expand)
         z_pair = z_pair + z_mut.unsqueeze(-2) + z_mut.unsqueeze(-3)
         
-        if use_coords: 
-            # Embed pair distances of representative atoms:
-            with torch.amp.autocast("cuda", enabled=False):
-                x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
-                distance_pred = torch.cdist(
-                    x_pred_rep_coords, x_pred_rep_coords
-                )  # [..., N_tokens, N_tokens]
-            z_pair = z_pair + self.linear_no_bias_d(
-                one_hot(
-                    x=distance_pred,
-                    lower_bins=self.lower_bins,
-                    upper_bins=self.upper_bins,
-                )
-            )  # [..., N_tokens, N_tokens, c_z]
+        # Embed pair distances of representative atoms:
+        with torch.amp.autocast("cuda", enabled=False):
+            x_pred_rep_coords = x_pred_rep_coords.to(torch.float32)
+            distance_pred = torch.cdist(
+                x_pred_rep_coords, x_pred_rep_coords
+            )  # [..., N_tokens, N_tokens]
+        z_pair = z_pair + self.linear_no_bias_d(
+            one_hot(
+                x=distance_pred,
+                lower_bins=self.lower_bins,
+                upper_bins=self.upper_bins,
+            )
+        )  # [..., N_tokens, N_tokens, c_z]
 
-            z_pair = z_pair + self.linear_no_bias_d_wo_onehot(
-                distance_pred.unsqueeze(dim=-1)
-            )  # [..., N_tokens, N_tokens, c_z]
-        else:
-            z_pair = z_pair 
+        z_pair = z_pair + self.linear_no_bias_d_wo_onehot(
+            distance_pred.unsqueeze(dim=-1)
+        )  # [..., N_tokens, N_tokens, c_z]
 
         # pairformer w/ inter pair mask (attention to off-diagonal part of the pair feature)
         s_single, z_pair = self.pairformer_stack(

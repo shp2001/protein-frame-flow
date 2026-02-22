@@ -170,7 +170,7 @@ class ProteinData(LightningDataModule):
             collated_batch['loop_mask'],
             collated_batch['diffuse_mask'],
             threshold=8
-        )
+        ) * 0
 
         # Center based on motif locations
         motif_mask = 1 - collated_batch['loop_mask'] # (B, L)
