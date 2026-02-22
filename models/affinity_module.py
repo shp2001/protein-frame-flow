@@ -48,6 +48,7 @@ class AffinityModule(LightningModule):
             distance_bin_end=self._affinity_cfg.distance_bin_end,
             distance_bin_step=self._affinity_cfg.distance_bin_step,
             stop_gradient=self._affinity_cfg.stop_gradient,
+            pool_mutation=self._affinity_cfg.pool_mutation,
         )
         # Set-up interpolant for mini-rollout
         self.rollout = Interpolant(cfg.rollout)
