@@ -68,7 +68,7 @@ pdb_dataset:
   general_max_num_res: 400
   
   # build scaffold_idx
-  mask_all_ag_blocks: True
+  not_mask_ag_blocks: True
   max_interface_mask_ratio: 0.8
   min_anchor_residues: 4
 

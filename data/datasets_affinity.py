@@ -550,7 +550,7 @@ class AffinityDataset(Dataset):
 
     def _build_scaffold_idx(self, mask_info, target_chains, processed_path,
                             max_mask_ratio, min_anchor_residues,
-                            mask_all_ag_blocks):
+                            not_mask_ag_blocks):
         """체인별 interface masking (비율 초과 시 작은 block 우선으로 한도 내 포함)"""
         processed_feats = du.read_pkl(processed_path)
         chain_index_arr = torch.tensor(processed_feats['chain_index'])
@@ -564,8 +564,8 @@ class AffinityDataset(Dataset):
             if chain_total_len == 0:
                 continue
 
-            # mask_all_ag_blocks=True이면 receptor_chains는 scaffold_idx에서 제외
-            if mask_all_ag_blocks and chain_id in self.receptor_chains:
+            # not_mask_ag_blocks=True이면 receptor_chains는 scaffold_idx에서 제외
+            if not_mask_ag_blocks and chain_id in self.receptor_chains:
                 continue
 
             blocks = mask_info[chain_id]
@@ -637,13 +637,33 @@ class AffinityDataset(Dataset):
                 self.ligand_chains = list(receptor_chains_str)
                 self.receptor_chains = list(ligand_chains_str)
 
+            elif "Unknown" in csv_row['mode']:
+                # 체인별 길이 계산을 위해 processed_feats 로드
+                processed_feats = du.read_pkl(path)
+                chain_index_arr = torch.tensor(processed_feats['chain_index'])
+
+                def get_max_chain_len(chains):
+                    lengths = []
+                    for c in chains:
+                        c_int = du.chain_str_to_int(c)
+                        lengths.append(int((chain_index_arr == c_int).sum()))
+                    return max(lengths) if lengths else 0
+
+                ligand_max_len = get_max_chain_len(self.ligand_chains)
+                receptor_max_len = get_max_chain_len(self.receptor_chains)
+
+                # ligand가 너무 짧고 receptor가 충분히 길면 교체
+                if ligand_max_len < 30 and receptor_max_len >= 30:
+                    print(f"{path} ligand-receptor changed")
+                    self.ligand_chains, self.receptor_chains = self.receptor_chains, self.ligand_chains
+
             scaffold_idx = self._build_scaffold_idx(
                 mask_info=mask_info,
                 target_chains=self.ligand_chains + self.receptor_chains,
                 processed_path=path,
                 max_mask_ratio=self.dataset_cfg.max_interface_mask_ratio,
                 min_anchor_residues=self.dataset_cfg.min_anchor_residues,
-                mask_all_ag_blocks=self.dataset_cfg.mask_all_ag_blocks
+                not_mask_ag_blocks=self.dataset_cfg.not_mask_ag_blocks
             )
 
         if mut != "No_Mutation":
@@ -653,7 +673,8 @@ class AffinityDataset(Dataset):
                 _, chain_char, res_id_str, type_str = match.groups()
                 res_id = int(res_id_str)
                 # del은 residue가 사라지므로 제외, 이미 커버된 경우도 제외
-                if type_str == 'del' or res_id in covered[chain_char]:
+                covered_chain = covered.get(chain_char, set())
+                if type_str == 'del' or res_id in covered_chain:
                     continue
                 i = 0
                 while f"{chain_char}_mut{i}_start" in scaffold_idx:
