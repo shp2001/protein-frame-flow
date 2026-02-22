@@ -132,7 +132,7 @@ class AffinityHead(nn.Module):
             s_trunk = s_trunk.detach()
             z_trunk = z_trunk.detach()
 
-        s_trunk = self.input_strunk_ln(torch.clamp(s_trunk, min=-512, max=512))
+        s_trunk = self.input_strunk_ln(s_trunk)
 
         if not use_embedding:
             if inplace_safe:
