@@ -83,13 +83,12 @@ class AffinityHead(nn.Module):
             blocks_per_ckpt=blocks_per_ckpt,
         )
 
-        self.norm_g = nn.LayerNorm(self.c_z)
-
         if pool_mutation:
             affinity_out_mlp_in = self.c_z * 2
         else:
             affinity_out_mlp_in = self.c_z
 
+        self.norm_g = nn.LayerNorm(affinity_out_mlp_in)
         self.affinity_out_mlp = nn.Sequential(
             Linear(affinity_out_mlp_in, self.c_z, initializer='relu'),
             nn.ReLU(),
