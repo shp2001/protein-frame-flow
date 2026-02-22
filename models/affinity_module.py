@@ -296,10 +296,13 @@ class AffinityModule(LightningModule):
                         pred_positions_37.append(pred_position_37)
                     
                     pred_positions = np.stack(pred_positions_37)
-                    
+                    mutation = batch['mutation']
+                    # data_source = batch['data_source']
+                    raw_path = batch['raw_path']
+                    pdb_id = raw_path.split('/')[-1].replace('.pdb', '')
                     sample_dir = os.path.join(
                         self.checkpoint_dir,
-                        f'{pdb_id}_len_{num_res}'
+                        f'{pdb_id}_{mutation}'
                     )
                     os.makedirs(sample_dir, exist_ok=True)
 

@@ -685,7 +685,7 @@ class AffinityDataset(Dataset):
         processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = csv_row['mode']
         processed_row['raw_path'] = csv_row['raw_path'] 
-
+        processed_row['mutation'] = mut
         return processed_row
 
     def _create_split(self, data_csv):

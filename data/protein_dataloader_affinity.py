@@ -111,7 +111,7 @@ class ProteinData(LightningDataModule):
         cropped_batch = []
         for feat in batch_feats:
             cropped_feat = {}
-            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'masked_chain', 'first_chain_len', 'raw_path', 'mode']
+            not_crop_key = ['crop_idx', 'scaffold_idx', 'chain_seq_list', 'masked_chain', 'first_chain_len', 'raw_path', 'mode', 'mutation']
             for key in feat.keys():
                 if key not in not_crop_key:
                     cropped_feat[key] = feat[key][feat['crop_idx']]
@@ -190,7 +190,7 @@ class ProteinData(LightningDataModule):
         
         # edge mask 
         collated_batch["edge_mask"] = collated_batch['res_mask'][:, None] * collated_batch['res_mask'][:, :, None]
-        
+        collated_batch["mutation"] = feat['mutation']
         return collated_batch
 
     def collate_fn(self, batch):
