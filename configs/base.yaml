@@ -143,8 +143,8 @@ experiment:
     sc_viol_loss_t_pass: 0.75
 
     # affinity loss 
-    rank_loss_weight: 1.0
-    rank_margin: 0.1
+    rank_loss_weight: 5.0
+    rank_margin: 0.5
     reg_loss_weight: 0.0 # 0.5
     reg_margin: 1.0
     prob_loss_weight: 0.0 # 1.0

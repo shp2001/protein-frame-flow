@@ -225,16 +225,7 @@ class AffinityModule(LightningModule):
 
 
         total_loss = affinity_rank_loss * self._exp_cfg.training.rank_loss_weight + affinity_reg_loss * self._exp_cfg.training.reg_loss_weight
-        print("--------------------------------")
         print(f'{os.path.basename(paired_batch["batch_0"]["raw_path"])} & {os.path.basename(paired_batch["batch_1"]["raw_path"])}')
-        print("affinity_pred_values[0]", affinity_pred_values[0])
-        print("affinity_pred_values[1]", affinity_pred_values[1])
-        print("log_kd1", torch.log10(paired_batch['kd1']))
-        print("log_kd2", torch.log10(paired_batch['kd2']))
-        print("affinity_rank_loss", affinity_rank_loss)
-        print("affinity_reg_loss", affinity_reg_loss)
-        print("total_loss", total_loss)
-        print("--------------------------------")
 
         return {
             "total_loss": total_loss,

@@ -185,6 +185,33 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
     chain_idx = torch.tensor(processed_feats['chain_index'])
     residue_index = torch.tensor(processed_feats['residue_index'])
 
+    num_res = chain_feats['aatype'].shape[0]
+    mutation_mask = torch.zeros(num_res, dtype=torch.long)
+
+    if mut != "No_Mutation":
+        raw_mutations = mut.split('_')
+        for m in raw_mutations:
+            match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", m)
+            if not match:
+                continue
+            aa_char, chain_char, res_id_str, type_str = match.groups()
+            target_res_id = int(res_id_str)
+            target_chain_idx = du.chain_str_to_int(chain_char)
+
+            curr_chain = processed_feats['chain_index']
+            curr_res = processed_feats['residue_index']
+
+            if not isinstance(curr_chain, torch.Tensor):
+                curr_chain = torch.tensor(curr_chain)
+            if not isinstance(curr_res, torch.Tensor):
+                curr_res = torch.tensor(curr_res)
+
+            mask_loc = (curr_chain == target_chain_idx) & (curr_res == target_res_id)
+            idx_locs = torch.where(mask_loc)[0]
+
+            for idx_loc in idx_locs:
+                mutation_mask[idx_loc.item()] = 1
+
     return {
         'res_plddt': torch.tensor(res_plddt),
         'aatype': chain_feats['aatype'],
@@ -212,6 +239,7 @@ def _process_csv_row(processed_file_path, mut, scaffold_idx):
         'rigidgroups_gt_frames': chain_feats['rigidgroups_gt_frames'],
         'rigidgroups_gt_exists': chain_feats['rigidgroups_gt_exists'],
         'rigidgroups_alt_gt_frames': chain_feats['rigidgroups_alt_gt_frames'],
+        'mutation_mask': mutation_mask
     }
 
 
@@ -252,6 +280,72 @@ class BaseDataset(Dataset):
     def __len__(self):
         return len(self.csv)
 
+    def _build_scaffold_idx(self, mask_info, target_chains, processed_path,
+                            max_mask_ratio, min_anchor_residues,
+                            not_mask_ag_blocks):
+        """체인별 interface masking (비율 초과 시 작은 block 우선으로 한도 내 포함)"""
+        processed_feats = du.read_pkl(processed_path)
+        chain_index_arr = torch.tensor(processed_feats['chain_index'])
+
+        scaffold_idx = {}
+        for chain_id in target_chains:
+            if chain_id not in mask_info:
+                continue
+
+            chain_total_len = int((chain_index_arr == du.chain_str_to_int(chain_id)).sum())
+            if chain_total_len == 0:
+                continue
+
+            # not_mask_ag_blocks=True이면 receptor_chains는 scaffold_idx에서 제외
+            if not_mask_ag_blocks and chain_id in self.receptor_chains:
+                continue
+
+            blocks = mask_info[chain_id]
+            n_interface = sum(len(b) for b in blocks)
+            max_maskable = max(min(int(chain_total_len * max_mask_ratio),
+                                chain_total_len - min_anchor_residues), 0)
+
+            if n_interface <= max_maskable:
+                selected = list(enumerate(blocks))
+            else:
+                selected, accumulated = [], 0
+                for orig_idx, block in sorted(enumerate(blocks), key=lambda x: len(x[1])):
+                    if accumulated + len(block) > max_maskable:
+                        continue
+                    selected.append((orig_idx, block))
+                    accumulated += len(block)
+
+                if not selected and blocks:
+                    smallest_idx, smallest_block = min(enumerate(blocks), key=lambda x: len(x[1]))
+                    partial = smallest_block[:max_maskable]
+                    if partial:
+                        scaffold_idx[f"{chain_id}_{smallest_idx}_start"] = partial[0]
+                        scaffold_idx[f"{chain_id}_{smallest_idx}_end"] = partial[-1]
+                    continue
+
+            for orig_idx, block in selected:
+                scaffold_idx[f"{chain_id}_{orig_idx}_start"] = block[0]
+                scaffold_idx[f"{chain_id}_{orig_idx}_end"] = block[-1]
+
+        return scaffold_idx
+
+
+    def _get_covered_residues(self, scaffold_idx):
+        """scaffold_idx의 start/end 구간을 {chain_str: set(residue_ids)} 로 반환"""
+        prefixes = {}
+        for key, val in scaffold_idx.items():
+            for suffix in ('_start', '_end'):
+                if key.endswith(suffix):
+                    prefixes.setdefault(key[:-len(suffix)], {})[suffix[1:]] = val
+
+        covered = {}
+        for prefix, bounds in prefixes.items():
+            if 'start' not in bounds or 'end' not in bounds:
+                continue
+            chain_str = prefix.split('_')[0]
+            covered.setdefault(chain_str, set()).update(range(bounds['start'], bounds['end'] + 1))
+        return covered
+
     def _create_split(self, data_csv):
         self.csv = data_csv
         self._log.info(f'Inference: {len(self.csv)} examples')
@@ -267,7 +361,7 @@ class BaseDataset(Dataset):
         part_idx = 0
         
         meta_key = chains[part_idx].strip()
-        selected_mutation = mutations[part_idx].strip()
+        mut = mutations[part_idx].strip()
         
         has_source = 'Source Data Set' in csv_row.index
         if has_source:
@@ -297,35 +391,59 @@ class BaseDataset(Dataset):
             with open(mask_path, 'r') as f:
                 mask_info = json.load(f)
             
-            if "TCR" in selected_meta_row.get('mode', ''):
+            if "TCR" in selected_meta_row['mode']:
                 self.ligand_chains = list(receptor_chains_str)
                 self.receptor_chains = list(ligand_chains_str)
 
-            for chain_id in self.ligand_chains:
-                if chain_id not in mask_info:
+            elif "Unknown" in selected_meta_row['mode']:
+                # 체인별 길이 계산을 위해 processed_feats 로드
+                processed_feats = du.read_pkl(path)
+                chain_index_arr = torch.tensor(processed_feats['chain_index'])
+
+                def get_max_chain_len(chains):
+                    lengths = []
+                    for c in chains:
+                        c_int = du.chain_str_to_int(c)
+                        lengths.append(int((chain_index_arr == c_int).sum()))
+                    return max(lengths) if lengths else 0
+
+                ligand_max_len = get_max_chain_len(self.ligand_chains)
+                receptor_max_len = get_max_chain_len(self.receptor_chains)
+
+                # ligand가 너무 짧고 receptor가 충분히 길면 교체
+                if ligand_max_len < 30 and receptor_max_len >= 30:
+                    print(f"{path} ligand-receptor changed")
+                    self.ligand_chains, self.receptor_chains = self.receptor_chains, self.ligand_chains
+
+            scaffold_idx = self._build_scaffold_idx(
+                mask_info=mask_info,
+                target_chains=self.ligand_chains + self.receptor_chains,
+                processed_path=path,
+                max_mask_ratio=self._inference_cfg.max_interface_mask_ratio,
+                min_anchor_residues=self._inference_cfg.min_anchor_residues,
+                not_mask_ag_blocks=self._inference_cfg.not_mask_ag_blocks,
+            )
+
+        if mut != "No_Mutation":
+            covered = self._get_covered_residues(scaffold_idx)
+            for part in mut.split('_'):
+                match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", part)
+                _, chain_char, res_id_str, type_str = match.groups()
+                res_id = int(res_id_str)
+                # del은 residue가 사라지므로 제외, 이미 커버된 경우도 제외
+                covered_chain = covered.get(chain_char, set())
+                if type_str == 'del' or res_id in covered_chain:
                     continue
-                for idx, block in enumerate(mask_info[chain_id]):
-                    scaffold_idx[f"{chain_id}_{idx}_start"] = block[0]
-                    scaffold_idx[f"{chain_id}_{idx}_end"] = block[-1]
+                i = 0
+                while f"{chain_char}_mut{i}_start" in scaffold_idx:
+                    i += 1
+                scaffold_idx[f"{chain_char}_mut{i}_start"] = res_id
+                scaffold_idx[f"{chain_char}_mut{i}_end"] = res_id
 
-            if selected_mutation != "No_Mutation":
-                mut_parts = selected_mutation.split('_')          
-                for part in mut_parts:
-                    m_chain = part[1] # Chain ID 추출
-                    m_residue = int(part[2:-1]) # Residue ID 추출 (숫자 부분)
-
-                    if m_chain in self.receptor_chains and m_chain in mask_info:
-                        for idx, block in enumerate(mask_info[m_chain]):
-                            if m_residue in block:
-                                scaffold_idx[f"{m_chain}_{idx}_start"] = m_residue
-                                scaffold_idx[f"{m_chain}_{idx}_end"] = m_residue
-                                break 
-
-
-        processed_row = _process_csv_row(path, selected_mutation, scaffold_idx)
+        processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = selected_meta_row.get('mode', 'affinity')
         processed_row['raw_path'] = selected_meta_row.get('raw_path', '')
-        
+        processed_row['mutation'] = mut
         return processed_row
 
     def _sample_scaffold_mask(self, batch):
@@ -367,7 +485,6 @@ class BaseDataset(Dataset):
                 if found_idx != -1:
                     interface_points.append(found_idx)
 
-            interface_points = sorted(interface_points)
             for i in range(len(interface_points)//2):
                 start = interface_points[2*i]
                 end   = interface_points[2*i+1]
@@ -490,7 +607,6 @@ class BaseDataset(Dataset):
         feats['affinity_kd'] = csv_row['Affinity_Kd [nM]']
         feats['csv_idx'] = torch.tensor(row_idx, dtype=torch.long)
         feats['processed_path'] = selected_meta_row['processed_path']
-        feats['mutation'] = selected_mutation
         if has_source:
             feats['data_source'] = csv_row['Source Data Set']
         return feats
@@ -566,7 +682,7 @@ def collate_fn(batch):
         cropped_batch['loop_mask'],
         cropped_batch['diffuse_mask'],
         threshold=8
-    )
+    ) * 0
     
     # Centering
     motif_mask = 1 - cropped_batch['loop_mask']

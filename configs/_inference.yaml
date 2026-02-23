@@ -8,6 +8,11 @@ inference:
   predict_dir: /home/psh/protein-frame-flow/inference_outputs/
   inference_subdir: run_${now:%Y-%m-%d}_${now:%H-%M-%S}
 
+  # build scaffold_idx
+  not_mask_ag_blocks: True
+  max_interface_mask_ratio: 0.8
+  min_anchor_residues: 4
+
   # cropping 
   ab_max_num_res: 400 
   crop_ab: False
@@ -21,7 +26,7 @@ inference:
   output_dir: /home/psh/protein-frame-flow/inference_outputs/
 
   # Choose checkpoint path
-  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.3.2.2_affinity/v2.3.2.2_wo_ag_mask_dist_weighted_ppb/2026-02-21_00-32-15/epoch=39-step=2320.ckpt
+  ckpt_path: /home/psh/protein-frame-flow/ckpt/v2.4.0_affinity/v2.4.0_wo_ag_mask_w_mut_mask_mutweighted/2026-02-22_22-56-03/epoch=35-step=2088.ckpt
   num_gpus: 1
 
   # trans rot perturbation 
