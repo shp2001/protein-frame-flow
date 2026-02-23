@@ -550,7 +550,8 @@ class AffinityDataset(Dataset):
 
     def _build_scaffold_idx(self, mask_info, target_chains, processed_path,
                             max_mask_ratio, min_anchor_residues,
-                            not_mask_ag_blocks):
+                            not_mask_ag_blocks, mask_ag_mut_block, 
+                            mutations):
         """체인별 interface masking (비율 초과 시 작은 block 우선으로 한도 내 포함)"""
         processed_feats = du.read_pkl(processed_path)
         chain_index_arr = torch.tensor(processed_feats['chain_index'])
@@ -564,7 +565,6 @@ class AffinityDataset(Dataset):
             if chain_total_len == 0:
                 continue
 
-            # not_mask_ag_blocks=True이면 receptor_chains는 scaffold_idx에서 제외
             if not_mask_ag_blocks and chain_id in self.receptor_chains:
                 continue
 
@@ -595,8 +595,55 @@ class AffinityDataset(Dataset):
                 scaffold_idx[f"{chain_id}_{orig_idx}_start"] = block[0]
                 scaffold_idx[f"{chain_id}_{orig_idx}_end"] = block[-1]
 
-        return scaffold_idx
+        # --- Mutation 처리 ---
+        if mutations != "No_Mutation":
+            covered = self._get_covered_residues(scaffold_idx)
+            for part in mutations.split('_'):
+                match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", part)
+                if not match:
+                    continue
+                _, chain_char, res_id_str, type_str = match.groups()
+                res_id = int(res_id_str)
 
+                covered_chain = covered.get(chain_char, set())
+                if type_str == 'del' or res_id in covered_chain:
+                    continue
+
+                if mask_ag_mut_block and chain_char in mask_info:
+                    containing_blocks = [
+                        (orig_idx, block)
+                        for orig_idx, block in enumerate(mask_info[chain_char])
+                        if res_id in block
+                    ]
+                    for orig_idx, block in containing_blocks:
+                        key_prefix = f"{chain_char}_mut_block_{orig_idx}"
+                        if f"{key_prefix}_start" in scaffold_idx:
+                            continue
+
+                        chain_total_len = int((chain_index_arr == du.chain_str_to_int(chain_char)).sum())
+                        current_covered = covered.get(chain_char, set())
+                        new_covered = current_covered | set(range(block[0], block[-1] + 1))
+
+                        if len(new_covered) >= chain_total_len:
+                            # 체인 전체를 커버하게 되면 단일 residue만 추가
+                            i = 0
+                            while f"{chain_char}_mut{i}_start" in scaffold_idx:
+                                i += 1
+                            scaffold_idx[f"{chain_char}_mut{i}_start"] = res_id
+                            scaffold_idx[f"{chain_char}_mut{i}_end"] = res_id
+                        else:
+                            scaffold_idx[f"{key_prefix}_start"] = block[0]
+                            scaffold_idx[f"{key_prefix}_end"] = block[-1]
+                            covered.setdefault(chain_char, set()).update(range(block[0], block[-1] + 1))
+                else:
+                    # 단일 residue 마스킹
+                    i = 0
+                    while f"{chain_char}_mut{i}_start" in scaffold_idx:
+                        i += 1
+                    scaffold_idx[f"{chain_char}_mut{i}_start"] = res_id
+                    scaffold_idx[f"{chain_char}_mut{i}_end"] = res_id
+
+        return scaffold_idx
 
     def _get_covered_residues(self, scaffold_idx):
         """scaffold_idx의 start/end 구간을 {chain_str: set(residue_ids)} 로 반환"""
@@ -663,7 +710,8 @@ class AffinityDataset(Dataset):
                 processed_path=path,
                 max_mask_ratio=self.dataset_cfg.max_interface_mask_ratio,
                 min_anchor_residues=self.dataset_cfg.min_anchor_residues,
-                not_mask_ag_blocks=self.dataset_cfg.not_mask_ag_blocks
+                not_mask_ag_blocks=self.dataset_cfg.not_mask_ag_blocks,
+                mask_ag_mut_block=self.dataset_cfg.mask_ag_mut_block,
             )
 
         if mut != "No_Mutation":

@@ -378,7 +378,7 @@ def crop_general_affinity(
         for inner in outer
     )
 
-    max_len = min(res_num_interface * 4, max_len)
+    max_len = min(res_num_interface * 3, max_len)
 
     interface_mask = torch.zeros(L, dtype=torch.bool, device=device)
     for chain_str, res_blocks in mask_info.items():
