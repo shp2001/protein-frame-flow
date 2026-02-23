@@ -712,23 +712,8 @@ class AffinityDataset(Dataset):
                 min_anchor_residues=self.dataset_cfg.min_anchor_residues,
                 not_mask_ag_blocks=self.dataset_cfg.not_mask_ag_blocks,
                 mask_ag_mut_block=self.dataset_cfg.mask_ag_mut_block,
+                mutations=mut
             )
-
-        if mut != "No_Mutation":
-            covered = self._get_covered_residues(scaffold_idx)
-            for part in mut.split('_'):
-                match = re.match(r"([a-zA-Z])([a-zA-Z0-9])(\d+)(.*)", part)
-                _, chain_char, res_id_str, type_str = match.groups()
-                res_id = int(res_id_str)
-                # del은 residue가 사라지므로 제외, 이미 커버된 경우도 제외
-                covered_chain = covered.get(chain_char, set())
-                if type_str == 'del' or res_id in covered_chain:
-                    continue
-                i = 0
-                while f"{chain_char}_mut{i}_start" in scaffold_idx:
-                    i += 1
-                scaffold_idx[f"{chain_char}_mut{i}_start"] = res_id
-                scaffold_idx[f"{chain_char}_mut{i}_end"] = res_id
 
         processed_row = _process_csv_row(path, mut, scaffold_idx)
         processed_row['mode'] = csv_row['mode']
