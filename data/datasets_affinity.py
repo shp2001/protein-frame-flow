@@ -825,13 +825,11 @@ class AffinityDataset(Dataset):
                     print("mask_path", mask_path)
                 feats['crop_idx'] = crop_general_affinity(
                     trans_1=feats['trans_1'],
-                    loop_mask=feats['loop_mask'],
                     nan_mask=feats['res_mask'],
                     max_len=self.dataset_cfg.general_max_num_res,
                     mask_info=mask_info,
                     residue_index=feats['residue_index'],
                     chain_index=feats['chain_index'],
-                    max_res_num_interface=self.dataset_cfg.filter.max_mask_residues
                 )
             feats_paired[f"batch_{sample_num}"] = feats
         feats_paired['label'] = label

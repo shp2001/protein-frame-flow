@@ -361,16 +361,14 @@ def crop_antigen(
 
 def crop_general_affinity(
     trans_1, 
-    loop_mask, 
     nan_mask, 
     max_len,
     mask_info,
     residue_index,
     chain_index,
-    max_res_num_interface=220
     ):  
     
-    L = loop_mask.shape[0]
+    L = trans_1.shape[0]
     device = trans_1.device
     
     res_num_interface = sum(
@@ -379,35 +377,27 @@ def crop_general_affinity(
         for inner in outer
     )
 
-    lower_bound = max_len // 3
-    upper_bound = max_len 
+    max_len = min(res_num_interface * 2, max_len)
 
-    ratio = min(res_num_interface / max_res_num_interface, 1.0)
-    dynamic_max_len = lower_bound + (ratio * (upper_bound - lower_bound))
-    max_len = int(dynamic_max_len)
+    # mask_info로부터 interface_mask 생성 (loop_mask 대체)
+    interface_mask = torch.zeros(L, dtype=torch.bool, device=device)
+    for chain_str, res_blocks in mask_info.items():
+        c_int = du.chain_str_to_int(chain_str)
+        chain_bool = (chain_index == c_int)
+        for res_block in res_blocks:
+            for pdb_res_id in res_block:
+                match = chain_bool & (residue_index == pdb_res_id)
+                interface_mask = interface_mask | match
 
     if torch.sum(nan_mask) <= max_len:
         crop_idx = [i for i in range(L) if nan_mask[i] == 1]
 
     else:
-        priority_mask = torch.zeros(L, dtype=torch.bool, device=device)
-        
-        for chain_str, res_blocks in mask_info.items():
-            c_int = du.chain_str_to_int(chain_str)
-            chain_bool = (chain_index == c_int)
-            
-            for res_block in res_blocks:
-                for pdb_res_id in res_block:
-                    match = chain_bool & (residue_index == pdb_res_id)
-                    priority_mask = priority_mask | match
-
-        distance_map = get_distance_map(trans_1) # (L, L)
-        loop_indices = loop_mask.nonzero().flatten()
-        if len(loop_indices) == 0:
-            print("loop_mask", loop_mask)
-            print("mask_info", mask_info)
-        dist_vectors = distance_map[loop_indices, :] # (Num_Loop, L)
-        min_dist_vector, _ = torch.min(dist_vectors, dim=0) # (L,) 각 잔기별 Loop까지의 최단 거리
+        priority_mask = interface_mask  # 이미 위에서 동일하게 계산됨
+        distance_map = get_distance_map(trans_1)
+        interface_indices = interface_mask.nonzero().flatten()
+        dist_vectors = distance_map[interface_indices, :]
+        min_dist_vector, _ = torch.min(dist_vectors, dim=0)
         ranking_scores = min_dist_vector.clone()
         ranking_scores[priority_mask] = -1.0
         ranking_scores[nan_mask == 0] = float('inf')
@@ -415,8 +405,6 @@ def crop_general_affinity(
 
         _, selected_indices = torch.topk(ranking_scores, k, largest=False)
         crop_idx = sorted(selected_indices.tolist())
-        
-        # 혹시 모를 inf 값 포함(max_len > valid_len 인 경우) 방지를 위해 nan_mask 재확인
         crop_idx = [i for i in crop_idx if nan_mask[i] == 1]
 
     return crop_idx
