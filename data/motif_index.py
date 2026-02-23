@@ -360,7 +360,8 @@ def crop_antigen(
 ######################## crop_general_protein ########################
 
 def crop_general_affinity(
-    trans_1, 
+    trans_1,
+    loop_mask, 
     nan_mask, 
     max_len,
     mask_info,
@@ -377,9 +378,8 @@ def crop_general_affinity(
         for inner in outer
     )
 
-    max_len = min(res_num_interface * 2, max_len)
+    max_len = min(res_num_interface * 4, max_len)
 
-    # mask_info로부터 interface_mask 생성 (loop_mask 대체)
     interface_mask = torch.zeros(L, dtype=torch.bool, device=device)
     for chain_str, res_blocks in mask_info.items():
         c_int = du.chain_str_to_int(chain_str)
@@ -393,6 +393,7 @@ def crop_general_affinity(
         crop_idx = [i for i in range(L) if nan_mask[i] == 1]
 
     else:
+        interface_mask = interface_mask | loop_mask.bool()
         priority_mask = interface_mask  # 이미 위에서 동일하게 계산됨
         distance_map = get_distance_map(trans_1)
         interface_indices = interface_mask.nonzero().flatten()
