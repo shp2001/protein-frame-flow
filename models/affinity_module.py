@@ -2,6 +2,7 @@ from typing import Any
 import torch
 import time
 import math 
+from scipy.stats import spearmanr
 
 import os
 import random
@@ -322,16 +323,6 @@ class AffinityModule(LightningModule):
                 else:
                     pred_trans_1 = batch['trans_1']
 
-            # if hasattr(self, "confidence_model"):
-            #     plddt_pred, pae_pred = self.confidence_model(
-            #         batch['ref_feature_dict'],
-            #         s_init[0],
-            #         s[0],
-            #         z[0],
-            #         batch['edge_mask'][0],
-            #         pred_trans_1,
-            #     )  
-
             # affinity prediction 
             inter_pair_mask = batch['edge_mask'] * inter_mask
             affinity_pred_value = self.affinity_model(
@@ -365,6 +356,20 @@ class AffinityModule(LightningModule):
         affinity_reg_loss = torch.mean(nn.functional.relu(diff - self._exp_cfg.training.reg_margin))
         if len(affinity_reg_loss.shape) == 1:
             affinity_reg_loss = affinity_reg_loss[None, ...]
+
+        # ==========================================
+        # 🟢 [추가됨] Spearman 상관계수를 위한 값 누적
+        # ==========================================
+        valid_preds = preds[mask].detach().cpu().numpy()
+        valid_targets = targets[mask].detach().cpu().numpy()
+
+        if not hasattr(self, 'val_spearman_preds'):
+            self.val_spearman_preds = []
+            self.val_spearman_targets = []
+            
+        self.val_spearman_preds.extend(valid_preds)
+        self.val_spearman_targets.extend(valid_targets)
+        # ==========================================
 
         # calculate affinity probability loss 
         if paired_batch["kd1"] == float('inf') or paired_batch["kd2"] == float('inf'):
@@ -466,7 +471,35 @@ class AffinityModule(LightningModule):
                 rank_zero_only=False
             )
         self.validation_epoch_metrics.clear()
+
+        # ==========================================
+        # 🟢 [추가됨] Epoch 단위 Spearman Correlation 계산 및 로깅
+        # ==========================================
+        preds_arr = np.array(self.val_spearman_preds)
+        targets_arr = np.array(self.val_spearman_targets)
+        
+        if len(preds_arr) > 1:
+            spearman_corr, _ = spearmanr(preds_arr, targets_arr)
+            
+            if not np.isnan(spearman_corr):
+                self._log_scalar(
+                    'valid/affinity_spearman',
+                    float(spearman_corr),
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    batch_size=len(preds_arr),
+                    sync_dist=True,
+                    rank_zero_only=False
+                )
+        
+            # 다음 Epoch를 위해 초기화
+            self.val_spearman_preds.clear()
+            self.val_spearman_targets.clear()
+        # ==========================================
+
         torch.cuda.empty_cache()
+
     # def on_after_backward(self):
     #     # 모든 파라미터에 대해 gradient 값 확인
     #     for name, param in self.named_parameters():
