@@ -143,7 +143,7 @@ experiment:
     sc_viol_loss_t_pass: 0.75
 
     # affinity loss 
-    rank_loss_weight: 5.0
+    rank_loss_weight: 1.0
     rank_margin: 0.5
     reg_loss_weight: 0.0 # 0.5
     reg_margin: 1.0
@@ -167,7 +167,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_w_ag_mut_block_w_mut_mask_mask_fix
+    name: v2.4.0_wo_ag_mask_w_mut_mask_mask_fix_ppb0
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0
@@ -182,7 +182,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 8
+    accumulate_grad_batches: 16
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

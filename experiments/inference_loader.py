@@ -265,14 +265,30 @@ class BaseDataset(Dataset):
         self._rng = np.random.default_rng(seed=123)
 
     def _load_metadata(self):
-        """Training dataloader의 메타데이터 로딩 로직"""
         meta_df = pd.read_csv(self.meta_csv_path)
-        
+
+        self._filtered_meta_keys = set()  # seq_len 초과로 제거된 키 기록
+
+        if 'seq_len' in meta_df.columns:
+            before = len(meta_df)
+            removed = meta_df[meta_df['seq_len'] >= 1500]
+            meta_df = meta_df[meta_df['seq_len'] < 1500]
+            self._log.info(f'Filtered out {before - len(meta_df)} entries with seq_len >= 1500 '
+                        f'({len(meta_df)} remaining)')
+
+            # 제거된 키 저장
+            if 'data_source' in meta_df.columns:
+                for _, row in removed.iterrows():
+                    self._filtered_meta_keys.add((row['pdb_name'], row['data_source']))
+            else:
+                for _, row in removed.iterrows():
+                    self._filtered_meta_keys.add(row['pdb_name'])
+
         if 'data_source' in meta_df.columns:
             return meta_df.set_index(['pdb_name', 'data_source']).to_dict(orient='index')
         else:
             return meta_df.set_index(['pdb_name']).to_dict(orient='index')
-
+        
     @property
     def is_training(self):
         return self._is_training
@@ -395,10 +411,28 @@ class BaseDataset(Dataset):
         return covered
 
     def _create_split(self, data_csv):
-        self.csv = data_csv
+        def _is_within_length_limit(row):
+            try:
+                chains = str(row['mapped_chains']).split(';')
+                meta_key = chains[0].strip()
+                if 'Source Data Set' in row.index:
+                    meta_key = (meta_key, row['Source Data Set'])
+                return meta_key not in self._filtered_meta_keys
+            except Exception:
+                return True
+
+        before = len(data_csv)
+        mask = data_csv.apply(_is_within_length_limit, axis=1)
+        self.csv = data_csv[mask].reset_index(drop=True)
+        filtered = before - len(self.csv)
+        if filtered > 0:
+            self._log.info(
+                f'Filtered out {filtered} affinity CSV entries whose seq_len >= 1500 '
+                f'({len(self.csv)} remaining)'
+            )
         self._log.info(f'Inference: {len(self.csv)} examples')
         self.csv['index'] = list(range(len(self.csv)))
-
+        
     def process_csv_row(self, csv_row, mut):
         """Training dataloader의 process_csv_row 로직 사용"""
         # metadata에서 정보 가져오기

@@ -41,11 +41,11 @@ scope_dataset:
 
 pdb_dataset:
   seed: ${shared.seed}
-  train_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_train_ppb.csv
-  valid_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_valid_ppb.csv
+  train_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_train_ppb_0.csv
+  valid_csv_path: /home/psh/data/affinity/ppb_affinity/affinity_valid_ppb_0.csv
 
-  train_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_train_ppb.csv
-  valid_meta_path: /home/psh/data/affinity/ppb_affinity/meta/metadata_valid_ppb.csv
+  train_meta_path: /home/psh/data/affinity/ppb_affinity/metadata_train_ppb_0.csv
+  valid_meta_path: /home/psh/data/affinity/ppb_affinity/metadata_valid_ppb_0.csv
 
   pairs_per_cluster: 3
 
@@ -69,7 +69,7 @@ pdb_dataset:
   
   # build scaffold_idx
   not_mask_ag_blocks: True
-  mask_ag_mut_block: True
+  mask_ag_mut_block: False
   max_interface_mask_ratio: 0.8
   min_anchor_residues: 4
 
