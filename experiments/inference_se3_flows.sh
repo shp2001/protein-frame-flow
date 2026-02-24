@@ -9,4 +9,4 @@
 
 
 echo "Running train_abb3.py"
-python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > %x_%j.log
+python -u -W ignore /home/psh/protein-frame-flow/experiments/inference_se3_flows.py > output.log

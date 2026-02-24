@@ -14,24 +14,6 @@ from experiments.inference_loader import BaseDataset, predict_dataloader
 
 from models.flow_module import FlowModule
 
-import functools
-
-_original_load = torch.load
-torch.load = functools.partial(_original_load, weights_only=False)
-
-np.Inf = np.inf
-np.Infinity = np.inf
-np.PINF = np.inf
-np.NINF = -np.inf
-np.NZERO = -0.0
-np.PZERO = 0.0
-np.bool = bool
-np.int = int
-np.float = float
-np.complex = complex
-np.object = object
-np.str = str
-
 torch.set_float32_matmul_precision('high')
 log = eu.get_pylogger(__name__)
 
@@ -102,8 +84,7 @@ class EvalRunner:
         return output_dir
 
     def run_sampling(self, save_file=True):
-        devices = GPUtil.getAvailable(
-            order='memory', limit = 8)[:self._infer_cfg.num_gpus]
+        devices = 1
         log.info(f"Using devices: {devices}")
         log.info(f'Evaluating {self._infer_cfg.task}')
         eval_dataset = BaseDataset(inf_cfg=self._cfg, is_training=False, task='inpainting')
