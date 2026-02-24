@@ -167,7 +167,7 @@ experiment:
       reduction: mean
 
   wandb:
-    name: v2.4.0_wo_ag_mask_w_mut_mask_mask_fix_ppb0
+    name: v2.4.0_w_ag_mask_label_coords_mask_fix_ppb0
     project: v2.4.0_affinity
   optimizer:
     warmup_steps: 0
@@ -182,7 +182,7 @@ experiment:
     log_every_n_steps: 1
     deterministic: False
     check_val_every_n_epoch: 1
-    accumulate_grad_batches: 16
+    accumulate_grad_batches: 8
   checkpointer:
     dirpath: /home/psh/protein-frame-flow/ckpt/${experiment.wandb.project}/${experiment.wandb.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
     save_last: True

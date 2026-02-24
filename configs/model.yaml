@@ -143,5 +143,5 @@ model:
     distance_bin_end: 52.0
     distance_bin_step: 1.25
     stop_gradient: True
-    use_pred_coords: True
+    use_pred_coords: False
     pool_mutation: False
