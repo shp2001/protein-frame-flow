@@ -1,4 +1,4 @@
-name: cdrflow_env
+name: fm
 channels:
   - pytorch
   - nvidia
