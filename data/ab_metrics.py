@@ -2,8 +2,8 @@ import warnings
 from abnumber import Chain
 from Bio.PDB import PDBParser, PDBIO
 from Bio.SeqUtils import seq1
-import pyrosetta
-import rosetta
+# import pyrosetta
+# import rosetta
 
 import os
 import json 

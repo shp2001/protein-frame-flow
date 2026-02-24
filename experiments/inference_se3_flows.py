@@ -14,6 +14,23 @@ from experiments.inference_loader import BaseDataset, predict_dataloader
 
 from models.flow_module import FlowModule
 
+import functools
+
+_original_load = torch.load
+torch.load = functools.partial(_original_load, weights_only=False)
+
+np.Inf = np.inf
+np.Infinity = np.inf
+np.PINF = np.inf
+np.NINF = -np.inf
+np.NZERO = -0.0
+np.PZERO = 0.0
+np.bool = bool
+np.int = int
+np.float = float
+np.complex = complex
+np.object = object
+np.str = str
 
 torch.set_float32_matmul_precision('high')
 log = eu.get_pylogger(__name__)

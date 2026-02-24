@@ -277,7 +277,6 @@ def collate_fn(batch):
                 include_ag=include_ag
                 )
         if mode == 'general' or mode == 'polymer' or mode == 'monomer':
-            print(feat['raw_path'])
             cropped_feat['crop_idx'] = crop_general_protein(
                 feat['trans_1'],
                 loop_mask=feat['loop_mask'],

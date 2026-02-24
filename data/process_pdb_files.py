@@ -242,7 +242,7 @@ def main(args):
     if not os.path.exists(write_dir):
         os.makedirs(write_dir)
     if args.debug:
-        metadata_file_name = 'metadata_debug.csv'
+        metadata_file_name = 'metadata.csv'
     else:
         metadata_file_name = 'metadata.csv'
     metadata_path = os.path.join(write_dir, metadata_file_name)

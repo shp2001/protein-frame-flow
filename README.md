@@ -1,199 +1,37 @@
-# FrameFlow
+# CDRFlow
 
-FrameFlow is a SE(3) flow matching method for protein backbone generation and motif-scaffolding.
-The method is described in two papers:
+CDRFlow는 항원-항체 복합체의 서열과 epitope 정보를 활용해 정밀하게 CDR conformation 및 binding orientation을 예측할 수 있도록 한다.
 
-* [Improved motif-scaffolding with SE(3) flow matching](https://arxiv.org/abs/2401.04082)
-* [Fast protein backbone generation with SE (3) flow matching](https://arxiv.org/abs/2310.05297)
+## Input: 
+- 항원-항체 복합체의 서열
+- 항원-항체 복합체의 backbone 구조
+  - 정답 구조가 아닌 예측 구조, 혹은 MT를 예측할 때는 WT의 구조 활용
+  - 모델이 대략적인 binding orientation과 epitope 정보를 알 수 있도록 한다. 
 
-Unconditional protein backbone generation:
+## Output:
+- 항원-항체 복합체의 all-atom 구조 
 
-![frameflow-uncond](https://github.com/microsoft/flow-matching/blob/main/media/unconditional.gif)
+## Inference 방법
+### Data Processing 
+1. /home/psh/data/{target_name}/pdb을 만들고 분석하고자 하는 protein의 PDB 파일을 저장. 
+    - 저장하는 PDB file은 chothia numbering이 되지 않은, 기본 PDB 파일이어야 한다.
+    - Heavy chain id는 A, Light chain id는 B로 맞춰야 한다.
+    - 아직 코드 상의 이유로 하나의 PDB 파일만 처리한다. 
 
-Motif condifioned scaffold backbone generation:
+2. /home/psh/protein-frame-flow/notebook/process_data.ipynb 주피터 노트북에서 INPUT_PDB_DIR와 CDR_SEQS를 지정하고 '모두 실행' 클릭
+    - INPUT_PDB_DIR: 사용자가 PDB 파일을 저장한 디렉토리 
+    - CDR_SEQS: 사용자가 지정한 CDR 영역의 서열
 
-![frameflow-cond](https://github.com/microsoft/flow-matching/blob/main/media/scaffolding.gif)
+### Utilize DMS Data (dms point mutation을 예측하고 싶지 않다면 이 단계는 스킵)
+1. /home/psh/data/{target_name}/dms에 Proteina에서 제공한 dms excel 파일 저장
+2. /home/psh/protein-frame-flow/notebook/utilize_dms.ipynb 주피터 노트북에서 INPUT_META_DIR, XLSX_FILES, REL_AFFINITY_THRESHOLD을 '모두 실행' 클릭 
+    - INPUT_META_DIR: /home/psh/data/{target_name}/meta
+    - XLSX_FILES: dms excel 파일 경로들을 리스트 형태로 지정
+    - REL_AFFINITY_THRESHOLD: DMS 데이터 상에서 relativate affinity가 REL_AFFINITY_THRESHOLD 이상인 point mutation만 선별
 
-If you use this work (or code), then please cite the first paper (citing both would make me happier :).
-
-```bash
-@article{
-yim2024improved,
-title={Improved motif-scaffolding with {SE}(3) flow matching},
-author={Jason Yim and Andrew Campbell and Emile Mathieu and Andrew Y. K. Foong and Michael Gastegger and Jose Jimenez-Luna and Sarah Lewis and Victor Garcia Satorras and Bastiaan S. Veeling and Frank Noe and Regina Barzilay and Tommi Jaakkola},
-journal={Transactions on Machine Learning Research},
-issn={2835-8856},
-year={2024},
-url={https://openreview.net/forum?id=fa1ne8xDGn},
-note={}
-}
-
-@article{yim2023fast,
-  title={Fast protein backbone generation with SE (3) flow matching},
-  author={Yim, Jason and Campbell, Andrew and Foong, Andrew YK and Gastegger, Michael and Jim{\'e}nez-Luna, Jos{\'e} and Lewis, Sarah and Satorras, Victor Garcia and Veeling, Bastiaan S and Barzilay, Regina and Jaakkola, Tommi and others},
-  journal={arXiv preprint arXiv:2310.05297},
-  year={2023}
-}
-```
-
-> [!NOTE]  
-> See the [legacy branch](https://github.com/microsoft/protein-frame-flow/tree/legacy) for the old version of this repo from the workshop paper [Fast protein backbone generation with SE (3) flow matching](https://arxiv.org/abs/2310.05297).
-
-## Future updates
-
-Adding ProteinMPNN or folding with AlphaFold2 or ESMFold can't be done currently with Microsoft's open source policy for this project.
-I am in discussion for a more standardized motif-scaffolding codebase specifically for benchmarking that myself (and others) hope will make this task easier to evaluate.
-Currently it is very arduous with requiring over 2600 ProteinMPNN and AlphaFold2 evaluations for each benchmark run.
-
-## Installation
-
-Set up your conda environment.
-
-```bash
-# Conda environment with dependencies.
-conda env create -f fm.yml
-
-# Activate environment
-conda activate fm
-
-# Manually need to install torch-scatter.
-pip install torch-scatter -f https://data.pyg.org/whl/torch-2.0.0+cu117.html
-
-# Install local package.
-# Current directory should be protein-frame-flow/
-pip install -e .
-```
-
-Datasets and weights are hosted on Zenodo [here](https://zenodo.org/records/12776473?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6Ijg2MDUzYjUzLTkzMmYtNDRhYi1iZjdlLTZlMzk0MmNjOGM3NSIsImRhdGEiOnt9LCJyYW5kb20iOiIwNjExMjEwNGJkMDJjYzRjNGRmNzNmZWJjMWU4OGU2ZSJ9.Jo_xXr6-PpOzJHUEAuSmQJK72TMTcI49SStlAVdOHoI2wi1i59FeXnogHvcNioBjGiJtJN7UAxc6Ihuf1d7_eA).
-* `preprocessed_pdb.tar.gz` (2.7 GB)
-* `weights.tar.gz` (0.6 GB)
-* `preprocessed_scope.tar.gz` (0.3 GB)
-
-Next, untar the datasets
-
-```bash
-tar -xzvf preprocessed_pdb.tar.gz
-tar -xzvf weights.tar.gz
-tar -xzvf preprocessed_scope.tar.gz
-```
-
-Other datasets are also possible to train on by processing with the `data/process_pdb_files.py` script.
-Your directory should now look like this
-
-```bash
-├── analysis
-├── build
-├── configs
-├── data
-├── experiments
-├── media
-├── models
-├── openfold
-├── processed_pdb
-├── processed_scope
-└── weights
-```
-
-## Wandb
-
-Our training relies on logging with wandb. Log in to Wandb and make an account.
-Authorize Wandb [here](https://wandb.ai/authorize).
-
-## Training
-
-All training flags are in `configs/base.yaml`. Below is explanation-by-example of the main flags to change. Note you can combine multiple flags in the command.
-
-```bash
-# Train on PDB or SCOPE
-python -W ignore experiments/train_se3_flows.py data.dataset=pdb
-python -W ignore experiments/train_se3_flows.py data.dataset=scope
-
-# Train on hallucination or inpainting (motif-scaffolding)
-python -W ignore experiments/train_se3_flows.py data.task=hallucination
-python -W ignore experiments/train_se3_flows.py data.inpainting=inpainting
-
-# Train with larger batches. Depends on GPU memory.
-python -W ignore experiments/train_se3_flows.py data.sampler.max_num_res_squared=600_000
-
-# Train with more GPUs
-python -W ignore experiments/train_se3_flows.py experiment.num_devices=4
-```
-
-## Inference
-
-### Unconditional sampling
-
-Our inference script allows for DDP. By default we sample 10 sequences per
-length [70, 100, 200, 300]. Samples are stored as PDB files as well as the
-trajectories. We do not include evaluation code using ProteinMPNN and ESMFold
-but this should be easy to set-up if one looks at the [FrameDiff codebase](https://github.com/jasonkyuyim/se3_diffusion).
-
-```bash
-# Single GPU
-python -W ignore experiments/inference_se3_flows.py -cn inference_unconditional
-
-# Multi GPU
-python -W ignore experiments/inference_se3_flows.py -cn inference_unconditional inference.num_gpus=2
-```
-
-### Motif-scaffolding
-
-By default, we use and recommend the amortization model.
-Like unconditional sampling, multi-GPU DDP is supported.
-We support the RFdiffusion motif-scaffolding benchmark as described in [Supp. Methods Table 9 of Watson et al](https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-023-06415-8/MediaObjects/41586_2023_6415_MOESM1_ESM.pdf).
-We do not include motif 6VW1 since it involves multiple chains that FrameFlow cannot handle.
-Benchmarking works by reading the contig settings in `motif_scaffolding/benchmark.csv`.
-Consider target `3IXT` in the CSV.
-
-| target | contig                        | length | motif_path                              |
-|--------|-------------------------------|--------|-----------------------------------------|
-| 3IXT   | 10-40,P254-277,10-40          | 50-75  | ./motif_scaffolding/targets/3IXT.pdb    |
-
-Explanation of each column:
-
-* `target`: unique identifier for the motif.
-* `contig`: same contig syntax as RFdiffusion to specify motifs from a PDB file and scaffolds to sample.
-See the [motif-scaffolding section in the RFdiffusion README](https://github.com/RosettaCommons/RFdiffusion?tab=readme-ov-file#motif-scaffolding) for more information.
-* `length`: randomly sampled total scaffold length.
-* `motif_path`: path to PDB file with motif.
-
-> [!NOTE]  
-> To specify your own motif, follow the syntax in `benchmark.csv` and point `samples.csv_path` to the your custom CSV with motif-scaffolding tasks.
-
-To run motif-scaffolding, we specify the settings in `configs/inference_scaffolding.yaml`.
-See `inference.samples` for different sampling settings.
-
-```bash
-# Single GPU
-python -W ignore experiments/inference_se3_flows.py -cn inference_scaffolding
-
-# Multi GPU
-python -W ignore experiments/inference_se3_flows.py -cn inference_scaffolding inference.num_gpus=2
-
-# FrameFlow-guidance
-python -W ignore experiments/inference_se3_flows.py -cn inference_scaffolding_guidance
-```
-
-# Responsible AI FAQ
-- What is FrameFlow?
-  - FrameFlow is a deep neural network that models 3D protein structures.
-- What can FrameFlow do?
-  - By sampling from FrameFlow, you can obtain a description of the positions and orientations of the backbone atoms in a protein.
-- What is/are FrameFlow’s intended use(s)?
-  - FrameFlow is intended for research purposes only, for the machine learning for structural biology community.
-- How was FrameFlow evaluated? What metrics are used to measure performance?
-  - FrameFlow was evaluated on how novel, designable and diverse the protein structures sampled from FrameFlow were. 
-- What are the limitations of FrameFlow? How can users minimize the impact of FrameFlow’s limitations when using the system?
-  - FrameFlow has not been tested by real-world experiments to see if the proteins it samples are actually designable. FrameFlow should be used for research purposes only.
-- What operational factors and settings allow for effective and responsible use of FrameFlow?
-  - FrameFlow should be used for research purposes only.
-
-# Contributing
-This project welcomes contributions and suggestions. Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the Microsoft Open Source Code of Conduct. For more information see the Code of Conduct FAQ or contact opencode@microsoft.com with any additional questions or comments.
-
-# Trademarks
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow Microsoft's Trademark & Brand Guidelines. Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
+### Prediction 
+1. /home/psh/protein-frame-flow/configs/_inference.yaml의 csv_path키 값을 /home/psh/data/{target_name}/meta/metadata_dms.csv으로 변경
+2. terminal에서 다음을 실행
+    conda activate fm
+    cd /home/psh/protein-frame-flow
+    sbatch 
