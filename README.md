@@ -33,3 +33,14 @@ CDRFlow는 항원-항체 복합체의 서열과 epitope 정보를 활용해 정�
 1. /home/{user_name}/protein-frame-flow/configs/_inference.yaml의 csv_path 키 값을 /home/{user_name}/data/{target_name}/meta/metadata_dms.csv으로 변경
 2. 터미널에 다음 명령어 입력 
     sbatch /home/{user_name}/protein-frame-flow/experiments/inference_se3_flows.sh
+
+### Analyzation
+1. /home/{user_name}/protein-frame-flow/notebook/analyze.ipynb 열기
+2. CDR 및 framework RMSD 측정. (Measure RMSD 구역에서 실행)
+    - label_file_path: /home/{user_name}/data/{target_name}/pdb/{target}.pdb
+    - cdrflow_inf_dir: /home/psh/protein-frame-flow/inference_outputs 에 생성된 inference output 디렉토리 
+    - metadata_path: /home/{user_name}/data/{target_name}/meta/metadata_dms.csv
+3. RMSD visualization (visualization 구역에서 실행)
+4. rmsd threshold 이상인 샘플들 중 pLDDT가 높은 샘플 선택 (Select samples by pLDDT 구역에서 실행)
+    - selected_cdrs: pLDDT 조건을 체크하고 싶은 cdr 혹은 framework(h1, h2, h3, l1, l2, l3, fr)
+    - rmsd_threshold: threshold 이상의 rmsd를 보인 샘플들을 선택
