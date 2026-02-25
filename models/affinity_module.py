@@ -637,10 +637,10 @@ class AffinityModule(LightningModule):
         inter_mask = 1 - (ligand_mask_i == ligand_mask_j).float() # 0: diag / 1: off-diag
 
         sample_root_dir = os.path.join(self.inference_dir, pdb_mt_id)
-
         if not os.path.exists(sample_root_dir):
             os.makedirs(sample_root_dir, exist_ok=True)
-
+        else:
+            return None
         s_init, z_init, trans_perturbed = self.model.embed_input(batch)
         _, s, z, pair_outputs = self.model.do_pairformer(
             s_init,
