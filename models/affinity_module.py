@@ -210,8 +210,9 @@ class AffinityModule(LightningModule):
         
         # calculate affinity rank loss 
         target = 1.0 - 2.0 * label
-        margin_loss_fn = nn.MarginRankingLoss(margin=self._exp_cfg.training.rank_margin, reduce=False)
-        affinity_rank_loss = margin_loss_fn(affinity_pred_values[0], affinity_pred_values[1], target)      # batch_0 > batch_1 * 10 -> label: 0
+        log_kd_diff = torch.abs(torch.log10(kd1) - torch.log10(kd2))
+        margin = self._exp_cfg.training.rank_margin_Mmax * torch.tanh(self._exp_cfg.training.rank_margin_alpha * log_kd_diff)
+        affinity_rank_loss = torch.relu(-target * (affinity_pred_values[0] - affinity_pred_values[1]) + margin)
         if len(affinity_rank_loss.shape) == 1:
             affinity_rank_loss = affinity_rank_loss[None, ...]
         
@@ -226,8 +227,14 @@ class AffinityModule(LightningModule):
 
 
         total_loss = affinity_rank_loss * self._exp_cfg.training.rank_loss_weight + affinity_reg_loss * self._exp_cfg.training.reg_loss_weight
+        print("--------------------------------")
         print(f'{os.path.basename(paired_batch["batch_0"]["raw_path"])} & {os.path.basename(paired_batch["batch_1"]["raw_path"])}')
-
+        print("affinity_pred_values[0]", affinity_pred_values[0])
+        print("affinity_pred_values[1]", affinity_pred_values[1])
+        print("log_kd1", torch.log10(paired_batch['kd1']))
+        print("log_kd2", torch.log10(paired_batch['kd2']))
+        print("affinity_rank_loss", affinity_rank_loss)
+        print("--------------------------------")
         return {
             "total_loss": total_loss,
             "affinity_rank_loss": affinity_rank_loss,
@@ -343,8 +350,9 @@ class AffinityModule(LightningModule):
 
         # calculate affinity rank loss 
         target = 1.0 - 2.0 * label
-        margin_loss_fn = nn.MarginRankingLoss(margin=self._exp_cfg.training.rank_margin, reduce=False)
-        affinity_rank_loss = margin_loss_fn(affinity_pred_values[0], affinity_pred_values[1], target)      # batch_0 > batch_1 * 10 -> label: 0
+        log_kd_diff = torch.abs(torch.log10(kd1) - torch.log10(kd2))
+        margin = self._exp_cfg.training.rank_margin_Mmax * torch.tanh(self._exp_cfg.training.rank_margin_alpha * log_kd_diff)
+        affinity_rank_loss = torch.relu(-target * (affinity_pred_values[0] - affinity_pred_values[1]) + margin)
         if len(affinity_rank_loss.shape) == 1:
             affinity_rank_loss = affinity_rank_loss[None, ...]
         
