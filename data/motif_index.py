@@ -252,7 +252,7 @@ def provide_anchor(diffuse_mask, res_mask, chain_index, mode):
                     if res_mask[i] == 1:
                         break
 
-    elif mode == 'polymer':
+    else:
         unique_chains = torch.unique(chain_index)
 
         for chain_id in unique_chains:
@@ -284,9 +284,6 @@ def provide_anchor(diffuse_mask, res_mask, chain_index, mode):
                     diffuse_mask[chain_indices[i]] = 0
                     if chain_res_mask[i] == 1:
                         break
-    else:
-        return diffuse_mask
-
     return diffuse_mask
 
 # get alpha carbon distance map with translation vector 

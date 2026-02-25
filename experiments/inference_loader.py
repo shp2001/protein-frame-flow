@@ -321,24 +321,7 @@ class BaseDataset(Dataset):
             max_maskable = max(min(int(chain_total_len * max_mask_ratio),
                                 chain_total_len - min_anchor_residues), 0)
 
-            if n_interface <= max_maskable:
-                selected = list(enumerate(blocks))
-            else:
-                selected, accumulated = [], 0
-                for orig_idx, block in sorted(enumerate(blocks), key=lambda x: len(x[1])):
-                    if accumulated + len(block) > max_maskable:
-                        continue
-                    selected.append((orig_idx, block))
-                    accumulated += len(block)
-
-                if not selected and blocks:
-                    smallest_idx, smallest_block = min(enumerate(blocks), key=lambda x: len(x[1]))
-                    partial = smallest_block[:max_maskable]
-                    if partial:
-                        scaffold_idx[f"{chain_id}_{smallest_idx}_start"] = partial[0]
-                        scaffold_idx[f"{chain_id}_{smallest_idx}_end"] = partial[-1]
-                    continue
-
+            selected = list(enumerate(blocks))
             for orig_idx, block in selected:
                 scaffold_idx[f"{chain_id}_{orig_idx}_start"] = block[0]
                 scaffold_idx[f"{chain_id}_{orig_idx}_end"] = block[-1]
